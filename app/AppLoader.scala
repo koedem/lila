@@ -94,6 +94,7 @@ final class LilaComponents(ctx: ApplicationLoader.Context) extends BuiltInCompon
   lazy val analyse: Analyse               = wire[Analyse]
   lazy val api: Api                       = wire[Api]
   lazy val appeal: Appeal                 = wire[Appeal]
+  lazy val ask: Ask                       = wire[Ask]
   lazy val auth: Auth                     = wire[Auth]
   lazy val blog: Blog                     = wire[Blog]
   lazy val playApi: PlayApi               = wire[PlayApi]

@@ -7,6 +7,7 @@ import lila.common.config.BaseUrl
 import lila.common.{ EmailAddress, Markdown }
 import lila.db.dsl._
 import lila.msg.MsgApi
+import lila.ask.{ Ask, AskApi }
 import lila.security.Permission
 import lila.user.{ Authenticator, User, UserRepo }
 import lila.user.Holder
@@ -17,6 +18,7 @@ final class ClasApi(
     studentCache: ClasStudentCache,
     nameGenerator: NameGenerator,
     userRepo: UserRepo,
+    askApi: AskApi,
     msgApi: MsgApi,
     authenticator: Authenticator,
     baseUrl: BaseUrl
@@ -59,8 +61,17 @@ final class ClasApi(
       }
     }
 
-    def updateWall(clas: Clas, text: Markdown): Funit =
-      coll.updateField($id(clas.id), "wall", text).void
+    def updateWall(clas: Clas, text: Markdown, t: Holder): Funit = {
+      askApi.prepare(text.value, t.user, clas.cookie, isMarkdown = true) flatMap { updated =>
+        coll.ext
+          .findAndUpdate[Clas](
+            selector = $id(clas.id),
+            update = $set("wall" -> updated.text, "cookie" -> updated.cookie),
+            fetchNewObject = false
+          )
+          .void
+      }
+    }
 
     def getAndView(id: Clas.Id, teacher: User): Fu[Option[Clas]] =
       coll.ext

@@ -11,18 +11,17 @@ case class Clas(
     name: String,
     desc: String,
     wall: Markdown = Markdown(""),
+    cookie: Option[lila.ask.Ask.Cookie] = None,
     teachers: NonEmptyList[User.ID], // first is owner
     created: Clas.Recorded,
     viewedAt: DateTime,
     archived: Option[Clas.Recorded]
 ) {
 
-  def id = _id
-
+  def id                                    = _id
   def withStudents(students: List[Student]) = Clas.WithStudents(this, students)
-
-  def isArchived = archived.isDefined
-  def isActive   = !isArchived
+  def isArchived                            = archived.isDefined
+  def isActive                              = !isArchived
 }
 
 object Clas {

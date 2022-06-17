@@ -5,7 +5,6 @@ import play.api.data._
 import play.api.data.Forms._
 import play.api.mvc._
 import views._
-
 import lila.api.Context
 import lila.app._
 import lila.user.Holder
@@ -86,10 +85,13 @@ final class Clas(env: Env, authC: Auth) extends LilaController(env) {
             }
         },
         forStudent = (clas, students) =>
-          env.clas.api.clas.teachers(clas) map { teachers =>
+          env.clas.api.clas.teachers(clas) flatMap { teachers =>
             preloadStudentUsers(students)
-            val wall = scalatags.Text.all.raw(env.clas.markup(clas))
-            Ok(views.html.clas.studentDashboard(clas, wall, teachers, students))
+            env.ask.api
+              .render(clas.wall.value, None, Option(env.clas.markup.formatter(s"clas:${clas.id}"))) map {
+              elems =>
+                Ok(views.html.clas.studentDashboard(clas, elems, teachers, students))
+            }
           },
         orDefault = _ =>
           if (isGranted(_.UserModView))
@@ -128,9 +130,14 @@ final class Clas(env: Env, authC: Auth) extends LilaController(env) {
     Secure(_.Teacher) { implicit ctx => me =>
       WithClassAny(id, me.user)(
         forTeacher = WithClass(me, id) { clas =>
-          env.clas.api.student.allWithUsers(clas) map { students =>
-            val wall = scalatags.Text.all.raw(env.clas.markup(clas))
-            views.html.clas.wall.show(clas, wall, students)
+          env.clas.api.student.allWithUsers(clas) flatMap { students =>
+            env.ask.api.render(
+              clas.wall.value,
+              Option(routes.Clas.wall(clas.id.value).url),
+              Option(env.clas.markup.formatter(s"clas:${clas.id}"))
+            ) map { elems =>
+              views.html.clas.wall.show(clas, elems, students)
+            }
           }
         },
         forStudent = (clas, _) => Redirect(routes.Clas.show(clas.id.value)).fuccess
@@ -157,7 +164,7 @@ final class Clas(env: Env, authC: Auth) extends LilaController(env) {
                 BadRequest(html.clas.wall.edit(clas, students, err))
               },
             text =>
-              env.clas.api.clas.updateWall(clas, text) inject
+              env.clas.api.clas.updateWall(clas, text, me) inject
                 Redirect(routes.Clas.wall(clas.id.value)).flashSuccess
           )
       }

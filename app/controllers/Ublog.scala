@@ -45,17 +45,22 @@ final class Ublog(env: Env) extends LilaController(env) {
         env.ublog.api.getUserBlog(user) flatMap { blog =>
           env.ublog.api.findByIdAndBlog(UblogPost.Id(id), blog.id) flatMap {
             _.filter(canViewPost(user, blog)).fold(notFound) { post =>
-              if (slug != post.slug) Redirect(urlOfPost(post)).fuccess
-              else {
-                env.ublog.api.otherPosts(UblogBlog.Id.User(user.id), post) zip
-                  ctx.me.??(env.ublog.rank.liked(post)) zip
-                  ctx.userId.??(env.relation.api.fetchFollows(_, user.id)) map {
-                    case ((others, liked), followed) =>
-                      val viewedPost = env.ublog.viewCounter(post, ctx.ip)
-                      val markup     = scalatags.Text.all.raw(env.ublog.markup(post))
-                      Ok(html.ublog.post(user, blog, viewedPost, markup, others, liked, followed))
-                  }
-              }
+              val urlAction = urlOfPost(post)
+              if (slug != post.slug) Redirect(urlAction).fuccess
+              else
+                env.ask.api.render(
+                  post.markdown.value,
+                  Some(urlAction.url),
+                  Some(env.ublog.markup.formatter(s"ublog:{$post.id}"))
+                ) flatMap { renderElements =>
+                  env.ublog.api.otherPosts(UblogBlog.Id.User(user.id), post) zip
+                    ctx.me.??(env.ublog.rank.liked(post)) zip
+                    ctx.userId.??(env.relation.api.fetchFollows(_, user.id)) map {
+                      case ((others, liked), followed) =>
+                        val viewedPost = env.ublog.viewCounter(post, ctx.ip)
+                        Ok(html.ublog.post(user, blog, viewedPost, renderElements, others, liked, followed))
+                    }
+                }
             }
           }
         }

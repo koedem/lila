@@ -6,14 +6,12 @@ import play.api.Configuration
 import play.api.libs.ws.StandaloneWSClient
 
 import lila.common.config._
-import lila.forum.actorApi.RemovePost
 import lila.hub.actorApi.team.CreateTeam
 import lila.mod.ModlogApi
-import lila.mon
 import lila.notify.NotifyApi
 import lila.pref.PrefApi
 import lila.relation.RelationApi
-import lila.user.User
+import lila.ask.AskApi
 
 @Module
 final private class ForumConfig(
@@ -33,6 +31,7 @@ final class Env(
     shutup: lila.hub.actors.Shutup,
     forumSearch: lila.hub.actors.ForumSearch,
     notifyApi: NotifyApi,
+    askApi: AskApi,
     relationApi: RelationApi,
     prefApi: PrefApi,
     userRepo: lila.user.UserRepo,

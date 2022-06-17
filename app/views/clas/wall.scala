@@ -6,11 +6,14 @@ import controllers.routes
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
+import lila.ask.Ask.imports._
 import lila.clas.{ Clas, Student }
 
 object wall {
 
-  def show(c: Clas, html: Frag, students: List[Student.WithUser])(implicit ctx: Context) =
+  def show(c: Clas, elems: Seq[lila.ask.Ask.RenderElement], students: List[Student.WithUser])(implicit
+      ctx: Context
+  ) =
     teacherDashboard.layout(c, students.filter(_.student.isActive), "wall")(
       div(cls := "clas-wall__actions")(
         a(dataIcon := "", href := routes.Clas.wallEdit(c.id.value), cls := "button button-clas text")(
@@ -23,7 +26,11 @@ object wall {
       if (c.wall.value.isEmpty)
         div(cls := "box__pad clas-wall clas-wall--empty")(trans.clas.nothingHere())
       else
-        div(cls := "box__pad clas-wall")(html)
+        elems map {
+          case isAsk(ask)  => views.html.ask.render(ask)
+          case isText(txt) => scalatags.Text.all.raw(txt)
+        },
+      div(cls := "box__pad clas-wall")(html)
     )
 
   def edit(c: Clas, students: List[Student.WithUser], form: Form[_])(implicit ctx: Context) =

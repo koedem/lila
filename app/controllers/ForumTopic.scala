@@ -1,10 +1,10 @@
 package controllers
 
+import scala.concurrent.Future
+import scala.concurrent.duration._
 import cats.implicits._
 import play.api.libs.json._
-import scala.concurrent.duration._
 import views._
-
 import lila.app._
 import lila.common.IpAddress
 import lila.user.Holder
@@ -64,6 +64,11 @@ final class ForumTopic(env: Env) extends LilaController(env) with ForumControlle
     Open { implicit ctx =>
       NotForKids {
         OptionFuResult(topicApi.show(categSlug, slug, page, ctx.me)) { case (categ, topic, posts) =>
+          val futureRenders = Future.sequence(
+            posts.currentPageResults map (p =>
+              env.ask.api.render(p.text, Some(s"${routes.ForumPost.redirect(p._id)}"))
+            )
+          )
           for {
             unsub       <- ctx.userId ?? env.timeline.status(s"forum:${topic.id}")
             canRead     <- access.isGrantedRead(categ.slug)
@@ -72,13 +77,17 @@ final class ForumTopic(env: Env) extends LilaController(env) with ForumControlle
             inOwnTeam <- ~(categ.team, ctx.me).mapN { case (teamId, me) =>
               env.team.cached.isLeader(teamId, me.id)
             }
+            askRenders <- futureRenders
             form <- ctx.me.ifTrue(
               canWrite && topic.open && !topic.isOld
             ) ?? { me => forms.postWithCaptcha(me, inOwnTeam) map some }
             _ <- env.user.lightUserApi preloadMany posts.currentPageResults.flatMap(_.userId)
             res <-
               if (canRead)
-                Ok(html.forum.topic.show(categ, topic, posts, form, unsub, canModCateg = canModCateg)).fuccess
+                Ok(
+                  html.forum.topic
+                    .show(categ, topic, posts, askRenders, form, unsub, canModCateg = canModCateg)
+                ).fuccess
               else notFound
           } yield res
         }

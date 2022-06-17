@@ -30,7 +30,7 @@ libraryDependencies ++= akka.bundle ++ playWs.bundle ++ Seq(
 lazy val modules = Seq(
   common, db, rating, user, security, hub, socket,
   msg, notifyModule, i18n, game, bookmark, search,
-  gameSearch, timeline, forum, forumSearch, team, teamSearch,
+  gameSearch, timeline, ask, forum, forumSearch, team, teamSearch,
   analyse, mod, round, pool, lobby, setup,
   importer, tournament, simul, relation, report, pref,
   evaluation, chat, puzzle, tv, coordinate, blog,
@@ -113,7 +113,7 @@ lazy val blog = module("blog",
 )
 
 lazy val ublog = module("ublog",
-  Seq(common, memo, timeline, irc),
+  Seq(common, memo, timeline, irc, ask),
   Seq(bloomFilter) ++ specs2Bundle ++ reactivemongo.bundle
 )
 
@@ -365,8 +365,13 @@ lazy val msg = module("msg",
   reactivemongo.bundle
 )
 
-lazy val forum = module("forum",
+lazy val ask = module("ask",
   Seq(common, db, user, security, hub, mod, notifyModule),
+  reactivemongo.bundle
+)
+
+lazy val forum = module("forum",
+  Seq(common, db, user, security, hub, mod, notifyModule, ask),
   reactivemongo.bundle
 )
 
@@ -386,7 +391,7 @@ lazy val teamSearch = module("teamSearch",
 )
 
 lazy val clas = module("clas",
-  Seq(common, memo, db, user, security, msg, history, puzzle),
+  Seq(common, memo, db, user, security, msg, history, ask, puzzle),
   reactivemongo.bundle ++ Seq(bloomFilter)
 )
 

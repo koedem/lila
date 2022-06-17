@@ -1,13 +1,14 @@
 package views
 package html.forum
 
+import controllers.routes
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.String.html.richText
 import lila.forum.Post
-
-import controllers.routes
+import lila.ask.Ask
+import lila.ask.Ask.imports._
 
 object post {
 
@@ -35,6 +36,7 @@ object post {
       categ: lila.forum.Categ,
       topic: lila.forum.Topic,
       post: lila.forum.Post,
+      render: Seq[Ask.RenderElement],
       url: String,
       canReply: Boolean,
       canModCateg: Boolean,
@@ -102,9 +104,13 @@ object post {
         ),
         a(cls := "anchor", href := url)(s"#${post.number}")
       ),
-      p(cls := "forum-post__message")(
-        if (post.erased) "<Comment deleted by user>"
-        else richText(post.text)
+      div(cls := "forum-post__message")(
+        if (post.erased) p("<Comment deleted by user>")
+        else
+          render map {
+            case isText(text) => p(richText(text))
+            case isAsk(ask)   => views.html.ask.render(ask)
+          }
       ),
       !post.erased option reactions(post, canReact),
       ctx.me.exists(post.shouldShowEditForm) option

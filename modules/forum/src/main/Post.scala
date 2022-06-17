@@ -5,6 +5,8 @@ import scala.concurrent.duration._
 
 import lila.user.User
 import lila.security.Granter
+import lila.ask.Ask
+import lila.ask.AskApi
 
 case class OldVersion(text: String, createdAt: DateTime)
 
@@ -24,7 +26,8 @@ case class Post(
     updatedAt: Option[DateTime] = None,
     erasedAt: Option[DateTime] = None,
     modIcon: Option[Boolean],
-    reactions: Option[Post.Reactions] = None
+    reactions: Option[Post.Reactions] = None,
+    askCookie: Option[Ask.Cookie] = None
 ) {
 
   private val permitEditsFor  = 4 hours
@@ -58,7 +61,7 @@ case class Post(
     canBeEditedBy(editingUser) &&
       updatedOrCreatedAt.plus(showEditFormFor.toMillis).isAfterNow
 
-  def editPost(updated: DateTime, newText: String): Post = {
+  def editPost(updated: DateTime, newText: String, newCookie: Option[Ask.Cookie]): Post = {
     val oldVersion = OldVersion(text, updatedOrCreatedAt)
 
     // We only store a maximum of 5 historical versions of the post to prevent abuse of storage space
@@ -68,11 +71,12 @@ case class Post(
       editHistory = history.some,
       text = newText,
       updatedAt = updated.some,
-      reactions = reactions.map(_.view.filterKeys(k => !Post.Reaction.positive(k)).toMap)
+      reactions = reactions.map(_.view.filterKeys(k => !Post.Reaction.positive(k)).toMap),
+      askCookie = newCookie
     )
   }
 
-  def erase = editPost(DateTime.now, "").copy(erasedAt = DateTime.now.some)
+  def erase = editPost(DateTime.now, "", None).copy(erasedAt = DateTime.now.some)
 
   def hasEdits = editHistory.isDefined
 
@@ -84,6 +88,8 @@ case class Post(
   def erased = erasedAt.isDefined
 
   def isBy(u: User) = userId.exists(_ == u.id)
+
+  def cleanTake(n: Int): String = AskApi.stripAsks(text, n)
 }
 
 object Post {
@@ -121,12 +127,13 @@ object Post {
       lang: Option[String],
       troll: Boolean,
       hidden: Boolean,
-      modIcon: Option[Boolean] = None
-  ): Post = {
-
+      modIcon: Option[Boolean] = None,
+      askCookie: Option[Ask.Cookie] = None
+  ): Post =
     Post(
       _id = lila.common.ThreadLocalRandom nextString idSize,
       topicId = topicId,
+      categId = categId,
       author = author,
       userId = userId,
       text = text,
@@ -134,9 +141,8 @@ object Post {
       lang = lang,
       troll = troll,
       hidden = hidden,
-      createdAt = DateTime.now,
-      categId = categId,
-      modIcon = modIcon
+      modIcon = modIcon,
+      askCookie = askCookie,
+      createdAt = DateTime.now
     )
-  }
 }

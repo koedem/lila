@@ -1,5 +1,7 @@
 package lila.clas
 
+import lila.common.Markdown
+
 import scala.concurrent.duration._
 
 final class ClasMarkup {
@@ -17,6 +19,9 @@ final class ClasMarkup {
     .expireAfterAccess(20 minutes)
     .maximumSize(512)
     .build[lila.common.Markdown, String]()
+
+  def formatter(logkey: String): String => String =
+    (text: String) => cache.get(Markdown(text), renderer(logkey))
 
   def apply(clas: Clas): String = cache.get(clas.wall, renderer(s"clas:${clas.id}"))
 }

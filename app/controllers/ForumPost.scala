@@ -2,10 +2,11 @@ package controllers
 
 import scala.concurrent.duration._
 import views._
-
 import lila.app._
 import lila.common.IpAddress
 import lila.msg.MsgPreset
+
+import scala.concurrent.Future
 
 final class ForumPost(env: Env) extends LilaController(env) with ForumController {
 
@@ -48,13 +49,27 @@ final class ForumPost(env: Env) extends LilaController(env) with ForumController
                 .fold(
                   err =>
                     CategGrantWrite(categSlug, tryingToPostAsMod = true) {
+                      val futureRenders = Future.sequence(
+                        posts.currentPageResults map (p =>
+                          env.ask.api.render(p.text, Some(s"${routes.ForumPost.redirect(p._id)}"))
+                        )
+                      )
                       for {
                         captcha     <- forms.anyCaptcha
                         unsub       <- env.timeline.status(s"forum:${topic.id}")(me.id)
                         canModCateg <- access.isGrantedMod(categ.slug)
+                        askRenders  <- futureRenders
                       } yield BadRequest(
                         html.forum.topic
-                          .show(categ, topic, posts, Some(err -> captcha), unsub, canModCateg = canModCateg)
+                          .show(
+                            categ,
+                            topic,
+                            posts,
+                            askRenders,
+                            Some(err -> captcha),
+                            unsub,
+                            canModCateg = canModCateg
+                          )
                       )
                     },
                   data =>
@@ -101,6 +116,7 @@ final class ForumPost(env: Env) extends LilaController(env) with ForumController
     AuthBody { implicit ctx => me =>
       postApi getPost id flatMap {
         _ ?? { post =>
+          env.ask.api.deleteAsks(post.askCookie)
           if (me.id == ~post.userId && !post.erased)
             postApi.erasePost(post) inject Redirect(routes.ForumPost.redirect(id))
           else

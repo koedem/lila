@@ -4,6 +4,8 @@ import controllers.routes
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
+import lila.ask.Ask.RenderElement
+import lila.ask.Ask.imports._
 import lila.clas.{ Clas, Student }
 import lila.common.String.html.richText
 import lila.user.User
@@ -12,7 +14,7 @@ object studentDashboard {
 
   def apply(
       c: Clas,
-      wall: Frag,
+      elems: Seq[RenderElement],
       teachers: List[User],
       students: List[Student.WithUser]
   )(implicit ctx: Context) =
@@ -58,7 +60,10 @@ object studentDashboard {
           }
         )
       ),
-      if (c.wall.value.nonEmpty) div(cls := "box__pad clas-wall")(wall),
+      if (c.wall.value.nonEmpty) div(cls := "box__pad clas-wall")(elems map {
+        case isAsk(ask)  => views.html.ask.render(ask)
+        case isText(txt) => scalatags.Text.all.raw(txt)
+      }),
       div(cls := "students")(studentList(students))
     )
 

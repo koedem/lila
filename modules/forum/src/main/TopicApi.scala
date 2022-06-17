@@ -9,6 +9,7 @@ import lila.common.String.noShouting
 import lila.db.dsl._
 import lila.hub.actorApi.timeline.{ ForumPost, Propagate }
 import lila.memo.CacheApi
+import lila.ask.AskApi
 import lila.security.{ Granter => MasterGranter }
 import lila.user.{ Holder, User }
 
@@ -16,6 +17,7 @@ final private[forum] class TopicApi(
     postRepo: PostRepo,
     topicRepo: TopicRepo,
     categRepo: CategRepo,
+    askApi: AskApi,
     mentionNotifier: MentionNotifier,
     paginator: ForumPaginator,
     indexer: lila.hub.actors.ForumSearch,
@@ -69,7 +71,10 @@ final private[forum] class TopicApi(
       data: ForumForm.TopicData,
       me: User
   ): Fu[Topic] =
-    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) flatMap { case (slug, lang) =>
+    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) zip askApi.prepare(
+      spam.replace(data.post.text),
+      me
+    ) flatMap { case ((slug, lang), updated) =>
       val topic = Topic.make(
         categId = categ.slug,
         slug = slug,
@@ -84,11 +89,12 @@ final private[forum] class TopicApi(
         userId = me.id.some,
         troll = me.marks.troll,
         hidden = topic.hidden,
-        text = spam.replace(data.post.text),
+        text = updated.text,
         lang = lang map (_.language),
         number = 1,
         categId = categ.id,
-        modIcon = (~data.post.modIcon && MasterGranter(_.PublicMod)(me)).option(true)
+        modIcon = (~data.post.modIcon && MasterGranter(_.PublicMod)(me)).option(true),
+        askCookie = updated.cookie
       )
       findDuplicate(topic) flatMap {
         case Some(dup) => fuccess(dup)
