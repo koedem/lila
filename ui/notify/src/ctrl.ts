@@ -1,9 +1,7 @@
-import { Ctrl, Notification, NotifyOpts, NotifyData, SingleNotifyData, Redraw } from './interfaces';
+import { Ctrl, NotifyOpts, NotifyData, SingleNotifyData, Redraw } from './interfaces';
 
 import * as xhr from 'common/xhr';
 import notify from 'common/notification';
-//import { asText } from './view';    TODO, put i18n back into non-streamer incomings
-import { defined } from 'common';
 
 export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
   let data: NotifyData | undefined,
@@ -20,12 +18,21 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     }
   });
 
-  function update(d: NotifyData | SingleNotifyData, incoming: boolean) {
-    opts.setCount(d.unread);
-    if (!('pager' in d)) {
-      updateSingle(d as SingleNotifyData);
+  function update(d: SingleNotifyData) {
+    if (opts.isVisible()) {
+      loadPage(1);
       return;
     }
+    data = undefined;
+    opts.setCount(d.unread);
+    opts.pulse();
+
+    if (!lichess.quietMode || d.note.content.user?.id == 'lichess') lichess.sound.playOnce('newPM');
+    if (d.alert) notify(d.note.content.text);
+    redraw();
+  }
+
+  function updatePage(d: NotifyData) {
     data = d;
     if (data.pager.currentPage === 1 && data.unread && opts.isVisible()) {
       opts.setNotified();
@@ -34,23 +41,13 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     }
     initiating = false;
     scrolling = false;
-    if (incoming) alertUser(data);
-    redraw();
-  }
-
-  function updateSingle(d: SingleNotifyData) {
-    if (opts.isVisible()) {
-      loadPage(1);
-      return;
-    }
-    data = undefined;
-    alertUser(d);
+    opts.setCount(data.unread);
     redraw();
   }
 
   const loadPage = (page: number) =>
     xhr.json(xhr.url('/notify', { page: page || 1 })).then(
-      d => update(d, false),
+      d => updatePage(d),
       _ => lichess.announce({ msg: 'Failed to load notifications' })
     );
 
@@ -101,33 +98,9 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
         method: 'post',
       })
       .then(
-        _ => update(emptyNotifyData, false),
+        _ => updatePage(emptyNotifyData),
         _ => lichess.announce({ msg: 'Failed to clear notifications' })
       );
-  }
-
-  function alertUser(d: NotifyData | SingleNotifyData) {
-    const note = getUnreadNotification(d);
-    if (!defined(note)) return;
-
-    opts.pulse();
-    if (!lichess.quietMode || note.content.user?.id == 'lichess') lichess.sound.playOnce('newPM');
-
-    if ('alert' in d && d.alert) {
-      const pushSubscribed = parseInt(lichess.storage.get('push-subscribed') || '0', 10) + 86400000 >= Date.now(); // 24h
-      // firefox and chrome merged push and notify into a single permission many moons ago
-      if (!pushSubscribed) notify(d.note.content.text);
-    }
-  }
-
-  function getUnreadNotification(d: NotifyData | SingleNotifyData): Notification | undefined {
-    if ('pager' in d) {
-      const ndata = d as NotifyData;
-      if (ndata.pager.currentPage !== 1) return undefined;
-      return ndata.pager.currentPageResults.find(n => !n.read);
-    } else {
-      return (d as SingleNotifyData).note;
-    }
   }
 
   return {

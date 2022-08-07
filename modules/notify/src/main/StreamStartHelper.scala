@@ -22,7 +22,8 @@ final private class StreamStartHelper(
 )(implicit
     ec: scala.concurrent.ExecutionContext
 ) {
-  def getNotiflowersAndPush(streamerId: User.ID, streamerName: String): Fu[Iterable[NotifiableFollower]] = {
+
+  def getNotiflowersAndPush(streamerId: User.ID, streamerName: String): Fu[Iterable[NotifiableFollower]] =
     relationApi.freshFollowersFromSecondary(streamerId, 14).flatMap { followers =>
       timeline ! {
         import lila.hub.actorApi.timeline.{ Propagate, StreamStart }
@@ -35,7 +36,6 @@ final private class StreamStartHelper(
         )
       }
     }
-  }
 
   case class NotiflowerView(unfiltered: Iterable[NotifiableFollower], sid: String, name: String) {
     import lila.pref.NotificationPref.Allows
@@ -57,8 +57,9 @@ final private class StreamStartHelper(
       notiflowers.groupMap(_.lang)(x => notesByUser.get(x.userId))
 
     def alertPartition(users: Set[String]): (Set[String], Set[String]) = {
-      val alertUsers = users.filter(x => Allows(byUser(x).allows).push)
+      val alertUsers = users.filter(x => Allows(byUser(x).allows).web)
       (alertUsers, users diff alertUsers)
+      // alertUsers have browser/web enabled in prefs
     }
   }
 

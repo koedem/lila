@@ -193,30 +193,26 @@ final private class PushApi(
       "fullId" -> pov.fullId
     )
 
-  def newMsg(t: lila.msg.MsgThread): Funit =
-    lightUser(t.lastMsg.user) flatMap {
-      _ ?? { sender =>
-        userRepo.isKid(t other sender) flatMap {
-          !_ ?? {
-            maybePush(
-              t other sender,
-              _.message,
-              NotificationPref.InboxMsg,
-              PushApi.Data(
-                title = sender.titleName,
-                body = shorten(t.lastMsg.text, 57 - 3, "..."),
-                stacking = Stacking.NewMessage,
-                payload = Json.obj(
-                  "userId" -> t.other(sender),
-                  "userData" -> Json.obj(
-                    "type"     -> "newMessage",
-                    "threadId" -> sender.id
-                  )
-                )
+  def newMsg(msg: lila.hub.actorApi.push.InboxMsg): Funit =
+    userRepo.isKid(msg.userId) flatMap {
+      !_ ?? {
+        maybePush(
+          msg.userId,
+          _.message,
+          NotificationPref.InboxMsg,
+          PushApi.Data(
+            title = msg.senderName,
+            body = msg.text,
+            stacking = Stacking.NewMessage,
+            payload = Json.obj(
+              "userId" -> msg.userId,
+              "userData" -> Json.obj(
+                "type"     -> "newMessage",
+                "threadId" -> msg.senderId
               )
             )
-          }
-        }
+          )
+        )
       }
     }
 
@@ -318,7 +314,6 @@ final private class PushApi(
 
   import NotificationPref._
   def streamStart(streamerId: User.ID, notifyList: List[NotifiableFollower]): Funit =
-  // nice execution context you have there...  should this be throttled?
     Future.applySequentially(notifyList) { target =>
       filterPush(
         target.userId,

@@ -5,12 +5,15 @@ import scala.concurrent.Future
 import lila.common.Bus
 import lila.common.config.MaxPerPage
 import lila.common.paginator.Paginator
+import lila.common.String.shorten
 import lila.db.dsl._
 import lila.db.paginator.Adapter
 import lila.hub.actorApi.socket.{SendTo, SendTos}
+import lila.hub.actorApi.push._
 import lila.memo.CacheApi._
 import lila.user.UserRepo
 import lila.i18n._
+import Notification._
 
 final class NotifyApi(
     jsonHandlers: JSONHandlers,
@@ -19,11 +22,11 @@ final class NotifyApi(
     cacheApi: lila.memo.CacheApi,
     streamStarter: StreamStartHelper,
     maxPerPage: MaxPerPage,
-    prefApi : lila.pref.PrefApi
+    prefApi : lila.pref.PrefApi,
+    getLightUser: lila.common.LightUser.Getter
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   import BSONHandlers.{ NotificationBSONHandler, NotifiesHandler }
-  import Notification._
 
   def getNotifications(userId: Notifies, page: Int): Fu[Paginator[Notification]] =
     Paginator(
@@ -108,9 +111,6 @@ final class NotifyApi(
               val (alertUsers, obliviousUsers) = views.alertPartition(users)
               sendTos(alertUsers, note, count, true, lang)
               sendTos(obliviousUsers, note, count, false, lang)
-              // at this point, terrified to look at lila-ws.  what if grouping these msgs
-              // into identical sendTos doesn't optimize traffic compared to many single sendTo
-              // calls? (it kind of snowballed on me)...
             }
           }
         }
@@ -185,11 +185,24 @@ final class NotifyApi(
 
   private def pushToUser(note: Notification) = {
     note.content match {
-      case MentionedInThread(commenter, topic, _, _, postId) =>
-        userRepo.byId(note.notifies.value) collect { case Some(user) =>
-          implicit val lang: play.api.i18n.Lang = user.realLang.getOrElse(defaultLang)
+      case PrivateMessage(sender: PrivateMessage.Sender, text:PrivateMessage.Text) =>
+        getLightUser(sender.value) map { case Some(luser) =>
           Bus.publish(
-            lila.hub.actorApi.push.ForumMention(
+            InboxMsg(
+              note.notifies.value,
+              luser.id,
+              luser.titleName,
+              shorten(text.value, 57 - 3, "...")
+            ),
+            "msgUnread"
+          )
+        }
+      case MentionedInThread(commenter, topic, _, _, postId) =>
+        userRepo.langOf(note.notifies.value) collect { case langOption =>
+          implicit val lang: play.api.i18n.Lang = I18nLangPicker.byStrOrDefault(langOption)
+
+          Bus.publish(
+            ForumMention(
               commenter.value,
               I18nKeys.xMentionedYouInY.txt(commenter, topic),
               postId.value

@@ -18,7 +18,8 @@ final class Env(
     cacheApi: lila.memo.CacheApi,
     prefApi: lila.pref.PrefApi,
     relationApi: lila.relation.RelationApi,
-    timeline: lila.hub.actors.Timeline
+    timeline: lila.hub.actors.Timeline,
+    postApi: lila.forum.PostApi
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     system: ActorSystem

@@ -109,7 +109,7 @@ export default function () {
 
     pubsub.on('socket.in.notifications', data => {
       if (!instance) load(data, true);
-      else instance.update(data, true);
+      else instance.update(data);
     });
     pubsub.on('notify-app.set-read', user => {
       if (!instance) load();

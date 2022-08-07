@@ -327,4 +327,5 @@ package plan {
 package push {
   case class TourSoon(tourId: String, tourName: String, userIds: Iterable[String], swiss: Boolean)
   case class ForumMention(userId: String, title: String, postId: String)
+  case class InboxMsg(userId: String, senderId: String, senderName: String, text: String)
 }

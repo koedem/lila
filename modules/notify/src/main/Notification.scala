@@ -27,7 +27,7 @@ object Notification {
   case class UnreadCount(value: Int) extends AnyVal
   case class AndUnread(pager: Paginator[Notification], unread: UnreadCount)
   case class SingleAndUnread(note: Notification, unread: UnreadCount, alert: Boolean)
-  case class Notifies(value: String)          extends AnyVal with StringValue
+  case class Notifies(value: String) extends AnyVal with StringValue
   case class NotificationRead(value: Boolean) extends AnyVal
 
   def make(notifies: Notification.Notifies, content: NotificationContent): Notification = {
