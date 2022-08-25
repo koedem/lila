@@ -232,4 +232,9 @@ export default rollupProject({
     input: 'src/speech.ts',
     output: 'speech',
   },
+  streamer: {
+    name: 'streamer',
+    input: 'src/streamer.ts',
+    output: 'streamer',
+  }
 });

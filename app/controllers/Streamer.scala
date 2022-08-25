@@ -103,7 +103,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
         env.streamer.api.sameChannels(streamer) map some
     }
 
-  def edit =
+  def edit = {
     Auth { implicit ctx => _ =>
       AsStreamer { s =>
         env.msg.twoFactorReminder(s.user.id) >>
@@ -112,6 +112,18 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
               NoCache(Ok(html.streamer.edit(sws, StreamerForm userForm sws.streamer, forMod)))
             }
           }
+      }
+    }
+  }
+  import lila.streamer.TwitchApi.ChannelInfo
+  def twitchSync(channel: String) =
+    Open { implicit ctx =>
+      env.streamer.twitchApi.channelInfo(channel) flatMap {
+        case Some(info) =>
+          implicit val channelInfoWrites: Writes[ChannelInfo] = Json.writes[ChannelInfo]
+          JsonOk(Json.toJson(info)).fuccess
+        case None =>
+          BadRequest("not found").fuccess
       }
     }
 

@@ -20,7 +20,8 @@ object edit {
 
     views.html.base.layout(
       title = s"${s.user.titleUsername} ${lichessStreamer.txt()}",
-      moreCss = cssTag("streamer.form")
+      moreCss = cssTag("streamer.form"),
+      moreJs = jsModule("streamer")
     ) {
       main(cls := "page-menu")(
         bits.menu("edit", s.withoutStream.some),
@@ -207,7 +208,8 @@ object edit {
                     twitchUsername(),
                     help = optionalOrEmpty().some,
                     half = true
-                  )(form3.input(_)),
+                  )
+                  (x => div( cls := "box twitch-box", form3.input(x), a(cls := "button twitch-sync")("sync"))),
                   form3.group(
                     form("youTube"),
                     youtubeChannel(),

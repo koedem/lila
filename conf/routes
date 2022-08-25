@@ -269,6 +269,7 @@ GET   /streamer                        controllers.Streamer.index(page: Int ?= 1
 GET   /api/streamer/featured           controllers.Streamer.featured
 GET   /streamer/live                   controllers.Streamer.live
 GET   /streamer/edit                   controllers.Streamer.edit
+GET   /streamer/twitch/get/:channel    controllers.Streamer.twitchSync(channel: String)
 POST  /streamer/new                    controllers.Streamer.create
 POST  /streamer/edit                   controllers.Streamer.editApply
 POST  /streamer/approval/request       controllers.Streamer.approvalRequest
