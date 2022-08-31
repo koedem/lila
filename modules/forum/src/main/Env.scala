@@ -15,6 +15,7 @@ import lila.pref.PrefApi
 import lila.relation.RelationApi
 import lila.user.User
 import lila.game.PgnDump
+import lila.ask.AskApi
 
 @Module
 final private class ForumConfig(
@@ -34,6 +35,7 @@ final class Env(
     shutup: lila.hub.actors.Shutup,
     forumSearch: lila.hub.actors.ForumSearch,
     notifyApi: NotifyApi,
+    askApi: AskApi,
     relationApi: RelationApi,
     prefApi: PrefApi,
     userRepo: lila.user.UserRepo,

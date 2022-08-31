@@ -3,6 +3,7 @@ package lila.forum
 import actorApi._
 import scala.concurrent.duration._
 
+import lila.ask.AskApi
 import lila.common.Bus
 import lila.common.paginator._
 import lila.common.String.noShouting
@@ -26,7 +27,8 @@ final private[forum] class TopicApi(
     timeline: lila.hub.actors.Timeline,
     shutup: lila.hub.actors.Shutup,
     detectLanguage: DetectLanguage,
-    cacheApi: CacheApi
+    cacheApi: CacheApi,
+    askApi: AskApi
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   import BSONHandlers._
@@ -69,7 +71,10 @@ final private[forum] class TopicApi(
       data: ForumForm.TopicData,
       me: User
   ): Fu[Topic] =
-    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) flatMap { case (slug, lang) =>
+    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) zip askApi.prepare(
+      spam.replace(data.post.text),
+      me
+    ) flatMap { case ((slug, lang), updated) =>
       val topic = Topic.make(
         categId = categ.slug,
         slug = slug,
@@ -84,11 +89,12 @@ final private[forum] class TopicApi(
         userId = me.id.some,
         troll = me.marks.troll,
         hidden = topic.hidden,
-        text = spam.replace(data.post.text),
+        text = updated.text,
         lang = lang map (_.language),
         number = 1,
         categId = categ.id,
-        modIcon = (~data.post.modIcon && MasterGranter(_.PublicMod)(me)).option(true)
+        modIcon = (~data.post.modIcon && MasterGranter(_.PublicMod)(me)).option(true),
+        askCookie = updated.cookie
       )
       findDuplicate(topic) flatMap {
         case Some(dup) => fuccess(dup)

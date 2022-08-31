@@ -39,7 +39,7 @@ lazy val modules = Seq(
   study, studySearch, fishnet, explorer, learn, plan,
   event, coach, practice, evalCache, irwin,
   activity, relay, streamer, bot, clas, swiss, storm, racer,
-  ublog, tutor, opening
+  ublog, tutor, opening, ask
 )
 
 lazy val moduleRefs = modules map projectToRef
@@ -113,7 +113,7 @@ lazy val blog = module("blog",
 )
 
 lazy val ublog = module("ublog",
-  Seq(common, memo, timeline, irc),
+  Seq(common, memo, timeline, irc, ask),
   Seq(bloomFilter) ++ specs2Bundle ++ reactivemongo.bundle
 )
 
@@ -375,8 +375,13 @@ lazy val msg = module("msg",
   reactivemongo.bundle
 )
 
-lazy val forum = module("forum",
+lazy val ask = module("ask",
   Seq(common, db, user, security, hub, mod, notifyModule),
+  reactivemongo.bundle
+)
+
+lazy val forum = module("forum",
+  Seq(common, db, user, security, hub, mod, notifyModule, ask),
   reactivemongo.bundle
 )
 

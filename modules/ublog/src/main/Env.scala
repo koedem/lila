@@ -19,7 +19,8 @@ final class Env(
     captcher: lila.hub.actors.Captcher,
     cacheApi: lila.memo.CacheApi,
     settingStore: lila.memo.SettingStore.Builder,
-    net: NetConfig
+    net: NetConfig,
+    askApi: lila.ask.AskApi
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler,

@@ -550,6 +550,11 @@ GET   /api/stream/irwin                controllers.Irwin.eventStream
 # Kaladin
 GET   /kaladin                         controllers.Irwin.kaladin
 
+# Ask
+POST  /ask/pick/:id/:pick              controllers.Ask.pick(id: String, pick: Int)
+POST  /ask/conclude/:id                controllers.Ask.conclude(id: String)
+POST  /ask/reset/:id                   controllers.Ask.reset(id: String)
+
 # Forum
 GET   /forum                           controllers.ForumCateg.index
 GET   /forum/search                    controllers.ForumPost.search(text: String ?= "", page: Int ?= 1)

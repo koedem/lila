@@ -133,6 +133,10 @@ export default rollupProject({
     output: 'team',
     name: 'teamStart',
   },
+  ask: {
+    input: 'src/ask.ts',
+    output: 'ask',
+  },
   forum: {
     input: 'src/forum.ts',
     output: 'forum',

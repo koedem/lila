@@ -5,6 +5,7 @@ import reactivemongo.api._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
+import lila.ask.AskApi
 import lila.db.dsl._
 import lila.hub.actorApi.timeline.Propagate
 import lila.memo.{ PicfitApi, PicfitUrl }
@@ -17,26 +18,31 @@ final class UblogApi(
     userRepo: UserRepo,
     picfitApi: PicfitApi,
     timeline: lila.hub.actors.Timeline,
-    irc: lila.irc.IrcApi
+    irc: lila.irc.IrcApi,
+    askApi: AskApi
 )(implicit ec: ExecutionContext) {
 
   import UblogBsonHandlers._
 
   def create(data: UblogForm.UblogPostData, user: User): Fu[UblogPost] = {
-    val post = data.create(user)
-    colls.post.insert.one(
-      postBSONHandler.writeTry(post).get ++ $doc(
-        "likers" -> List(user.id)
-      )
-    ) inject post
+    askApi.prepare(data.markdown.value, user, isMarkdown = true) flatMap { updated =>
+      val post = data.create(user, updated)
+      colls.post.insert.one(
+        postBSONHandler.writeTry(post).get ++ $doc(
+          "likers" -> List(user.id)
+        )
+      ) inject post
+    }
   }
 
   def update(data: UblogForm.UblogPostData, prev: UblogPost, user: User): Fu[UblogPost] =
-    getUserBlog(user, insertMissing = true) flatMap { blog =>
-      val post = data.update(user, prev)
-      colls.post.update.one($id(prev.id), $set(postBSONHandler.writeTry(post).get)) >> {
-        (post.live && prev.lived.isEmpty) ?? onFirstPublish(user, blog, post)
-      } inject post
+    askApi.prepare(data.markdown.value, user, prev.askCookie, isMarkdown = true) flatMap { updated =>
+      getUserBlog(user, insertMissing = true) flatMap { blog =>
+        val post = data.update(user, prev, updated)
+        colls.post.update.one($id(prev.id), $set(postBSONHandler.writeTry(post).get)) >> {
+          (post.live && prev.lived.isEmpty) ?? onFirstPublish(user, blog, post)
+        } inject post
+      }
     }
 
   private def onFirstPublish(user: User, blog: UblogBlog, post: UblogPost): Funit =
@@ -136,7 +142,8 @@ final class UblogApi(
 
   def delete(post: UblogPost): Funit =
     colls.post.delete.one($id(post.id)) >>
-      picfitApi.deleteByRel(imageRel(post))
+      picfitApi.deleteByRel(imageRel(post)) >>
+      askApi.deleteAsks(post.askCookie)
 
   def setTier(blog: UblogBlog.Id, tier: Int): Funit =
     colls.blog.update
