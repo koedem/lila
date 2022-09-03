@@ -71,7 +71,7 @@ final private[forum] class TopicApi(
       data: ForumForm.TopicData,
       me: User
   ): Fu[Topic] =
-    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) zip askApi.prepare(
+    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) zip askApi.freeze(
       spam.replace(data.post.text),
       me
     ) flatMap { case ((slug, lang), updated) =>
@@ -89,12 +89,12 @@ final private[forum] class TopicApi(
         userId = me.id.some,
         troll = me.marks.troll,
         hidden = topic.hidden,
-        text = updated.text,
+        text = updated,
         lang = lang map (_.language),
         number = 1,
         categId = categ.id,
         modIcon = (~data.post.modIcon && MasterGranter(_.PublicMod)(me)).option(true),
-        askCookie = updated.cookie
+        //askCookie = updated.cookie
       )
       findDuplicate(topic) flatMap {
         case Some(dup) => fuccess(dup)

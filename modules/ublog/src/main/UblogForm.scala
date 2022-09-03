@@ -4,8 +4,6 @@ import org.joda.time.DateTime
 import play.api.data._
 import play.api.data.Forms._
 
-import lila.ask.Ask
-import lila.ask.AskApi.Updated
 import lila.common.Form.{ cleanNonEmptyText, cleanText, stringIn, toMarkdown }
 import lila.i18n.{ defaultLang, LangList }
 import lila.user.User
@@ -77,13 +75,13 @@ object UblogForm {
 
     def realLanguage = language flatMap Lang.get
 
-    def create(user: User, updated: Updated) =
+    def create(user: User, updated: Markdown) =
       UblogPost(
         _id = UblogPost.Id(lila.common.ThreadLocalRandom nextString 8),
         blog = UblogBlog.Id.User(user.id),
         title = title,
         intro = intro,
-        markdown = Markdown(updated.text),
+        markdown = updated,
         language = LangList.removeRegion(realLanguage.orElse(user.realLang) | defaultLang),
         topics = topics ?? UblogTopic.fromStrList,
         image = none,
@@ -94,14 +92,14 @@ object UblogForm {
         lived = none,
         likes = UblogPost.Likes(1),
         views = UblogPost.Views(0),
-        askCookie = updated.cookie
+        //askCookie = updated.cookie
       )
 
-    def update(user: User, prev: UblogPost, updated: Updated) =
+    def update(user: User, prev: UblogPost, updated: Markdown) =
       prev.copy(
         title = title,
         intro = intro,
-        markdown = Markdown(updated.text),
+        markdown = updated,
         image = prev.image.map { i =>
           i.copy(alt = imageAlt, credit = imageCredit)
         },
@@ -111,7 +109,7 @@ object UblogForm {
         discuss = Option(discuss),
         updated = UblogPost.Recorded(user.id, DateTime.now).some,
         lived = prev.lived orElse live.option(UblogPost.Recorded(user.id, DateTime.now)),
-        askCookie = updated.cookie
+        //askCookie = updated.cookie
       )
   }
 

@@ -27,7 +27,7 @@ case class Post(
     erasedAt: Option[DateTime] = None,
     modIcon: Option[Boolean],
     reactions: Option[Post.Reactions] = None,
-    askCookie: Option[Ask.Cookie] = None
+    //askCookie: Option[Ask.Cookie] = None
 ) {
 
   private val permitEditsFor  = 4 hours
@@ -61,7 +61,7 @@ case class Post(
     canBeEditedBy(editingUser) &&
       updatedOrCreatedAt.plus(showEditFormFor.toMillis).isAfterNow
 
-  def editPost(updated: DateTime, newText: String, newCookie: Option[Ask.Cookie]): Post = {
+  def editPost(updated: DateTime, newText: String): Post = {
     val oldVersion = OldVersion(text, updatedOrCreatedAt)
 
     // We only store a maximum of 5 historical versions of the post to prevent abuse of storage space
@@ -72,11 +72,11 @@ case class Post(
       text = newText,
       updatedAt = updated.some,
       reactions = reactions.map(_.view.filterKeys(k => !Post.Reaction.positive(k)).toMap),
-      askCookie = newCookie
+      //askCookie = newCookie
     )
   }
 
-  def erase = editPost(DateTime.now, "", None).copy(erasedAt = DateTime.now.some)
+  def erase = editPost(DateTime.now, "").copy(erasedAt = DateTime.now.some)
 
   def hasEdits = editHistory.isDefined
 
@@ -117,7 +117,7 @@ object Post {
       }.toSet
   }
 
-  case class WithFrag(post: Post, body: scalatags.Text.all.Frag)
+  case class WithFrag(post: Post, body: scalatags.Text.all.Frag, asks: Iterable[lila.ask.Ask])
 
   def make(
       topicId: String,
@@ -145,6 +145,6 @@ object Post {
       createdAt = DateTime.now,
       categId = categId,
       modIcon = modIcon,
-      askCookie = askCookie
+      //askCookie = askCookie
     )
 }

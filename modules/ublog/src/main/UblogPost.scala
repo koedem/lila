@@ -23,7 +23,7 @@ case class UblogPost(
     lived: Option[UblogPost.Recorded],
     likes: UblogPost.Likes,
     views: UblogPost.Views,
-    askCookie: Option[lila.ask.Ask.Cookie]
+    //askCookie: Option[lila.ask.Ask.Cookie]
 ) extends UblogPost.BasePost {
 
   def isBy(u: User) = created.by == u.id

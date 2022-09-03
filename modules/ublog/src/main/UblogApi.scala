@@ -6,6 +6,7 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
 import lila.ask.AskApi
+import lila.common.Markdown
 import lila.db.dsl._
 import lila.hub.actorApi.timeline.Propagate
 import lila.memo.{ PicfitApi, PicfitUrl }
@@ -25,8 +26,8 @@ final class UblogApi(
   import UblogBsonHandlers._
 
   def create(data: UblogForm.UblogPostData, user: User): Fu[UblogPost] = {
-    askApi.prepare(data.markdown.value, user, isMarkdown = true) flatMap { updated =>
-      val post = data.create(user, updated)
+    askApi.freeze(data.markdown.value, user, isMarkdown = true) flatMap { updated =>
+      val post = data.create(user, Markdown(updated))
       colls.post.insert.one(
         postBSONHandler.writeTry(post).get ++ $doc(
           "likers" -> List(user.id)
@@ -36,9 +37,9 @@ final class UblogApi(
   }
 
   def update(data: UblogForm.UblogPostData, prev: UblogPost, user: User): Fu[UblogPost] =
-    askApi.prepare(data.markdown.value, user, prev.askCookie, isMarkdown = true) flatMap { updated =>
+    askApi.freeze(data.markdown.value, user, isMarkdown = true) flatMap { updated =>
       getUserBlog(user, insertMissing = true) flatMap { blog =>
-        val post = data.update(user, prev, updated)
+        val post = data.update(user, prev, Markdown(updated))
         colls.post.update.one($id(prev.id), $set(postBSONHandler.writeTry(post).get)) >> {
           (post.live && prev.lived.isEmpty) ?? onFirstPublish(user, blog, post)
         } inject post
@@ -143,7 +144,7 @@ final class UblogApi(
   def delete(post: UblogPost): Funit =
     colls.post.delete.one($id(post.id)) >>
       picfitApi.deleteByRel(imageRel(post)) >>
-      askApi.deleteAsks(post.askCookie)
+      askApi.deleteAll(post.markdown.value)
 
   def setTier(blog: UblogBlog.Id, tier: Int): Funit =
     colls.blog.update

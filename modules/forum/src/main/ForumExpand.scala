@@ -1,13 +1,13 @@
 package lila.forum
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scalatags.Text.all._
-
 import lila.base.RawHtml
 import lila.common.config
 import lila.common.String.html.richText
 
-final class ForumTextExpand(implicit ec: scala.concurrent.ExecutionContext, scheduler: akka.actor.Scheduler) {
+final class ForumTextExpand(askApi: lila.ask.AskApi)
+     (implicit ec: scala.concurrent.ExecutionContext, scheduler: akka.actor.Scheduler) {
 
   def one(text: String)(implicit netDomain: config.NetDomain): Fu[Frag] =
     lila.common.Bus.ask("lpv")(lila.hub.actorApi.lpv.LpvLinkRenderFromText(text, _)) map { linkRender =>
@@ -22,9 +22,11 @@ final class ForumTextExpand(implicit ec: scala.concurrent.ExecutionContext, sche
     texts.map(one).sequenceFu
 
   def manyPosts(posts: Seq[Post])(implicit netDomain: config.NetDomain): Fu[Seq[Post.WithFrag]] =
-    many(posts.map(_.text)) map {
-      _ zip posts map { case (body, post) =>
-        Post.WithFrag(post, body)
-      }
+    many(posts.map(_.text)) flatMap { p =>
+      (p zip posts).map { case (body, post) =>
+        askApi.getAll(post.text) map { asks =>
+          Post.WithFrag(post, body, asks)
+        }
+      }.sequenceFu
     }
 }

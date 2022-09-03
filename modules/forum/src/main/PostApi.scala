@@ -38,7 +38,7 @@ final class PostApi(
       data: ForumForm.PostData,
       me: User
   ): Fu[Post] =
-    detectLanguage(data.text) zip recentUserIds(topic, topic.nbPosts) zip askApi.prepare(
+    detectLanguage(data.text) zip recentUserIds(topic, topic.nbPosts) zip askApi.freeze(
       spam.replace(data.text),
       me
     ) flatMap { case ((lang, topicUserIds), updated) =>
@@ -49,14 +49,14 @@ final class PostApi(
         topicId = topic.id,
         author = none,
         userId = !anonMod option me.id,
-        text = updated.text,
+        text = updated,
         number = topic.nbPosts + 1,
         lang = lang.map(_.language),
         troll = me.marks.troll,
         hidden = topic.hidden,
         categId = categ.id,
         modIcon = modIcon option true,
-        askCookie = updated.cookie
+        //askCookie = updated.cookie
       )
       postRepo findDuplicate post flatMap {
         case Some(dup) if !post.modIcon.getOrElse(false) => fuccess(dup)
@@ -92,8 +92,8 @@ final class PostApi(
         case (_, post) if !post.canStillBeEdited =>
           fufail("Post can no longer be edited")
         case (_, post) =>
-          askApi.prepare(spam replace newText, user, post.askCookie) flatMap { updated =>
-            val newPost = post.editPost(DateTime.now, updated.text, updated.cookie)
+          askApi.freeze(spam replace newText, user) flatMap { updated =>
+            val newPost = post.editPost(DateTime.now, updated)
             (newPost.text != post.text).?? {
               postRepo.coll.update.one($id(post.id), newPost) >> newPost.isAnonModPost.?? {
                 logAnonPost(user.id, newPost, edit = true)

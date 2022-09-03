@@ -5,14 +5,19 @@ import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.ask.Ask
+import lila.ask.AskApi
 import lila.security.{ Granter, Permission }
 
 object ask {
   import RenderType._
 
-  def render(ask: Ask)(implicit ctx: Context) =
-    div(cls := "ask-container")(
-      renderInner(ask)
+  def embed(frag: Frag, asks: Iterable[Ask])(implicit ctx: Context) =
+    if (asks.isEmpty) frag
+    else RawFrag(
+      AskApi.embed(
+        frag.render,
+        (asks map(_._id) zip asks.map(renderContainer(_) render)) toMap
+      )
     )
 
   def renderInner(ask: Ask)(implicit ctx: Context) =
@@ -39,6 +44,11 @@ object ask {
         case Some(reveal) if getPick(ask).nonEmpty => div(cls := "ask-reveal")(p(reveal))
         case _                                     => emptyFrag
       }
+    )
+
+  private def renderContainer(ask: Ask)(implicit ctx: Context) =
+    div(cls := "ask-container")(
+      renderInner(ask)
     )
 
   private def quizChoices(ask: Ask)(implicit ctx: Context) = frag {

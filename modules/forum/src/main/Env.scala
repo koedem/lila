@@ -35,14 +35,14 @@ final class Env(
     shutup: lila.hub.actors.Shutup,
     forumSearch: lila.hub.actors.ForumSearch,
     notifyApi: NotifyApi,
-    askApi: AskApi,
     relationApi: RelationApi,
     prefApi: PrefApi,
     userRepo: lila.user.UserRepo,
     gameRepo: lila.game.GameRepo,
     cacheApi: lila.memo.CacheApi,
-    ws: StandaloneWSClient
-)(implicit
+    ws: StandaloneWSClient,
+    askApi: AskApi,
+ )(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler,
     mat: akka.stream.Materializer

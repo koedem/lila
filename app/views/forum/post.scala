@@ -40,7 +40,7 @@ object post {
       canModCateg: Boolean,
       canReact: Boolean
   )(implicit ctx: Context) = postWithFrag match {
-    case Post.WithFrag(post, body) =>
+    case Post.WithFrag(post, body, asks) =>
       st.article(cls := List("forum-post" -> true, "erased" -> post.erased), id := post.number)(
         div(cls := "forum-post__metas")(
           (!post.erased || canModCateg) option div(
@@ -105,7 +105,7 @@ object post {
         ),
         p(cls := "forum-post__message expand-text")(
           if (post.erased) "<Comment deleted by user>"
-          else body
+          else views.html.ask.embed(body, asks)
         ),
         !post.erased option reactions(post, canReact),
         ctx.me.exists(post.shouldShowEditForm) option
@@ -116,7 +116,7 @@ object post {
               cls            := "post-text-area edit-post-box",
               minlength      := 3,
               required
-            )(post.text),
+            )(env.ask.api.unfreezeSync(post.text, asks)),
             div(cls := "edit-buttons")(
               a(
                 cls   := "edit-post-cancel",

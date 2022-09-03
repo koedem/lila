@@ -5,7 +5,6 @@ import reactivemongo.api.bson._
 import lila.db.dsl._
 import lila.hub.actors.Timeline
 import lila.user.User
-import lila.ask.Ask.imports._
 import lila.security.Granter
 import lila.hub.actorApi.timeline.{ AskConcluded, Propagate }
 
@@ -44,78 +43,59 @@ final class AskApi(
       case None => None
     }
 
+  def hasAskEmbed(text: String): Boolean = hasAskId(text)
+
   def reset(ask: Ask): Fu[Option[Ask]] = reset(ask._id)
 
   def reset(id: Ask.ID): Fu[Option[Ask]] =
     coll.ext.findAndUpdate[Ask]($id(id), $unset("picks"), fetchNewObject = true)
 
-  def deleteAsks(cookie: Option[Ask.Cookie]): Funit =
-    coll.delete.one($inIds(extractCookieIds(cookie))).void
+  def deleteAll(text: String): Funit =
+    coll.delete.one($inIds(extractIds(text))).void
 
-  def prepare(
+  def getAll(text: String): Fu[List[Ask]] = coll.byIds[Ask](extractIds(text))
+
+  // terminology: "markdown" is the popular formatting syntax, "markup" is Ask definition language
+  // freeze is what you call before storing user text in the database, it updates database objects
+  // with ask markup and replaces them with non-char unicode sentinels and _ids
+  def freeze(
       formText: String,
       creator: User,
       oldCookie: Option[Ask.Cookie] = None,
       isMarkdown: Boolean = false
-  ): Fu[Updated] = {
-    if (true && !Granter(_.Pollster)(creator)) {
-
-      val markupIntervals            = getMarkupOffsets(formText)
-      val sanitize: String => String = if (isMarkdown) stripMarkdownEscapes else identity
-
-      val asks = getIntervalClosure(markupIntervals, formText.length) map { interval =>
-        val segment = formText.slice(interval._1, interval._2)
-
-        if (markupIntervals contains interval) {
-          val params = extractParams(segment)
-          Right(
-            Ask.make(
-              _id = extractId(segment),
-              question = sanitize(extractQuestion(segment)),
-              choices = extractChoices(segment) map sanitize,
-              isPublic = params.fold(false)(_ contains "public"),
-              isTally = params.fold(false)(_ contains "tally"),
-              isConcluded = params.fold(false)(_ contains "concluded"),
-              creator = creator.id,
-              answer = extractAnswer(segment) map sanitize,
-              reveal = extractReveal(segment) map sanitize
-            )
-          )
-        } else Left(segment)
+  ): Fu[String] = {
+    val sanitizer: String => String = if (isMarkdown) stripMarkdownEscapes else identity
+    val askIntervals = markupIntervals(formText)
+    askIntervals.map { case (start, end) =>
+      upsert(
+        textToAsk(formText.slice(start, end), creator, sanitizer)
+      )
+    }.sequenceFu map { asks =>
+      val iter = asks.iterator
+      val sb = new mutable.StringBuilder
+      intervalClosure(askIntervals, formText.length) map { segment =>
+        if (askIntervals contains segment) sb.append(s"$askIdSentinel{${iter.next()._id}}")
+        else sb.append(formText.slice(segment._1, segment._2))
       }
-      Future.sequence(asks.collect { case Right(a) => update(a) }) inject {
-        val ids = asks.collect { case Right(a) => a._id }
-        extractCookieIds(oldCookie).filterNot(ids contains) map delete
-        Updated(asks.map(_.fold(identity, a => askToText(a))).mkString, makeV1Cookie(ids))
-      }
-    } else fuccess(Updated(formText, None))
+      sb.toString
+    }
   }
 
-  def render(
-      text: String,
-      url: Option[String],
-      formatter: Option[String => String] = None
-  ): Fu[Seq[Ask.RenderElement]] = {
-    val markupOffsets = getMarkupOffsets(text)
-    Future.sequence(getIntervalClosure(markupOffsets, text.length) map { interval =>
-      val txt = text.slice(interval._1, interval._2)
+  // unfreeze replaces embedded ids in text with the markup to allow user edits
+  def unfreeze(frozen: String): Fu[String] =
+    if (!hasAskId(frozen)) fuccess(frozen)
+    else getAll(frozen) map(unfreezeSync(frozen,_))
 
-      if (!markupOffsets.contains(interval) || !hasId(txt))
-        fuccess(isText(formatter.fold(txt)(_(txt))))
-      else {
-        get(extractId(txt).get) flatMap { // .get ok due to hasId check in conditional
-          case None =>
-            fuccess(isText("[deleted]"))
-          case Some(ask) =>
-            url.map(setUrl(ask, _))
-            fuccess(isAsk(ask))
-        }
-      }
-    })
-  }
+  def unfreezeSync(frozen: String, asks: Iterable[Ask]): String =
+    if (asks.isEmpty) frozen
+    else {
+      val askIter = asks.iterator
+      matchIdRe.replaceAllIn(frozen, askToText(askIter.next()))
+    }
 
-  def setUrl(cookie: Option[Ask.Cookie], url: String): Funit =
-    coll.update.one($inIds(extractCookieIds(cookie)), $set("url" -> url), multi = true).void
+  def setUrl(frozen: String, url: String): Funit =
+    if (!hasAskId(frozen)) funit
+    else coll.update.one($inIds(extractIds(frozen)), $set("url" -> url), multi = true).void
 
   /*
   def getUserSummary(cookie: Option[Ask.Cookie], uid: User.ID): Fu[Seq[String]] =
@@ -134,7 +114,7 @@ final class AskApi(
       )
    */
 
-  private def update(ask: Ask): Fu[Ask] =
+  private def upsert(ask: Ask): Fu[Ask] =
     coll.byId[Ask](ask._id) map {
       case Some(dbAsk) =>
         if (dbAsk.invalidatedBy(ask)) {
@@ -164,34 +144,17 @@ final class AskApi(
 
 object AskApi {
 
-  case class Updated(text: String, cookie: Option[Ask.Cookie])
-
   def stripAsks(text: String, n: Int = -1): String =
-    matchAskRe.replaceAllIn(text, "").take(if (n == -1) text.length else n)
+    matchIdRe.replaceAllIn(text, "").take(if (n == -1) text.length else n)
 
-  // markdown fuckery - strip the backslashes when markdown escapes one of the characters below
-  private val stripMarkdownRe = raw"\\([*_`~.!{})(\[\]\-+|<>])".r // that could be overkill
-
-  // markup
-  private val matchAskRe = (
-    raw"(?m)^\?\?\h*\S.*\R"                    // match "?? <question>"
-      + raw"(?m)^(\?=(.*askid:(\S{8}))?.*\R)?" // match optional "?= <params>", id as group 3
-      + raw"(\?[#@]\h*\S.*\R?){2,}"            // match 2 or more "?# <choice>"
-      + raw"(\?!.*\R?)?"                       // match optional "?! <reveal>"
-  ).r
-  private val matchIdRe       = raw"(?m)^\?=.*askid:(\S{8})".r
-  private val matchQuestionRe = raw"(?m)^\?\?(.*)".r
-  private val matchParamsRe   = raw"(?m)^\?=(.*)".r
-  private val matchChoicesRe  = raw"(?m)^\?[#@](.*)".r
-  private val matchAnswerRe   = raw"(?m)^\?@(.*)".r
-  private val matchRevealRe   = raw"(?m)^\?!(.*)".r
-
-  // cookie
-  private val matchCookieIdsRe = raw"v1:\[([^]]+)]".r
+  // renders asks as html embedded in text
+  def embed(text: String, asks: Map[String, String]): String = {
+    matchIdRe.replaceAllIn(text, a => ~asks.get(a.group(1)))
+  }
 
   // renders ask as markup text
   private def askToText(ask: Ask): String = {
-    val sb = new mutable.StringBuilder("")
+    val sb = new mutable.StringBuilder
     sb ++= s"?? ${ask.question}\n"
     sb ++= s"?= askid:${ask._id}"
     sb ++= s"${ask.isPublic ?? " public"}"
@@ -201,29 +164,45 @@ object AskApi {
     (sb ++= s"${ask.reveal.fold("")(a => s"?! $a\n")}").toString
   }
 
+  // construct an Ask from the first markup in segment
+  private def textToAsk(segment: String, creator: User, sanitize: String => String): Ask = {
+    val params = extractParams(segment)
+    Ask.make(
+      _id = extractId(segment),
+      question = sanitize(extractQuestion(segment)),
+      choices = extractChoices(segment) map sanitize,
+      isPublic = params.fold(false)(_ contains "public"),
+      isTally = params.fold(false)(_ contains "tally"),
+      isConcluded = params.fold(false)(_ contains "concluded"),
+      creator = creator.id,
+      answer = extractAnswer(segment) map sanitize,
+      reveal = extractReveal(segment) map sanitize
+    )
+  }
+
+  // these tuple types for value equality (same RegexMatch objects don't have that)
+  type Interval = (Int, Int) // (start, end)
   type Intervals = Seq[(Int, Int)]
 
+  // returns the (begin, end) offsets of ask markups in text.
+  private def markupIntervals(text: String): Intervals =
+    matchAskRe.findAllMatchIn(text).map(m => (m.start, m.end)).toSeq
+
   // assumes inputs are non-overlapping and sorted, returns subs and its complement in [0, upper)
-  private def getIntervalClosure(subs: Intervals, upper: Int): Intervals = {
+  private def intervalClosure(subs: Intervals, upper: Int): Intervals = {
     val points = (0 :: subs.toList.flatten(i => List(i._1, i._2)) ::: upper :: Nil).distinct
     points.zip(points.tail)
   }
 
-  // returns the (begin, end) offsets of ask markups in text.
-  private def getMarkupOffsets(text: String): Seq[(Int, Int)] =
-    matchAskRe.findAllMatchIn(text).map(m => (m.start, m.end)).toList
+  // contains() is roughly 3x faster than simple regex matches() for me
+  private def hasAskId(t: String): Boolean =
+    t.contains(askIdSentinel) ?? matchIdRe.matches(t)
 
-  private def makeV1Cookie(idList: Seq[Ask.ID]): Option[String] =
-    idList match {
-      case Nil => None
-      case ids => ids.mkString(s"v1:[", ",", "]").some
-    }
+  private def extractId(text: String): Option[String] =
+    matchIdRe.findFirstMatchIn(text).map(_ group 1)
 
-  private def extractCookieIds(cookie: Option[Ask.Cookie]): Seq[Ask.ID] =
-    matchCookieIdsRe.findFirstMatchIn(~cookie).map(_.group(1)) match {
-      case Some(m) => ",".r.split(m).toSeq
-      case None    => Nil
-    }
+  private def extractIds(text: String): Iterable[String] =
+    matchIdRe.findAllMatchIn(text).map(_ group 1).toSeq
 
   private def extractQuestion(t: String): String = matchQuestionRe.findFirstMatchIn(t).get.group(1).trim
 
@@ -233,10 +212,6 @@ object AskApi {
   private def extractChoices(t: String): Ask.Choices =
     matchChoicesRe.findAllMatchIn(t).map(_.group(1).trim).distinct.toVector
 
-  private def hasId(t: String): Boolean = extractId(t).nonEmpty
-
-  private def extractId(t: String): Option[Ask.ID] = matchIdRe.findFirstMatchIn(t).map(_.group(1))
-
   private def extractAnswer(t: String): Option[String] =
     matchAnswerRe.findFirstMatchIn(t).map(_.group(1).trim)
 
@@ -244,4 +219,25 @@ object AskApi {
     matchRevealRe.findFirstMatchIn(t).map(_.group(1).trim)
 
   private def stripMarkdownEscapes(t: String): String = stripMarkdownRe.replaceAllIn(t, "$1")
+
+  // markdown fuckery - strip the backslashes when markdown escapes one of the characters below
+
+  private val stripMarkdownRe = raw"\\([*_`~.!{})(\[\]\-+|<>])".r // could be overkill
+
+  // frozen
+  private val askIdSentinel = "\ufdd6\ufdd4\ufdd2\ufdd0" // https://www.unicode.org/faq/private_use.html
+  private val matchIdRe = s"$askIdSentinel\\{(\\S{8})}".r
+
+  // markup
+  private val matchAskRe = (
+    raw"(?m)^\?\?\h*\S.*\R"                    // match "?? <question>"
+      + raw"(?m)^(\?=(.*askid:(\S{8}))?.*\R)?" // match optional "?= <params>", id as group 3
+      + raw"(\?[#@]\h*\S.*\R?){2,}"            // match 2 or more "?# <choice>"
+      + raw"(\?!.*\R?)?"
+    ).r
+  private val matchQuestionRe = raw"(?m)^\?\?(.*)".r
+  private val matchParamsRe   = raw"(?m)^\?=(.*)".r
+  private val matchChoicesRe  = raw"(?m)^\?[#@](.*)".r
+  private val matchAnswerRe   = raw"(?m)^\?@(.*)".r
+  private val matchRevealRe   = raw"(?m)^\?!(.*)".r
 }

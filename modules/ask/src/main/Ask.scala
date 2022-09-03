@@ -59,12 +59,6 @@ object Ask {
   type Cookie        = String
   type Choices       = IndexedSeq[String]
   type Picks         = Map[User.ID, Int] // _2 is index in Choices list
-  type RenderElement = Either[Ask, String]
-
-  object imports { // for slightly cleaner view code, import lila.ask.Ask.imports._
-    val isAsk  = Left  // match rndrElem { case isAsk(q) => ...
-    val isText = Right //                  case isText(t) => ...
-  }
 
   def make(
       _id: Option[String],
