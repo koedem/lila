@@ -82,11 +82,11 @@ object topic {
         jsModule("forum"),
         formWithCaptcha.isDefined option captchaTag,
         jsModule("expandText"),
-        jsModule("ask"),
+        jsModule("ask")
       ),
       moreCss = frag(
         cssTag("forum"),
-        cssTag("ask"),
+        cssTag("ask")
       ),
       openGraph = lila.app.ui
         .OpenGraph(

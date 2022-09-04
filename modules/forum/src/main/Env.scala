@@ -41,8 +41,8 @@ final class Env(
     gameRepo: lila.game.GameRepo,
     cacheApi: lila.memo.CacheApi,
     ws: StandaloneWSClient,
-    askApi: AskApi,
- )(implicit
+    askApi: AskApi
+)(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler,
     mat: akka.stream.Materializer

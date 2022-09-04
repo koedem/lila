@@ -91,8 +91,8 @@ object UblogForm {
         updated = none,
         lived = none,
         likes = UblogPost.Likes(1),
-        views = UblogPost.Views(0),
-        //askCookie = updated.cookie
+        views = UblogPost.Views(0)
+        // askCookie = updated.cookie
       )
 
     def update(user: User, prev: UblogPost, updated: Markdown) =
@@ -108,8 +108,8 @@ object UblogForm {
         live = live,
         discuss = Option(discuss),
         updated = UblogPost.Recorded(user.id, DateTime.now).some,
-        lived = prev.lived orElse live.option(UblogPost.Recorded(user.id, DateTime.now)),
-        //askCookie = updated.cookie
+        lived = prev.lived orElse live.option(UblogPost.Recorded(user.id, DateTime.now))
+        // askCookie = updated.cookie
       )
   }
 

@@ -19,14 +19,19 @@ object post {
       markup: Frag,
       others: List[UblogPost.PreviewPost],
       liked: Boolean,
-      followed: Boolean
+      followed: Boolean,
+      asks: Iterable[lila.ask.Ask]
   )(implicit
       ctx: Context
   ) =
     views.html.base.layout(
-      moreCss = cssTag("ublog"),
+      moreCss = frag(
+        cssTag("ublog"),
+        cssTag("ask")
+      ),
       moreJs = frag(
         jsModule("expandText"),
+        jsModule("ask"),
         ctx.isAuth option jsModule("ublog")
       ),
       title = s"${trans.ublog.xBlog.txt(user.username)} • ${post.title}",
@@ -105,7 +110,10 @@ object post {
             }
           ),
           strong(cls := "ublog-post__intro")(post.intro),
-          div(cls := "ublog-post__markup expand-text")(markup),
+          div(cls := "ublog-post__markup expand-text", role := "document")(
+            // markdown is currently putting lpv <div>s inside of <p> elements, should be looked at
+            views.html.ask.render(markup, asks)
+          ),
           div(cls := "ublog-post__footer")(
             if (post.live && ~post.discuss)
               a(

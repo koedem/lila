@@ -1,5 +1,7 @@
 package views.html
 
+import scala.collection.mutable
+
 import controllers.routes
 import lila.api.Context
 import lila.app.templating.Environment._
@@ -11,14 +13,13 @@ import lila.security.{ Granter, Permission }
 object ask {
   import RenderType._
 
-  def embed(frag: Frag, asks: Iterable[Ask])(implicit ctx: Context) =
-    if (asks.isEmpty) frag
-    else RawFrag(
-      AskApi.embed(
-        frag.render,
-        (asks map(_._id) zip asks.map(renderContainer(_) render)) toMap
+  def render(frag: Frag, asks: Iterable[Ask])(implicit ctx: Context) =
+    if (asks.isEmpty)
+      frag
+    else
+      RawFrag(
+        AskApi.renderAsks(frag.render, asks.map(renderContainer(_) render))
       )
-    )
 
   def renderInner(ask: Ask)(implicit ctx: Context) =
     div(cls := "ask", id := ask._id)(
@@ -119,7 +120,7 @@ object ask {
     case None => ""
 
     case Some(choiceText) =>
-      val sb        = new StringBuilder();
+      val sb        = new mutable.StringBuilder(256);
       val pick      = getPick(ask)
       val count     = ask.count(choiceText)
       val hasChoice = pick.nonEmpty

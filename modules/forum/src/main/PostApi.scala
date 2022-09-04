@@ -27,7 +27,7 @@ final class PostApi(
     timeline: lila.hub.actors.Timeline,
     shutup: lila.hub.actors.Shutup,
     detectLanguage: DetectLanguage,
-    askApi: AskApi,
+    askApi: AskApi
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   import BSONHandlers._
@@ -41,7 +41,7 @@ final class PostApi(
     detectLanguage(data.text) zip recentUserIds(topic, topic.nbPosts) zip askApi.freeze(
       spam.replace(data.text),
       me
-    ) flatMap { case ((lang, topicUserIds), updated) =>
+    ) flatMap { case ((lang, topicUserIds), frozen) =>
       val publicMod = MasterGranter(_.PublicMod)(me)
       val modIcon   = ~data.modIcon && (publicMod || MasterGranter(_.SeeReport)(me))
       val anonMod   = modIcon && !publicMod
@@ -49,14 +49,14 @@ final class PostApi(
         topicId = topic.id,
         author = none,
         userId = !anonMod option me.id,
-        text = updated,
+        text = frozen.text,
         number = topic.nbPosts + 1,
         lang = lang.map(_.language),
         troll = me.marks.troll,
         hidden = topic.hidden,
         categId = categ.id,
-        modIcon = modIcon option true,
-        //askCookie = updated.cookie
+        modIcon = modIcon option true
+        // askCookie = updated.cookie
       )
       postRepo findDuplicate post flatMap {
         case Some(dup) if !post.modIcon.getOrElse(false) => fuccess(dup)
@@ -92,8 +92,8 @@ final class PostApi(
         case (_, post) if !post.canStillBeEdited =>
           fufail("Post can no longer be edited")
         case (_, post) =>
-          askApi.freeze(spam replace newText, user) flatMap { updated =>
-            val newPost = post.editPost(DateTime.now, updated)
+          askApi.freeze(spam replace newText, user) flatMap { frozen =>
+            val newPost = post.editPost(DateTime.now, frozen.text)
             (newPost.text != post.text).?? {
               postRepo.coll.update.one($id(post.id), newPost) >> newPost.isAnonModPost.?? {
                 logAnonPost(user.id, newPost, edit = true)

@@ -6,8 +6,8 @@ import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.String.html.richText
 import lila.forum.Post
-
 import controllers.routes
+import lila.ask.AskApi.Frozen
 
 object post {
 
@@ -103,9 +103,9 @@ object post {
           ),
           a(cls := "anchor", href := url)(s"#${post.number}")
         ),
-        p(cls := "forum-post__message expand-text")(
-          if (post.erased) "<Comment deleted by user>"
-          else views.html.ask.embed(body, asks)
+        div(cls := "forum-post__message expand-text", role := "document")(
+          if (post.erased) p("<Comment deleted by user>")
+          else views.html.ask.render(body, asks)
         ),
         !post.erased option reactions(post, canReact),
         ctx.me.exists(post.shouldShowEditForm) option
@@ -116,7 +116,7 @@ object post {
               cls            := "post-text-area edit-post-box",
               minlength      := 3,
               required
-            )(env.ask.api.unfreezeSync(post.text, asks)),
+            )(env.ask.api.unfreeze(Frozen(post.text, asks))),
             div(cls := "edit-buttons")(
               a(
                 cls   := "edit-post-cancel",

@@ -26,8 +26,8 @@ case class Post(
     updatedAt: Option[DateTime] = None,
     erasedAt: Option[DateTime] = None,
     modIcon: Option[Boolean],
-    reactions: Option[Post.Reactions] = None,
-    //askCookie: Option[Ask.Cookie] = None
+    reactions: Option[Post.Reactions] = None
+    // askCookie: Option[Ask.Cookie] = None
 ) {
 
   private val permitEditsFor  = 4 hours
@@ -71,8 +71,8 @@ case class Post(
       editHistory = history.some,
       text = newText,
       updatedAt = updated.some,
-      reactions = reactions.map(_.view.filterKeys(k => !Post.Reaction.positive(k)).toMap),
-      //askCookie = newCookie
+      reactions = reactions.map(_.view.filterKeys(k => !Post.Reaction.positive(k)).toMap)
+      // askCookie = newCookie
     )
   }
 
@@ -144,7 +144,7 @@ object Post {
       hidden = hidden,
       createdAt = DateTime.now,
       categId = categId,
-      modIcon = modIcon,
-      //askCookie = askCookie
+      modIcon = modIcon
+      // askCookie = askCookie
     )
 }

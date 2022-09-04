@@ -55,10 +55,10 @@ case class Ask(
 object Ask {
   val idSize = 8
 
-  type ID            = String
-  type Cookie        = String
-  type Choices       = IndexedSeq[String]
-  type Picks         = Map[User.ID, Int] // _2 is index in Choices list
+  type ID      = String
+  type Cookie  = String
+  type Choices = IndexedSeq[String]
+  type Picks   = Map[User.ID, Int] // _2 is index in Choices list
 
   def make(
       _id: Option[String],
