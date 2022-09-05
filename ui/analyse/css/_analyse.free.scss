@@ -6,22 +6,6 @@
     @extend %flex-center;
 
     position: relative;
-
-    .action {
-      @extend %box-radius-bottom;
-
-      position: absolute;
-      #{$end-direction}: 0;
-      top: 100%;
-      text-align: right;
-      visibility: hidden;
-
-      @include transition;
-    }
-
-    textarea:focus ~ .action {
-      visibility: visible;
-    }
   }
 
   .name {
