@@ -13,6 +13,19 @@ import lila.security.{ Granter, Permission }
 object ask {
   import RenderType._
 
+  def testRanked()(implicit ctx: Context): Frag =
+    div(cls := "ask-container")(
+      div(cls := "ask")(
+        ol(cls := "ask-ranked")(
+          li(cls := "ask-ranked-choice", value := "1", draggable:="true")("Red Ivy"),
+          li(cls := "ask-ranked-choice", value := "2", draggable:="true")("Nefertiti"),
+          li(cls := "ask-ranked-choice", value := "3", draggable:="true")("Patricia Araujo"),
+          li(cls := "ask-ranked-choice", value := "4", draggable:="true")("Lisa Kage"),
+          li(cls := "ask-ranked-choice", value := "5", draggable:="true")("Suzanna Holmes"),
+        )
+      )
+    )
+    
   def render(frag: Frag, asks: Iterable[Ask])(implicit ctx: Context) =
     if (asks.isEmpty)
       frag

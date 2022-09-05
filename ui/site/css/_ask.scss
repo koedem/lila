@@ -133,6 +133,25 @@
     }
   }
 
+  .ask-ranked {
+    @extend %flex-wrap;
+    margin: 0 0 0.5em 0;
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+
+  .ask-ranked-choice {
+    @extend %metal, %box-radius;
+
+    display: inline-block;
+    padding: 0.6em 1.2em;
+    margin: 0 0.3em 0.3em 0;
+    white-space: nowrap;
+    user-select: none;
+    cursor: pointer;
+  }
+
   div.ask-bar-graph {
     * {
       box-sizing: border-box;
