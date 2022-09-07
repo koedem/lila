@@ -26,7 +26,7 @@ final class UblogApi(
   import UblogBsonHandlers._
 
   def create(data: UblogForm.UblogPostData, user: User): Fu[UblogPost] = {
-    askApi.freeze(data.markdown.value, user, isMarkdown = true) flatMap { frozen =>
+    askApi.freeze(data.markdown.value, user) flatMap { frozen =>
       val post = data.create(user, Markdown(frozen.text))
       colls.post.insert.one(
         postBSONHandler.writeTry(post).get ++ $doc(
@@ -37,12 +37,14 @@ final class UblogApi(
   }
 
   def update(data: UblogForm.UblogPostData, prev: UblogPost, user: User): Fu[UblogPost] =
-    askApi.freeze(data.markdown.value, user, isMarkdown = true) flatMap { frozen =>
+    askApi.freeze(data.markdown.value, user) flatMap { frozen =>
       getUserBlog(user, insertMissing = true) flatMap { blog =>
         val post = data.update(user, prev, Markdown(frozen.text))
         colls.post.update.one($id(prev.id), $set(postBSONHandler.writeTry(post).get)) >> {
           (post.live && prev.lived.isEmpty) ?? onFirstPublish(user, blog, post)
-        } inject post.copy(markdown = Markdown(askApi.unfreeze(frozen)))
+        } inject {
+          post.copy(markdown = Markdown(askApi.unfreeze(frozen.text, frozen.asks)))
+        }
       }
     }
 
