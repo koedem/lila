@@ -737,6 +737,13 @@ POST  /api/bulk-pairing/:id/start-clocks  controllers.BulkPairing.startClocks(id
 GET   /api/games/user/:username        controllers.Game.apiExportByUser(username: String)
 GET   /api/games/user/:username/imports controllers.Game.apiExportByUserImportedGames(username: String)
 
+# External engine
+GET   /api/external-engine             controllers.Analyse.externalEngineList
+POST  /api/external-engine             controllers.Analyse.externalEngineCreate
+GET   /api/external-engine/:id         controllers.Analyse.externalEngineShow(id: String)
+PUT   /api/external-engine/:id         controllers.Analyse.externalEngineUpdate(id: String)
+DELETE /api/external-engine/:id        controllers.Analyse.externalEngineDelete(id: String)
+
 # Mobile API only
 GET   /api/user/:name/games            controllers.Api.userGames(name: String)
 
