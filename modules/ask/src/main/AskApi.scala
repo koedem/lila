@@ -234,8 +234,10 @@ object AskApi {
     points.zip(points.tail)
   }
 
-  private def extractIds(t: String): List[String] =
+  private def extractIds(t: String): List[String] = { // used so much it deserves some optimization
+    var idIndex = t.indexOf(frozenIdMagic)
     frozenIdRe.findAllMatchIn(t).map(_ group 1) toList
+  }
 
   private def extractQuestion(t: String): String =
     questionInAskRe.findFirstMatchIn(t).get.group(1).trim // NPE good here
