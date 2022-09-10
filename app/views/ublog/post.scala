@@ -20,7 +20,7 @@ object post {
       others: List[UblogPost.PreviewPost],
       liked: Boolean,
       followed: Boolean,
-      asks: Iterable[lila.ask.Ask]
+      asks: Iterable[Option[lila.ask.Ask]]
   )(implicit
       ctx: Context
   ) =

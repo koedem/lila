@@ -13,26 +13,14 @@ import lila.security.{ Granter, Permission }
 object ask {
   import RenderType._
 
-  def testRanked()(implicit ctx: Context): Frag =
-    div(cls := "ask-container")(
-      div(cls := "ask")(
-        ol(cls := "ask-ranked")(
-          li(cls := "ask-ranked-choice", value := "1", draggable:="true")("Red Ivy"),
-          li(cls := "ask-ranked-choice", value := "2", draggable:="true")("Nefertiti"),
-          li(cls := "ask-ranked-choice", value := "3", draggable:="true")("Patricia Araujo"),
-          li(cls := "ask-ranked-choice", value := "4", draggable:="true")("Lisa Kage"),
-          li(cls := "ask-ranked-choice", value := "5", draggable:="true")("Suzanna Holmes"),
-        )
-      )
+  def render(frag: Frag, asks: Iterable[Option[Ask]])(implicit ctx: Context) =
+    if (asks.isEmpty) frag
+    else RawFrag(
+      AskApi.renderAsks(frag.render, asks.map {
+        case Some(ask) => renderOuter(ask) render
+        case None => AskApi.askDeletedFrag
+      })
     )
-    
-  def render(frag: Frag, asks: Iterable[Ask])(implicit ctx: Context) =
-    if (asks.isEmpty)
-      frag
-    else
-      RawFrag(
-        AskApi.renderAsks(frag.render, asks.map(renderContainer(_) render))
-      )
 
   def renderInner(ask: Ask)(implicit ctx: Context) =
     div(cls := "ask", id := ask._id)(
@@ -52,6 +40,7 @@ object ask {
       RenderType(ask) match {
         case QUIZ => quizChoices(ask)
         case POLL => pollChoices(ask)
+        case RANKED => rankChoices(ask)
         case BAR  => barGraph(ask)
       },
       ask.reveal match {
@@ -60,7 +49,7 @@ object ask {
       }
     )
 
-  private def renderContainer(ask: Ask)(implicit ctx: Context) =
+  private def renderOuter(ask: Ask)(implicit ctx: Context) =
     div(cls := "ask-container")(
       renderInner(ask)
     )
@@ -105,6 +94,15 @@ object ask {
           ),
           label(`for` := id, cls := (if (pick.contains(i)) "ask-vote" else "ask-enabled"))(choiceText)
         )
+      }
+    )
+  }
+
+  private def rankChoices(ask: Ask)(implicit ctx: Context) = frag {
+    val ranking = getRanking(ask) getOrElse (1 to ask.choices.length).toList
+    ol(cls := "ask-ranked", id := ask._id)(
+      ranking map { choice =>
+        li(cls := "ask-ranked-choice", value := choice, draggable := "true")(ask.choices(choice - 1))
       }
     )
   }
@@ -157,12 +155,19 @@ object ask {
             sb ++= pluralize("vote", count)
           if (ask.isPublic && ask.isTally || isShusher)
             sb ++= whoPicked(ask, choiceText, sb.nonEmpty)
+
+        case RANKED =>
+
+
       }
       if (sb.isEmpty) choiceText else sb.toString
   }
 
   private def getPick(ask: Ask)(implicit ctx: Context): Option[Int] =
-    ctx.me.flatMap(u => ask.picks.flatMap(p => p.get(u.id)))
+    ctx.me.flatMap(u => ask.picks.flatMap(_ get u.id) flatMap(_ headOption))
+
+  private def getRanking(ask: Ask)(implicit ctx: Context): Option[List[Int]] =
+    ctx.me.flatMap(u => ask.picks.flatMap(_ get u.id))
 
   private def pluralize(item: String, n: Int): String =
     if (n == 0) s"No ${item}s" else if (n == 1) s"1 ${item}" else s"$n ${item}s"
@@ -175,9 +180,10 @@ object ask {
   sealed abstract class RenderType()
   object RenderType {
     case object POLL extends RenderType
+    case object RANKED extends RenderType
     case object QUIZ extends RenderType
     case object BAR  extends RenderType
     def apply(ask: Ask): RenderType =
-      if (ask.isQuiz) QUIZ else if (ask.isConcluded) BAR else POLL
+      if (ask.isQuiz) QUIZ else if (ask.isConcluded) BAR else if (ask.isRanked) RANKED else POLL
   }
 }

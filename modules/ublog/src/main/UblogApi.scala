@@ -28,6 +28,7 @@ final class UblogApi(
   def create(data: UblogForm.UblogPostData, user: User): Fu[UblogPost] = {
     askApi.freeze(data.markdown.value, user) flatMap { frozen =>
       val post = data.create(user, Markdown(frozen.text))
+      askApi.setUrl(frozen.text, s"/ublog/${post._id}/redirect")
       colls.post.insert.one(
         postBSONHandler.writeTry(post).get ++ $doc(
           "likers" -> List(user.id)
@@ -43,7 +44,7 @@ final class UblogApi(
         colls.post.update.one($id(prev.id), $set(postBSONHandler.writeTry(post).get)) >> {
           (post.live && prev.lived.isEmpty) ?? onFirstPublish(user, blog, post)
         } inject {
-          post.copy(markdown = Markdown(askApi.unfreeze(frozen.text, frozen.asks)))
+          post.copy(markdown = Markdown(askApi.unfreeze(frozen.text, frozen.asks map some)))
         }
       }
     }

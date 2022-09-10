@@ -1,7 +1,8 @@
 package lila.ask
 
-import lila.user.User
 import org.joda.time.DateTime
+
+import lila.user.User
 
 case class Ask(
     _id: Ask.ID,
@@ -10,20 +11,23 @@ case class Ask(
     isPublic: Boolean,    // users picks are not secret
     isTally: Boolean,     // results visible before closing
     isConcluded: Boolean, // no more picks
+    isRanked: Boolean,    // ranked choice poll
     creator: User.ID,
     createdAt: DateTime,
+    numChoices: Int,      // size of choices seq, for safe rank updates
     answer: Option[String],
     reveal: Option[String],
     picks: Option[Ask.Picks],
     url: Option[String]
 ) {
 
-  def invalidatedBy(p: Ask): Boolean =
-    question != p.question ||
-      choices != p.choices ||
-      isPublic != p.isPublic ||
-      answer != p.answer ||
-      reveal != p.reveal
+  def equivalent(a: Ask): Boolean =
+    question == a.question &&
+      choices == a.choices &&
+      isPublic == a.isPublic &&
+      isRanked == a.isRanked &&
+      answer == a.answer &&
+      reveal == a.reveal
 
   def participants: Seq[User.ID] =
     picks match {
@@ -31,25 +35,28 @@ case class Ask(
       case None    => Nil
     }
 
-  def hasPick(uid: User.ID): Boolean = picks.exists(_.contains(uid))
+  def hasPick(uid: User.ID): Boolean = picks.exists(_ contains uid)
 
   def getPick(uid: User.ID): Option[Int] =
-    picks flatMap (p => p.get(uid).flatMap(v => Some(v)))
+    picks flatMap(_.get(uid) flatMap(_ headOption))
 
-  def count(choice: Int): Int    = picks.fold(0)(_.values.count(_ == choice))
-  def count(choice: String): Int = count(choices.indexOf(choice))
+  def getRanking(uid: User.ID): Option[List[Int]] =
+    picks flatMap(_.get(uid) flatMap(_ some))
 
-  def whoPicked(choice: String): Seq[User.ID] = whoPicked(choices.indexOf(choice))
+  def count(choice: Int): Int    = picks.fold(0)(_.values.count(_.headOption contains choice))
+  def count(choice: String): Int = count(choices indexOf choice)
+
+  def whoPicked(choice: String): Seq[User.ID] = whoPicked(choices indexOf choice)
   def whoPicked(choice: Int): Seq[User.ID] =
     picks match {
       case Some(p) =>
-        p.collect { case (text, i) if choice == i => text }.toSeq
+        p.collect { case (text, i) if i.headOption.contains(choice) => text }.toSeq
       case None => Nil
     }
 
-  def isPoll: Boolean = answer.isEmpty
+  def isPoll: Boolean = answer isEmpty
 
-  def isQuiz: Boolean = answer.nonEmpty
+  def isQuiz: Boolean = answer nonEmpty
 }
 
 object Ask {
@@ -58,7 +65,7 @@ object Ask {
   type ID      = String
   type Cookie  = String
   type Choices = IndexedSeq[String]
-  type Picks   = Map[User.ID, Int] // _2 is index in Choices list
+  type Picks   = Map[User.ID, List[Int]] // _2 is list of indices into Choices seq
 
   def make(
       _id: Option[String],
@@ -67,6 +74,7 @@ object Ask {
       isPublic: Boolean,
       isTally: Boolean,
       isConcluded: Boolean,
+      isRanked: Boolean,
       creator: User.ID,
       answer: Option[String],
       reveal: Option[String]
@@ -78,6 +86,8 @@ object Ask {
       isPublic = isPublic,
       isTally = isTally,
       isConcluded = isConcluded,
+      isRanked = isRanked,
+      numChoices = choices.size,
       createdAt = DateTime.now(),
       creator = creator,
       answer = answer,

@@ -12,6 +12,11 @@ final class Ask(env: Env) extends LilaController(env) {
       }
     }
 
+  def rank(id: String, ranking: String) =
+    AuthBody { implicit ctx => me =>
+      env.ask.api.rank(id, me.id, ranking.split('-').map(_ toInt).toList).void
+    }
+
   def conclude(id: String) = authorizedAction(id, env.ask.api.conclude)
 
   def reset(id: String) = authorizedAction(id, env.ask.api.reset)

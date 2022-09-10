@@ -27,7 +27,6 @@ case class Post(
     erasedAt: Option[DateTime] = None,
     modIcon: Option[Boolean],
     reactions: Option[Post.Reactions] = None
-    // askCookie: Option[Ask.Cookie] = None
 ) {
 
   private val permitEditsFor  = 4 hours
@@ -72,7 +71,6 @@ case class Post(
       text = newText,
       updatedAt = updated.some,
       reactions = reactions.map(_.view.filterKeys(k => !Post.Reaction.positive(k)).toMap)
-      // askCookie = newCookie
     )
   }
 
@@ -117,7 +115,7 @@ object Post {
       }.toSet
   }
 
-  case class WithFrag(post: Post, body: scalatags.Text.all.Frag, asks: Iterable[lila.ask.Ask])
+  case class WithFrag(post: Post, body: scalatags.Text.all.Frag, asks: Iterable[Option[lila.ask.Ask]])
 
   def make(
       topicId: String,

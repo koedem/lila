@@ -80,6 +80,7 @@ final class PostApi(
               lila.mon.forum.post.create.increment()
               mentionNotifier.notifyMentionedUsers(post, topic)
               Bus.publish(actorApi.CreatePost(post), "forumPost")
+              askApi.setUrl(frozen.text, "/forum/post/" + post._id)
             } inject post
       }
     }

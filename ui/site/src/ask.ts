@@ -19,46 +19,51 @@ function rewire(container: HTMLElement){
   return false;
 }
 
-function getElementTextArray(ask: Element): Array<string|null> {
-  return Array.from($('.ask-ranked-choice', ask), (e: EleLoose) => e?.textContent);
-}
-
 function bindRankedAsk (_: any, ask: Element): void {
   let dragging: Element|null = null;
   let origAfter: Element|null = null;
-  let serverOrder = getElementTextArray(ask);
-  $('.ask-ranked-choice', ask).on('dragover',  (e: DragEvent) => {
-    if (!dragging) return;
-    const target = e.target as Element;
-    if (target) e.preventDefault();
-    target.parentNode?.insertBefore(dragging, isBefore(dragging, target) ? target : target?.nextSibling);
-  }).on('dragstart', (e: DragEvent) => {
-    dragging = e.target as Element;
-    origAfter = dragging.nextElementSibling;
-    e.dataTransfer!.effectAllowed = "move";
-    e.dataTransfer!.setData("text/plain", '');
-  }).on('drop', (e: DragEvent) => {
-    const currentOrder = getElementTextArray(ask);
-    console.log(currentOrder);
-    if (currentOrder.toString() != serverOrder.toString()) {
-      console.log('xhr here');
+  let serverRanking = getRanking(ask);
+  const askId = ask.getAttribute('id');
+  
+  $('.ask-ranked-choice', ask)
+    .on('dragstart', (e: DragEvent) => {
+      dragging = e.target as Element;
+      origAfter = dragging.nextElementSibling;
+      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.setData('text/plain', '');
+    })
+    .on('dragenter',  (e: DragEvent) => {
+      if (dragging == e.target) return;
+      const target = e.target as Element;
+      target.parentNode?.insertBefore(dragging!, isBefore(dragging!, target) ? target : target?.nextSibling);
+    })
+    .on('dragover', (e: DragEvent) => {
       e.preventDefault();
-      serverOrder = currentOrder;
-    }
-    dragging = null;
-    origAfter = null;
-  }).on('dragend', () => {
-    // drop was unsuccessful. reset to serverOrder
-    if (!dragging) return;
-    dragging.parentNode?.insertBefore(dragging, origAfter);
-    dragging = null;
-    origAfter = null;
-  });
+    })
+    .on('dragend', () => {
+      dragging?.parentNode?.insertBefore(dragging, origAfter);
+    })
+    .on('drop', () => {
+      dragging = null;
+      const ranking = getRanking(ask);
+      if (ranking != serverRanking) {
+        xhr.text(`/ask/rank/${askId}/${ranking}`, { method: 'post' }).then(
+          () => serverRanking = ranking,
+          (rsp: string) => console.log(`XHR error: ${rsp}`));
+      }
+    });
 }
+
+function getRanking(ask: Element): string {
+  return Array.from(
+    $('.ask-ranked-choice', ask), 
+    e => e?.getAttribute('value')
+  ).join('-');
+}
+
 function isBefore(dragging: Element, target: Element|null) {
-  if (target?.parentNode === dragging.parentNode)
-    for (var cur = dragging.previousSibling; cur && cur.nodeType !== 9; cur = cur.previousSibling)
-      if (cur === target)
-        return true;
+  if (dragging.parentElement == target?.parentElement)
+    for (let it = dragging.previousSibling; it; it = it.previousSibling)
+      if (it === target) return true;
   return false;
 }
