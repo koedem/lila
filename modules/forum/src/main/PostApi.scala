@@ -38,13 +38,12 @@ final class PostApi(
       data: ForumForm.PostData,
       me: User
   ): Fu[Post] =
-    detectLanguage(data.text) zip recentUserIds(topic, topic.nbPosts) zip askApi.freeze(
-      spam.replace(data.text),
-      me
-    ) flatMap { case ((lang, topicUserIds), frozen) =>
+    detectLanguage(data.text) zip recentUserIds(topic, topic.nbPosts) flatMap {
+      case (lang, topicUserIds) =>
       val publicMod = MasterGranter(_.PublicMod)(me)
       val modIcon   = ~data.modIcon && (publicMod || MasterGranter(_.SeeReport)(me))
       val anonMod   = modIcon && !publicMod
+        val frozen = askApi.freeze(spam.replace(data.text), me)
       val post = Post.make(
         topicId = topic.id,
         author = none,
@@ -65,7 +64,8 @@ final class PostApi(
             topicRepo.coll.update.one($id(topic.id), topic withPost post) >> {
               shouldHideOnPost(topic) ?? topicRepo.hide(topic.id, value = true)
             } >>
-            categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>- {
+            categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>
+              askApi.commit(frozen, s"/forum/redirect/post/${post._id}".some) >>- {
               !categ.quiet ?? (indexer ! InsertPost(post))
               promotion.save(me, post.text)
               shutup ! {
@@ -80,7 +80,6 @@ final class PostApi(
               lila.mon.forum.post.create.increment()
               mentionNotifier.notifyMentionedUsers(post, topic)
               Bus.publish(actorApi.CreatePost(post), "forumPost")
-              askApi.setUrl(frozen.text, "/forum/post/" + post._id)
             } inject post
       }
     }
@@ -93,7 +92,7 @@ final class PostApi(
         case (_, post) if !post.canStillBeEdited =>
           fufail("Post can no longer be edited")
         case (_, post) =>
-          askApi.freeze(spam replace newText, user) flatMap { frozen =>
+          askApi.freezeAsync(spam replace newText, user) flatMap { frozen =>
             val newPost = post.editPost(DateTime.now, frozen.text)
             (newPost.text != post.text).?? {
               postRepo.coll.update.one($id(post.id), newPost) >> newPost.isAnonModPost.?? {

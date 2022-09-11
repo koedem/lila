@@ -9,6 +9,13 @@ import lila.user.User
 
 import lila.security.Granter
 
+/* an ASK is an object that represents a single poll or quiz question.  MARKUP means the ask
+ * definition language.  the FREEZE process transforms form text prior to database storage and
+ * updates collection objects with ask markup.  freeze methods return FROZEN replacement text
+ * with magic/id tags substituted for markup. UNFREEZE methods allow editing by substituting the
+ * markup back into a previously frozen text.   everything else should be pretty self explanatory
+ */
+
 final class AskApi(
     coll: Coll,
     timeline: lila.hub.actors.Timeline
@@ -32,7 +39,7 @@ final class AskApi(
 
   def rank(id: Ask.ID, uid: User.ID, ranking: List[Int]): Funit = {
     if (ranking != Nil && (ranking.distinct.size != ranking.size || ranking.min < 1 || ranking.max > ranking.size))
-      return funit // be safe
+      return funit // It's the RUSSIANS!
 
     val (selector, updater) =
       if (ranking == Nil) (
@@ -70,7 +77,7 @@ final class AskApi(
     else funit
   }
 
-  def getAll(text: String): Fu[List[Option[Ask]]] =
+  def asksIn(text: String): Fu[List[Option[Ask]]] =
     if (!hasAskId(text)) fuccess(Nil)
     else {
       val orderedIds = extractIds(text)
@@ -80,13 +87,30 @@ final class AskApi(
       }
     }
 
-  /* terminology: "markdown" is the popular formatting syntax, "markup" is the ask definition language.
-   * "freeze" transforms form text prior to database storage and updates collection objects with any
-   * ask markup.  it returns "frozen" replacement text with magic/id pairs substituted for the markup.
-   * "unfreeze" prepares for editing - substituting ask markup back into a previously frozen text
-   */
+  // freeze is synchronous but requires a subsequent async "commit" step that actually stores the asks
+  def freeze(text: String, creator: User): Frozen = {
+    val askIntervals                = getMarkupIntervals(text)
+    val asks = askIntervals.map { case (start, end) =>
+      textToAsk(text.substring(start, end), creator)
+    }
+    val it = asks.iterator
+    val sb = new java.lang.StringBuilder(text.length)
+    intervalClosure(askIntervals, text.length) map { seg =>
+      if (it.hasNext && askIntervals.contains(seg)) sb.append(s"$frozenIdMagic{${it.next()._id}}")
+      else sb.append(text, seg._1, seg._2)
+    }
+    Frozen(sb.toString, asks)
+  }
 
-  /*def freeze(text: String, creator: User): Fu[Frozen] = {
+  // commit flushes the asks to the db and optionally sets the timeline entry link at poll conclusion
+  def commit(frozen: Frozen, url: Option[String] = None): Fu[Iterable[Ask]] = {
+    frozen.asks map { ask =>
+      upsert(ask.copy(url = url))
+    } sequenceFu
+  }
+
+  // freezeAsync is freeze & commit together without the url.  call setUrl once you know it
+  def freezeAsync(text: String, creator: User): Fu[Frozen] = {
     val askIntervals                = getMarkupIntervals(text)
     askIntervals.map { case (start, end) =>
       // rarely more than a few of these in a text, otherwise this should be batched
@@ -102,43 +126,27 @@ final class AskApi(
       }
       Frozen(sb.toString, asks)
     }
-  }*/
-  def freeze(text: String, creator: User): Fu[Frozen] = {
-    val askIntervals                = getMarkupIntervals(text)
-    askIntervals.map { case (start, end) =>
-      textToAsk(text.substring(start, end), creator))
-    } map { asks =>
-      val it = asks.iterator
-      val sb = new java.lang.StringBuilder(text.length)
-      intervalClosure(askIntervals, text.length) map { seg =>
-        if (it.hasNext && askIntervals.contains(seg)) sb.append(s"$frozenIdMagic{${it.next()._id}}")
-        else sb.append(text, seg._1, seg._2)
-      }
-      Frozen(sb.toString, asks)
-    }
   }
 
-
-  // commit flushes the asks to the db and optionally sets the link used in timeline event at poll conclusion
+  // we should probably call this at some point after freezeAsync in the edit/update flow, leave it for now
   def setUrl(frozen: String, url: Option[String]): Funit =
     if (!hasAskId(frozen)) funit
     else coll.update.one($inIds(extractIds(frozen)), $set("url" -> url), multi = true).void
-
 
   // unfreeze replaces embedded ids in text with ask markup to allow user edits
   def unfreeze(text: String, asks: Iterable[Option[Ask]]): String =
     if (asks.isEmpty) text
     else {
-      val iter = asks.iterator
-      frozenIdRe.replaceAllIn(text, iter.next().fold(askDeletedFrag)(askToText))
+      val it = asks.iterator
+      frozenIdRe.replaceAllIn(text, _ => it.next().fold(askDeletedFrag)(askToText))
     }
 
   // unfreezeAsync when you can spare the time and don't have the asks handy
   def unfreezeAsync(text: String): Fu[String] =
     if (!hasAskId(text)) fuccess(text)
-    else getAll(text) map (asks => unfreeze(text, asks))
+    else asksIn(text) map (asks => unfreeze(text, asks))
 
-  // these next three are here for convenience and just redirect to object methods
+  // these just redirect to the object for convenience
   def hasAskId(text: String): Boolean = AskApi.hasAskId(text)
 
   def stripAsks(text: String, n: Int = -1): String = AskApi.stripAsks(text, n)
@@ -152,7 +160,8 @@ final class AskApi(
       case Some(dbAsk) =>
         if (dbAsk.equivalent(ask)) fuccess(dbAsk)
         else {
-          val askWithUrl = ask.copy(url = dbAsk.url) // no need to call setUrl again on edits
+          val askWithUrl = ask.copy(url = dbAsk.url)
+          // TODO - should probably call setUrl from ublog & post after updates in case a new ask was added
           coll.update.one($id(ask._id), askWithUrl) inject askWithUrl
         }
       case None =>
@@ -163,17 +172,17 @@ final class AskApi(
 }
 
 object AskApi {
-  // wraps freeze method's return value and unfreeze's parameter
+  // used as return value / parameter
   case class Frozen(text: String, asks: Iterable[Ask])
 
-  // contains() is much faster than regex matches so believe in magic
-  def hasAskId(t: String): Boolean = t.contains(frozenIdMagic)
+  // believe in magic
+  def hasAskId(text: String): Boolean = text.contains(frozenIdMagic)
 
-  // use to remove frozen artifacts for summaries
+  // remove frozen artifacts for summaries
   def stripAsks(text: String, n: Int = -1): String =
     frozenIdRe.replaceAllIn(text, "").take(if (n == -1) text.length else n)
 
-  // used to combine ask html fragments with frozen text
+  // combine ask html fragments with frozen text
   def renderAsks(text: String, askFrags: Iterable[String]): String = {
     val sb = new java.lang.StringBuilder(text.length + askFrags.foldLeft(0)((x, y) => x + y.length))
     val it = askFrags.iterator
@@ -185,9 +194,10 @@ object AskApi {
     sb.toString
   }
 
+  // when we can't find the thing
   val askDeletedFrag = "&lt;poll deleted&gt;<br>"
 
-  // renders ask as markup text
+  // render ask as markup text
   private def askToText(ask: Ask): String = {
     val sb = new mutable.StringBuilder(1024)
     // scala StringBuilder here for ++= readability
@@ -220,27 +230,38 @@ object AskApi {
     )
   }
 
-  // rely on intervals rather than Regex.Match for value equality
+  // use index pairs rather than Regex.Match for value equality
   type Interval  = (Int, Int) // [start, end)
   type Intervals = List[(Int, Int)]
 
-  // returns the (begin, end) offsets of ask markups in text.
+  // return list of (start, end) indices of ask markups in text.
   private def getMarkupIntervals(t: String): Intervals =
     askRe.findAllMatchIn(t).map(m => (m.start, m.end)) toList
 
-  // assumes inputs are non-overlapping and sorted, returns subs and its complement in [0, upper)
+  // return subs and its complement in [0, upper), assumes inputs are non-overlapping and sorted
   private def intervalClosure(subs: Intervals, upper: Int): Intervals = {
     val points = (0 :: subs.flatten(i => List(i._1, i._2)) ::: upper :: Nil).distinct
     points.zip(points.tail)
   }
 
-  private def extractIds(t: String): List[String] = { // used so much it deserves some optimization
+  // extractIds is called often - don't use regex for simple processing that should be fast
+  // magic/id in a frozen text looks like:  ﷖﷔﷒﷐{8_charId}
+  private def extractIds(t: String): List[String] = {
     var idIndex = t.indexOf(frozenIdMagic)
-    frozenIdRe.findAllMatchIn(t).map(_ group 1) toList
+    val ids = mutable.ListBuffer[String]()
+    while (idIndex != -1 && idIndex < t.length - 13) {    // 14 is total magic length
+      ids addOne t.substring(idIndex + 5, idIndex + 13)   // (5, 13) delimit id within magic
+      idIndex = t.indexOf(frozenIdMagic, idIndex + 14)
+    }
+    ids.toList
   }
 
+  // frozen id magic https://www.unicode.org/faq/private_use.html
+  private val frozenIdMagic = "\ufdd6\ufdd4\ufdd2\ufdd0"
+  private val frozenIdRe    = s"$frozenIdMagic\\{(\\S{8})}".r
+
   private def extractQuestion(t: String): String =
-    questionInAskRe.findFirstMatchIn(t).get.group(1).trim // NPE good here
+    questionInAskRe.findFirstMatchIn(t).get.group(1).trim // NPE is desired here
 
   private def extractParams(t: String): Option[String] =
     paramsInAskRe.findFirstMatchIn(t).map(_ group 1)
@@ -256,10 +277,6 @@ object AskApi {
 
   private def extractReveal(t: String): Option[String] =
     revealInAskRe.findFirstMatchIn(t).map(_.group(1).trim)
-
-  // frozen
-  private val frozenIdMagic = "\ufdd6\ufdd4\ufdd2\ufdd0" // https://www.unicode.org/faq/private_use.html
-  private val frozenIdRe    = s"$frozenIdMagic\\{(\\S{8})}".r
 
   // markup
   private val askRe = (

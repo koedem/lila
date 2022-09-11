@@ -26,19 +26,18 @@ final class UblogApi(
   import UblogBsonHandlers._
 
   def create(data: UblogForm.UblogPostData, user: User): Fu[UblogPost] = {
-    askApi.freeze(data.markdown.value, user) flatMap { frozen =>
-      val post = data.create(user, Markdown(frozen.text))
-      askApi.setUrl(frozen.text, s"/ublog/${post._id}/redirect")
+    val frozen = askApi.freeze(data.markdown.value, user)
+    val post = data.create(user, Markdown(frozen.text))
+    askApi.commit(frozen, s"/ublog/${post._id}/redirect".some) >>
       colls.post.insert.one(
         postBSONHandler.writeTry(post).get ++ $doc(
           "likers" -> List(user.id)
         )
       ) inject post
-    }
   }
 
   def update(data: UblogForm.UblogPostData, prev: UblogPost, user: User): Fu[UblogPost] =
-    askApi.freeze(data.markdown.value, user) flatMap { frozen =>
+    askApi.freezeAsync(data.markdown.value, user) flatMap { frozen =>
       getUserBlog(user, insertMissing = true) flatMap { blog =>
         val post = data.update(user, prev, Markdown(frozen.text))
         colls.post.update.one($id(prev.id), $set(postBSONHandler.writeTry(post).get)) >> {

@@ -53,7 +53,7 @@ final class Ublog(env: Env) extends LilaController(env) {
                   ctx.userId.??(env.relation.api.fetchFollows(_, user.id)) zip
                   env.ublog.markup(post) flatMap { case (((others, liked), followed), markup) =>
                     val viewedPost = env.ublog.viewCounter(post, ctx.ip)
-                    env.ask.api.getAll(post.markdown.value) map { asks =>
+                    env.ask.api.asksIn(post.markdown.value) map { asks =>
                       Ok(html.ublog.post(user, blog, viewedPost, markup, others, liked, followed, asks))
                     }
                   }

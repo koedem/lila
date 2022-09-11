@@ -26,7 +26,7 @@ final class ForumTextExpand(askApi: lila.ask.AskApi)(implicit
   def manyPosts(posts: Seq[Post])(implicit netDomain: config.NetDomain): Fu[Seq[Post.WithFrag]] =
     many(posts.map(_.text)) flatMap { p =>
       (p zip posts).map { case (body, post) =>
-        askApi.getAll(post.text) map { asks =>
+        askApi.asksIn(post.text) map { asks =>
           Post.WithFrag(post, body, asks)
         }
       }.sequenceFu

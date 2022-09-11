@@ -116,7 +116,7 @@ object post {
               cls            := "post-text-area edit-post-box",
               minlength      := 3,
               required
-            )(env.ask.api.unfreeze(post.text, asks)),
+            )(env.ask.api.unfreeze(post.text.pp, asks.pp)),
             div(cls := "edit-buttons")(
               a(
                 cls   := "edit-post-cancel",

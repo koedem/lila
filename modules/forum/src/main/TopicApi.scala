@@ -71,10 +71,8 @@ final private[forum] class TopicApi(
       data: ForumForm.TopicData,
       me: User
   ): Fu[Topic] =
-    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) zip askApi.freeze(
-      spam.replace(data.post.text),
-      me
-    ) flatMap { case ((slug, lang), frozen) =>
+    topicRepo.nextSlug(categ, data.name) zip detectLanguage(data.post.text) flatMap { case (slug, lang) =>
+      val frozen = askApi.freeze(spam.replace(data.post.text), me)
       val topic = Topic.make(
         categId = categ.slug,
         slug = slug,
@@ -101,7 +99,8 @@ final private[forum] class TopicApi(
         case None =>
           postRepo.coll.insert.one(post) >>
             topicRepo.coll.insert.one(topic withPost post) >>
-            categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>- {
+            categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>
+              askApi.commit(frozen, s"/forum/redirect/post/${post._id}".some) >>- {
               !categ.quiet ?? (indexer ! InsertPost(post))
               promotion.save(me, post.text)
               shutup ! {
@@ -116,7 +115,6 @@ final private[forum] class TopicApi(
               lila.mon.forum.post.create.increment()
               mentionNotifier.notifyMentionedUsers(post, topic)
               Bus.publish(actorApi.CreatePost(post), "forumPost")
-              askApi.setUrl(frozen.text, "/forum/post/" + post._id)
             } inject topic
       }
     }
