@@ -29,7 +29,7 @@ final class AskApi(
 
   def pick(id: Ask.ID, uid: User.ID, pick: Option[Int]): Fu[Option[Ask]] =
     coll.ext.findAndUpdate[Ask](
-      selector = $and($id(id), $doc("isConcluded" -> false)),
+      selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
       update = { pick.fold($unset(s"picks.$uid"))(p => $set(s"picks.$uid" -> List(p))) },
       fetchNewObject = true
     ) flatMap {
@@ -39,17 +39,15 @@ final class AskApi(
 
   def rank(id: Ask.ID, uid: User.ID, ranking: List[Int]): Funit = {
     if (ranking != Nil && (ranking.distinct.size != ranking.size || ranking.min < 1 || ranking.max > ranking.size))
-      return funit // It's the RUSSIANS!
+      return funit // must be the russians
 
     val (selector, updater) =
       if (ranking == Nil) (
-        $and($id(id), $doc("isConcluded" -> false)),
+        $and($id(id), $doc("tags" -> $ne("concluded"))),
         $unset(s"picks.$uid")
       ) else (
         $and(
-          $id(id),
-          $doc("isConcluded" -> false),
-          $doc("numChoices" -> $eq(ranking.length)) // be safe
+          $id(id), $doc("tags" -> $ne("concluded")), $doc("numChoices" -> $eq(ranking.length))
         ),
         $set(s"picks.$uid" -> ranking)
       )
@@ -59,7 +57,7 @@ final class AskApi(
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
   def conclude(id: Ask.ID): Fu[Option[Ask]] =
-    coll.ext.findAndUpdate[Ask]($id(id), $set("isConcluded" -> true), fetchNewObject = true) collect {
+    coll.ext.findAndUpdate[Ask]($id(id), $addToSet("tags" -> "concluded"), fetchNewObject = true) collect {
       case Some(ask) =>
         timeline ! Propagate(AskConcluded(ask.creator, ask.question, ~ask.url))
           .toUsers(ask.participants.toList)
@@ -72,20 +70,17 @@ final class AskApi(
   def reset(id: Ask.ID): Fu[Option[Ask]] =
     coll.ext.findAndUpdate[Ask]($id(id), $unset("picks"), fetchNewObject = true)
 
+  def byUser(uid: User.ID): Fu[List[Ask]] =
+    coll.find($doc("creator" -> uid)).sort($sort desc "createdAt").cursor[Ask]().list(1000)
+
   def deleteAll(text: String): Funit = {
     if (hasAskId(text)) coll.delete.one($inIds(extractIds(text))).void
     else funit
   }
 
+  // None values in the asksIn list are still important for sequencing
   def asksIn(text: String): Fu[List[Option[Ask]]] =
-    if (!hasAskId(text)) fuccess(Nil)
-    else {
-      val orderedIds = extractIds(text)
-      coll.byIds[Ask](orderedIds) map { ids =>
-        // apparently insertion order means nothing
-        orderedIds map { id => ids.find(_._id == id)}
-      }
-    }
+    coll.optionsByOrderedIds[Ask, Ask.ID](extractIds(text))(_._id)
 
   // freeze is synchronous but requires a subsequent async "commit" step that actually stores the asks
   def freeze(text: String, creator: User): Frozen = {
@@ -203,10 +198,9 @@ object AskApi {
     // scala StringBuilder here for ++= readability
     sb ++= s"?? ${ask.question}\n"
     sb ++= s"?= askId:${ask._id}"
-    sb ++= s"${ask.isPublic ?? " public"}"
-    sb ++= s"${ask.isTally ?? " tally"}"
-    sb ++= s"${ask.isRanked ?? " rank"}"
-    sb ++= s"${ask.isConcluded ?? " concluded"}\n"
+    sb ++= s"${ask.isPublic ?? " public"}${ask.isTally ?? " tally"}"
+    sb ++= s"${ask.isRanked ?? " rank"}${ask.isConcluded ?? " concluded"}"
+    sb ++= s"${ask.isVertical ?? " vertical"}${ask.isFeedback ?? " feedback"}\n"
     sb ++= ask.choices.map(c => s"?${if (ask.answer.contains(c)) "@" else "#"} $c\n").mkString
     sb ++= s"${ask.reveal.fold("")(r => s"?! $r\n")}"
     sb.toString
@@ -215,68 +209,67 @@ object AskApi {
   // construct an Ask from the first markup in segment
   private def textToAsk(segment: String, creator: User): Ask = {
     val params = extractParams(segment)
-    val lowerParams = params ?? (_ toLowerCase)
     Ask.make(
-      _id = extractIdParam(params),
+      _id = extractIdFromParams(params),
       question = extractQuestion(segment),
       choices = extractChoices(segment),
-      isPublic = lowerParams contains "public",
-      isTally = lowerParams contains "tally",
-      isConcluded = lowerParams contains "concluded",
-      isRanked = lowerParams contains "rank",
+      tags = extractTagsFromParams(params map(_ toLowerCase)),
       creator = creator.id,
       answer = extractAnswer(segment),
       reveal = extractReveal(segment)
     )
   }
 
-  // use index pairs rather than Regex.Match for value equality
+  // keep track of index pairs for value equality on match boundaries
   type Interval  = (Int, Int) // [start, end)
-  type Intervals = List[(Int, Int)]
+  type Intervals = List[Interval]
 
   // return list of (start, end) indices of ask markups in text.
   private def getMarkupIntervals(t: String): Intervals =
-    askRe.findAllMatchIn(t).map(m => (m.start, m.end)) toList
+    askRe findAllMatchIn t map(m => (m.start, m.end)) toList
 
-  // return subs and its complement in [0, upper), assumes inputs are non-overlapping and sorted
+  // return subs and their complement in [0, upper)
   private def intervalClosure(subs: Intervals, upper: Int): Intervals = {
-    val points = (0 :: subs.flatten(i => List(i._1, i._2)) ::: upper :: Nil).distinct
-    points.zip(points.tail)
+    val points = (0 :: subs.flatten(i => List(i._1, i._2)) ::: upper :: Nil).distinct.sorted
+    points zip(points tail)
   }
 
   // extractIds is called often - don't use regex for simple processing that should be fast
   // magic/id in a frozen text looks like:  ﷖﷔﷒﷐{8_charId}
-  private def extractIds(t: String): List[String] = {
-    var idIndex = t.indexOf(frozenIdMagic)
+  private def extractIds(t: String): List[Ask.ID] = {
+    var i = t indexOf frozenIdMagic
     val ids = mutable.ListBuffer[String]()
-    while (idIndex != -1 && idIndex < t.length - 13) {    // 14 is total magic length
-      ids addOne t.substring(idIndex + 5, idIndex + 13)   // (5, 13) delimit id within magic
-      idIndex = t.indexOf(frozenIdMagic, idIndex + 14)
+    while (i != -1 && i < t.length - 13) {    // 14 is total magic length
+      ids addOne t.substring(i + 5, i + 13)   // (5, 13) delimit id within magic
+      i = t.indexOf(frozenIdMagic, i + 14)
     }
-    ids.toList
+    ids toList
   }
 
-  // frozen id magic https://www.unicode.org/faq/private_use.html
+  // magic "non characters" for private use in unicode https://www.unicode.org/faq/private_use.html
   private val frozenIdMagic = "\ufdd6\ufdd4\ufdd2\ufdd0"
   private val frozenIdRe    = s"$frozenIdMagic\\{(\\S{8})}".r
 
   private def extractQuestion(t: String): String =
-    questionInAskRe.findFirstMatchIn(t).get.group(1).trim // NPE is desired here
+    questionInAskRe.findFirstMatchIn(t).get group 1 trim // NPE is desired if we fail here
 
   private def extractParams(t: String): Option[String] =
-    paramsInAskRe.findFirstMatchIn(t).map(_ group 1)
+    paramsInAskRe findFirstMatchIn t map(_ group 1)
 
-  private def extractIdParam(tOpt: Option[String]): Option[String] =
-    tOpt.flatMap(idInParamsRe.findFirstMatchIn(_).map(_ group 1))
+  private def extractIdFromParams(o: Option[String]): Option[String] =
+    o flatMap(idInParamsRe findFirstMatchIn _ map(_ group 1))
+
+  private def extractTagsFromParams(o: Option[String]): Ask.Tags =
+    o.fold(Set.empty[String])(tagsInParamsRe findAllMatchIn _ collect(_ group 1) toSet) filterNot(_ startsWith "id:")
 
   private def extractChoices(t: String): Ask.Choices =
-    choicesInAskRe.findAllMatchIn(t).map(_.group(1).trim).distinct toVector
+    (choicesInAskRe findAllMatchIn t map(_ group 1 trim) distinct) toVector
 
   private def extractAnswer(t: String): Option[String] =
-    answerInAskRe.findFirstMatchIn(t).map(_.group(1).trim)
+    answerInAskRe findFirstMatchIn t map(_ group 1 trim)
 
   private def extractReveal(t: String): Option[String] =
-    revealInAskRe.findFirstMatchIn(t).map(_.group(1).trim)
+    revealInAskRe findFirstMatchIn t map(_ group 1 trim)
 
   // markup
   private val askRe = (
@@ -287,7 +280,8 @@ object AskApi {
   ).r
   private val questionInAskRe = raw"^\?\?(.*)".r
   private val paramsInAskRe   = raw"(?m)^\?=(.*)".r
-  private val idInParamsRe    = raw"askId:(\S{8})".r
+  private val idInParamsRe    = raw"id:(\S{8})".r
+  private val tagsInParamsRe  = raw"\h*(\S+)".r
   private val choicesInAskRe  = raw"(?m)^\?[#@](.*)".r
   private val answerInAskRe   = raw"(?m)^\?@(.*)".r
   private val revealInAskRe   = raw"(?m)^\?!(.*)".r

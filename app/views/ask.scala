@@ -13,6 +13,28 @@ import lila.security.{ Granter, Permission }
 object ask {
   import RenderType._
 
+  def report(asks: List[Ask], user: lila.common.LightUser)(implicit ctx: Context) = {
+    views.html.base.layout(
+      title = s"${user.titleName} polls",
+      moreJs = frag(
+        jsModule("ask")
+      ),
+      moreCss = frag(
+        cssTag("ask")
+      ),
+      csp = defaultCsp.withInlineIconFont.some
+    ) {
+      main(cls := "ask page-small box box-pad")(
+        h1(
+          s"${user.titleName} polls"
+        ),
+        div(cls := "ask__report")(
+          asks map renderInner
+        )
+      )
+    }
+  }
+
   def render(frag: Frag, asks: Iterable[Option[Ask]])(implicit ctx: Context) =
     if (asks.isEmpty) frag
     else RawFrag(

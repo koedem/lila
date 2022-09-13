@@ -8,7 +8,7 @@ final class Ask(env: Env) extends LilaController(env) {
     AuthBody { implicit ctx => me =>
       env.ask.api.pick(id, me.id, if (pick < 0) None else Some(pick)) map {
         case Some(ask) => Ok(views.html.ask.renderInner(ask))
-        case None      => NotFound(s"Ask id ${id} not found")
+        case None      => NotFound(s"Ask $id not found")
       }
     }
 
@@ -20,6 +20,16 @@ final class Ask(env: Env) extends LilaController(env) {
   def conclude(id: String) = authorizedAction(id, env.ask.api.conclude)
 
   def reset(id: String) = authorizedAction(id, env.ask.api.reset)
+
+  def byUser(uid: String) =
+    AuthBody { implicit ctx => me =>
+      for {
+        user <- env.user.lightUser(uid)
+        asks <- env.ask.api.byUser(uid)
+        if user.nonEmpty
+      }
+      yield Ok(views.html.ask.report(asks, user.get))
+    }
 
   private def authorizedAction(id: String, action: lila.ask.Ask => Fu[Option[lila.ask.Ask]]) =
     AuthBody { implicit ctx => me =>

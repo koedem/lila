@@ -128,7 +128,6 @@ object Post {
       troll: Boolean,
       hidden: Boolean,
       modIcon: Option[Boolean] = None,
-      askCookie: Option[Ask.Cookie] = None
   ): Post =
     Post(
       _id = lila.common.ThreadLocalRandom nextString idSize,
@@ -143,6 +142,5 @@ object Post {
       createdAt = DateTime.now,
       categId = categId,
       modIcon = modIcon
-      // askCookie = askCookie
     )
 }
