@@ -43,7 +43,7 @@ final class PostApi(
       val publicMod = MasterGranter(_.PublicMod)(me)
       val modIcon   = ~data.modIcon && (publicMod || MasterGranter(_.SeeReport)(me))
       val anonMod   = modIcon && !publicMod
-        val frozen = askApi.freeze(spam.replace(data.text), me)
+      val frozen = askApi.freeze(spam.replace(data.text), me)
       val post = Post.make(
         topicId = topic.id,
         author = none,
@@ -55,7 +55,6 @@ final class PostApi(
         hidden = topic.hidden,
         categId = categ.id,
         modIcon = modIcon option true
-        // askCookie = updated.cookie
       )
       postRepo findDuplicate post flatMap {
         case Some(dup) if !post.modIcon.getOrElse(false) => fuccess(dup)

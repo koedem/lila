@@ -1,6 +1,8 @@
 package controllers
 
 import lila.app._
+import play.api.data.Form
+import play.api.data.Forms.single
 
 final class Ask(env: Env) extends LilaController(env) {
 
@@ -15,6 +17,23 @@ final class Ask(env: Env) extends LilaController(env) {
   def rank(id: String, ranking: String) =
     AuthBody { implicit ctx => me =>
       env.ask.api.rank(id, me.id, ranking.split('-').map(_ toInt).toList).void
+    }
+
+  def feedback(id: String) =
+    AuthBody { implicit ctx => me =>
+      implicit val req = ctx.body
+      req.body.pp
+      feedbackForm.bindFromRequest().fold(
+        _ => BadRequest.fuccess,
+        text =>
+          env.ask.api.feedback(id, me.id, text) map {
+            case Some(ask) =>
+              Ok(views.html.ask.renderInner(ask))
+            case None =>
+              id.pp(s"$text ${me.id}")
+              NotFound
+          }
+      )
     }
 
   def conclude(id: String) = authorizedAction(id, env.ask.api.conclude)
@@ -44,4 +63,5 @@ final class Ask(env: Env) extends LilaController(env) {
             }
       }
     }
+  private val feedbackForm = Form[String](single("text" -> lila.common.Form.cleanNonEmptyText(maxLength = 80)))
 }

@@ -38,21 +38,23 @@ final class AskApi(
     }
 
   def rank(id: Ask.ID, uid: User.ID, ranking: List[Int]): Funit = {
-    if (ranking != Nil && (ranking.distinct.size != ranking.size || ranking.min < 1 || ranking.max > ranking.size))
-      return funit // must be the russians
-
     val (selector, updater) =
       if (ranking == Nil) (
         $and($id(id), $doc("tags" -> $ne("concluded"))),
         $unset(s"picks.$uid")
       ) else (
-        $and(
-          $id(id), $doc("tags" -> $ne("concluded")), $doc("numChoices" -> $eq(ranking.length))
-        ),
+        $and($id(id), $doc("tags" -> $ne("concluded"))),
         $set(s"picks.$uid" -> ranking)
       )
     coll.ext.findAndUpdate[Ask](selector = selector, update = updater).void
   }
+
+  def feedback(id: Ask.ID, uid: User.ID, text: String): Fu[Option[Ask]] =
+    coll.ext.findAndUpdate[Ask](
+      selector = $id(id),
+      update = if (text.isEmpty) $unset(s"feedback.$uid") else $set(s"feedback.$uid" -> text),
+      fetchNewObject = true
+    )
 
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
@@ -73,10 +75,7 @@ final class AskApi(
   def byUser(uid: User.ID): Fu[List[Ask]] =
     coll.find($doc("creator" -> uid)).sort($sort desc "createdAt").cursor[Ask]().list(1000)
 
-  def deleteAll(text: String): Funit = {
-    if (hasAskId(text)) coll.delete.one($inIds(extractIds(text))).void
-    else funit
-  }
+  def deleteAll(text: String): Funit = coll.delete.one($inIds(extractIds(text))).void
 
   // None values in the asksIn list are still important for sequencing
   def asksIn(text: String): Fu[List[Option[Ask]]] =
@@ -84,7 +83,7 @@ final class AskApi(
 
   // freeze is synchronous but requires a subsequent async "commit" step that actually stores the asks
   def freeze(text: String, creator: User): Frozen = {
-    val askIntervals                = getMarkupIntervals(text)
+    val askIntervals = getMarkupIntervals(text)
     val asks = askIntervals.map { case (start, end) =>
       textToAsk(text.substring(start, end), creator)
     }
@@ -123,7 +122,7 @@ final class AskApi(
     }
   }
 
-  // we should probably call this at some point after freezeAsync in the edit/update flow, leave it for now
+  // TODO should probably call this after freezeAsync on form submission for edits
   def setUrl(frozen: String, url: Option[String]): Funit =
     if (!hasAskId(frozen)) funit
     else coll.update.one($inIds(extractIds(frozen)), $set("url" -> url), multi = true).void
@@ -133,7 +132,7 @@ final class AskApi(
     if (asks.isEmpty) text
     else {
       val it = asks.iterator
-      frozenIdRe.replaceAllIn(text, _ => it.next().fold(askDeletedFrag)(askToText))
+      frozenIdRe.replaceAllIn(text, _ => it.next().fold(askNotFoundFrag)(askToText))
     }
 
   // unfreezeAsync when you can spare the time and don't have the asks handy
@@ -190,19 +189,19 @@ object AskApi {
   }
 
   // when we can't find the thing
-  val askDeletedFrag = "&lt;poll deleted&gt;<br>"
+  val askNotFoundFrag = "&lt;poll deleted&gt;<br>"
 
   // render ask as markup text
   private def askToText(ask: Ask): String = {
     val sb = new mutable.StringBuilder(1024)
     // scala StringBuilder here for ++= readability
     sb ++= s"?? ${ask.question}\n"
-    sb ++= s"?= askId:${ask._id}"
-    sb ++= s"${ask.isPublic ?? " public"}${ask.isTally ?? " tally"}"
-    sb ++= s"${ask.isRanked ?? " rank"}${ask.isConcluded ?? " concluded"}"
-    sb ++= s"${ask.isVertical ?? " vertical"}${ask.isFeedback ?? " feedback"}\n"
+    sb ++= s"?= id{${ask._id}}"
+    sb ++= s"${ask.isPublic ?? " public"}${ask.isTally ?? " tally"}${ask.isRanked ?? " rank"}"
+    sb ++= s"${ask.isConcluded ?? " concluded"}${ask.isVertical ?? " vertical"}"
+    sb ++= s"${ask.isStretch ?? " stretch"}${ask.isFeedback ?? " feedback"}\n"
     sb ++= ask.choices.map(c => s"?${if (ask.answer.contains(c)) "@" else "#"} $c\n").mkString
-    sb ++= s"${ask.reveal.fold("")(r => s"?! $r\n")}"
+    sb ++= s"${ask.footer.fold("")(r => s"?! $r\n")}"
     sb.toString
   }
 
@@ -216,7 +215,7 @@ object AskApi {
       tags = extractTagsFromParams(params map(_ toLowerCase)),
       creator = creator.id,
       answer = extractAnswer(segment),
-      reveal = extractReveal(segment)
+      footer = extractFooter(segment)
     )
   }
 
@@ -260,7 +259,7 @@ object AskApi {
     o flatMap(idInParamsRe findFirstMatchIn _ map(_ group 1))
 
   private def extractTagsFromParams(o: Option[String]): Ask.Tags =
-    o.fold(Set.empty[String])(tagsInParamsRe findAllMatchIn _ collect(_ group 1) toSet) filterNot(_ startsWith "id:")
+    o.fold(Set.empty[String])(tagsInParamsRe findAllMatchIn _ collect(_ group 1) toSet) filterNot(_ startsWith "id{")
 
   private def extractChoices(t: String): Ask.Choices =
     (choicesInAskRe findAllMatchIn t map(_ group 1 trim) distinct) toVector
@@ -268,21 +267,21 @@ object AskApi {
   private def extractAnswer(t: String): Option[String] =
     answerInAskRe findFirstMatchIn t map(_ group 1 trim)
 
-  private def extractReveal(t: String): Option[String] =
-    revealInAskRe findFirstMatchIn t map(_ group 1 trim)
+  private def extractFooter(t: String): Option[String] =
+    footerInAskRe findFirstMatchIn t map(_ group 1 trim)
 
   // markup
   private val askRe = (
     raw"(?m)^\?\?\h*\S.*\R"         // match "?? <question>"
       + raw"(\?=.*\R)?"             // match optional "?= <params>"
       + raw"(\?[#@]\h*\S.*\R?){2,}" // match 2 or more "?# <choice>" or "?@ <choice>"
-      + raw"(\?!.*\R?)?"            // match option "?! <reveal>"
+      + raw"(\?!.*\R?)?"            // match option "?! <trailer>"
   ).r
   private val questionInAskRe = raw"^\?\?(.*)".r
   private val paramsInAskRe   = raw"(?m)^\?=(.*)".r
-  private val idInParamsRe    = raw"id:(\S{8})".r
+  private val idInParamsRe    = raw"\bid\{(\S{8})}".r
   private val tagsInParamsRe  = raw"\h*(\S+)".r
   private val choicesInAskRe  = raw"(?m)^\?[#@](.*)".r
   private val answerInAskRe   = raw"(?m)^\?@(.*)".r
-  private val revealInAskRe   = raw"(?m)^\?!(.*)".r
+  private val footerInAskRe  = raw"(?m)^\?!(.*)".r
 }

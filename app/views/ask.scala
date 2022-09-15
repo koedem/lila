@@ -13,7 +13,7 @@ import lila.security.{ Granter, Permission }
 object ask {
   import RenderType._
 
-  def report(asks: List[Ask], user: lila.common.LightUser)(implicit ctx: Context) = {
+  def report(asks: List[Ask], user: lila.common.LightUser)(implicit ctx: Context): Frag = {
     views.html.base.layout(
       title = s"${user.titleName} polls",
       moreJs = frag(
@@ -35,16 +35,16 @@ object ask {
     }
   }
 
-  def render(frag: Frag, asks: Iterable[Option[Ask]])(implicit ctx: Context) =
+  def render(frag: Frag, asks: Iterable[Option[Ask]])(implicit ctx: Context): Frag =
     if (asks.isEmpty) frag
     else RawFrag(
       AskApi.renderAsks(frag.render, asks.map {
         case Some(ask) => renderOuter(ask) render
-        case None => AskApi.askDeletedFrag
+        case None => AskApi.askNotFoundFrag
       })
     )
 
-  def renderInner(ask: Ask)(implicit ctx: Context) =
+  def renderInner(ask: Ask)(implicit ctx: Context): Frag =
     div(cls := "ask", id := ask._id)(
       div(cls := "ask-header")(
         p(cls := "ask-question")(ask.question),
@@ -65,24 +65,22 @@ object ask {
         case RANKED => rankChoices(ask)
         case BAR  => barGraph(ask)
       },
-      ask.reveal match {
-        case Some(reveal) if getPick(ask).nonEmpty => div(cls := "ask-reveal")(p(reveal))
-        case _                                     => emptyFrag
-      }
+      footer(ask)
     )
 
-  private def renderOuter(ask: Ask)(implicit ctx: Context) =
+  private def renderOuter(ask: Ask)(implicit ctx: Context): Frag =
     div(cls := "ask-container")(
       renderInner(ask)
     )
 
-  private def quizChoices(ask: Ask)(implicit ctx: Context) = frag {
+  private def quizChoices(ask: Ask)(implicit ctx: Context): Frag = frag {
     val pick = getPick(ask)
     val ans  = ask.answer map (a => ask.choices.indexOf(a))
 
-    div(cls := "ask-choices")(
+    choiceContainer("ask-choices", ask)(
       ask.choices.zipWithIndex.map { case (choiceText, i) =>
         div(
+          ask.isStretch option (style := "flex: auto !important;"),
           title := tooltip(ask, choiceText.some),
           button(
             pick.isEmpty option (cls := "ask-xhr"),
@@ -101,13 +99,14 @@ object ask {
     )
   }
 
-  private def pollChoices(ask: Ask)(implicit ctx: Context) = frag {
+  private def pollChoices(ask: Ask)(implicit ctx: Context): Frag = frag {
     val pick = getPick(ask)
-    div(cls := "ask-choices")(
+    choiceContainer("ask-choices", ask)(
       ask.choices.zipWithIndex.map { case (choiceText, i) =>
-        val formPick = if (pick.exists(_ == i)) -1 else i
+        val formPick = if (pick contains i) -1 else i
         val id       = s"${ask._id}_$i"
         div(
+          ask.isStretch option (style := "flex: auto !important;"),
           title := tooltip(ask, choiceText.some),
           button(
             cls        := s"ask-xhr",
@@ -120,16 +119,36 @@ object ask {
     )
   }
 
-  private def rankChoices(ask: Ask)(implicit ctx: Context) = frag {
-    val ranking = getRanking(ask) getOrElse (1 to ask.choices.length).toList
-    ol(cls := "ask-ranked", id := ask._id)(
-      ranking map { choice =>
-        li(cls := "ask-ranked-choice", value := choice, draggable := "true")(ask.choices(choice - 1))
+  private def rankChoices(ask: Ask)(implicit ctx: Context): Frag =
+    choiceContainer("ask-ranked", ask)(
+      validRanking(ask) map { choice =>
+        div(
+          cls := "ask-ranked-choice",
+          value := choice,
+          draggable := "true",
+          ask.isStretch option (style := "flex: auto !important;")
+        )(ask.choices(choice - 1))
       }
     )
-  }
 
-  private def barGraph(ask: Ask)(implicit ctx: Context) = {
+  private def footer(ask: Ask)(implicit ctx: Context): Frag =
+    div(cls := "ask-footer")(
+      if (ask.isFeedback) div(
+        p(cls := "ask-prompt")(~ask.footer),
+        div(cls := "ask-footer-box")(
+          input(cls := "ask-text-field", tpe := "text", maxlength := 80, placeholder := "80 characters max")(
+            ask.getFeedback(ctx.me.get.id)
+          ),
+          input(cls := "ask-submit button", tpe := "submit")("Submit")
+        )
+      )
+      else div(cls := "ask-footer-box")(
+        p(cls := "ask-prompt")(!ask.isQuiz || getPick(ask).nonEmpty option ask.footer),
+        ask.isRanked option input(cls := "ask-submit button", tpe := "submit")("Submit")
+      )
+    )
+
+  private def barGraph(ask: Ask)(implicit ctx: Context): Frag =
     div(cls := "ask-bar-graph", id := ask._id)(
       table(
         tbody(frag {
@@ -147,12 +166,16 @@ object ask {
         })
       )
     )
-  }
 
-  private def tooltip(ask: Ask, choice: Option[String])(implicit ctx: Context): String = choice match {
-    case None => ""
+  private def choiceContainer(clas: String, ask: Ask) =
+    div(
+      cls := clas,
+      ask.isVertical option (style := "flex-flow: column !important;"),
+      ask.isStretch option (style := "align-items: stretch !important;"),
+    )
 
-    case Some(choiceText) =>
+  private def tooltip(ask: Ask, choice: Option[String])(implicit ctx: Context): String =
+    choice ?? { choiceText =>
       val sb        = new mutable.StringBuilder(256);
       val pick      = getPick(ask)
       val count     = ask.count(choiceText)
@@ -164,7 +187,7 @@ object ask {
         case BAR =>
           sb ++= pluralize("vote", count)
           if (ask.isPublic || isShusher)
-            sb ++= whoPicked(ask, choiceText, true)
+            sb ++= whoPicked(ask, choiceText, prefix = true)
 
         case QUIZ =>
           if (ask.isTally && hasChoice || isAuthor || isShusher)
@@ -179,7 +202,6 @@ object ask {
             sb ++= whoPicked(ask, choiceText, sb.nonEmpty)
 
         case RANKED =>
-
 
       }
       if (sb.isEmpty) choiceText else sb.toString
@@ -197,6 +219,18 @@ object ask {
   private def whoPicked(ask: Ask, choice: String, prefix: Boolean): String = {
     val who = ask.whoPicked(choice)
     who.take(10).mkString(prefix ?? ": ", " ", (who.length > 10) ?? ", and others...")
+  }
+
+  private def validRanking(ask: Ask)(implicit ctx: Context): List[Int] = {
+    val initialOrder = (1 to ask.choices.length).toList
+    getRanking(ask).fold(initialOrder) { r =>
+      if (r == Nil || r.distinct.sorted != initialOrder) {
+        // i hate to do this here but it beats counting the choices as a
+        // separate aggregation stage in every db update, or storing the size in a separate field
+        ctx.me.map(u => env.ask.api.pick(ask._id, u.id, None)) // blow away the bad value
+        initialOrder
+      } else r
+    }
   }
 
   sealed abstract class RenderType()

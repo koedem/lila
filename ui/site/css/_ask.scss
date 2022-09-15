@@ -17,7 +17,10 @@
   }
 
   div.ask-header {
-    @extend %flex-between;
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    justify-content: space-between;
     flex-wrap: nowrap;
     margin: 0 0 0.6em 0;
 
@@ -48,24 +51,57 @@
     }
   }
 
-  div.ask-reveal p {
-    margin: 1em 0 0 0;
+  div.ask-ranked {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: flex-start;
+    margin: 0 0 0.5em 0;
+
+    &:last-child {
+      margin-right: 0;
+    }
+    div.ask-ranked-choice {
+      @extend %metal, %box-radius;
+      flex: initial;
+      text-align: center;
+      display: inline-block;
+      padding: 0.6em 1.8em;
+      margin: 0 0 0.5em 0.5em;
+      white-space: nowrap;
+      user-select: none;
+      cursor: move;
+    }
+  }
+
+  div.ask-footer {
+    p.ask-prompt {
+    }
+    div.ask-footer-box {
+      margin: 0 0 1em 0.3em;
+      display: flex;
+      flex-flow: row wrap;
+      input.ask-text-field {
+        flex: auto;
+        margin-right: 1em;
+      }
+      input.ask-submit {
+        flex: initial;
+      }
+    }
   }
 
   div.ask-choices {
-    @extend %flex-wrap;
+    display: flex;
+    flex-flow: row wrap;
+    align-items: flex-start;
     overflow: hidden;
     margin: 0 0 0.5em 0;
 
     div {
-      //flex: 1 1 auto;  // full width expand
+      flex: initial;
       position: relative;
       border: none;
-      margin: 0 3px 3px 0;
-    }
-
-    div:last-child {
-      margin-right: 0;
+      margin: 0 0 0.5em 0.5em;
     }
 
     button {
@@ -74,7 +110,11 @@
     }
 
     label {
-      @extend %metal, %flex-center;
+      @extend %metal;
+      display: flex;
+      flex-flow: row wrap;
+      justify-content: center;
+      align-content: center;
       cursor: default;
       user-select: none;
       color: $c-font;
@@ -131,26 +171,6 @@
         transform: rotate(20deg);
       }
     }
-  }
-
-  .ask-ranked {
-    @extend %flex-wrap;
-    margin: 0 0 0.5em 0;
-
-    &:last-child {
-      margin-right: 0;
-    }
-  }
-
-  .ask-ranked-choice {
-    @extend %metal, %box-radius;
-
-    display: inline-block;
-    padding: 0.6em 1.8em;
-    margin: 0 0.3em 0.3em 0;
-    white-space: nowrap;
-    user-select: none;
-    cursor: move;
   }
 
   div.ask-bar-graph {

@@ -556,6 +556,7 @@ POST  /ask/rank/:id/:ranking           controllers.Ask.rank(id: String, ranking:
 POST  /ask/conclude/:id                controllers.Ask.conclude(id: String)
 POST  /ask/reset/:id                   controllers.Ask.reset(id: String)
 GET   /ask/list/:uid                   controllers.Ask.byUser(uid: String)
+POST  /ask/feedback/:id                controllers.Ask.feedback(id: String)
 
 # Forum
 GET   /forum                           controllers.ForumCateg.index
@@ -673,7 +674,7 @@ GET    /stat/rating/distribution/:perf controllers.User.ratingDistribution(perf:
 
 # API
 GET   /api                             controllers.Api.index
-POST  /api/users                       controllers.Api.usersByIds
+#POST  /api/users                       controllers.Api.usersByIds
 GET   /api/user/puzzle-activity        controllers.Puzzle.activity
 GET   /api/puzzle/daily                controllers.Puzzle.apiDaily
 GET   /api/puzzle/activity             controllers.Puzzle.activity

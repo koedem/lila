@@ -4,48 +4,65 @@ lichess.load.then(() => {
   $('div.ask-container').each(function (this: HTMLElement) {
     rewire(this);
     const ask = this.firstElementChild as HTMLElement;
-    $('.ask-ranked',ask).each(bindRankedAsk)
+    $('.ask-ranked', ask).each((_, el) => bindRankedAsk(el, ask.id));
+    $('.ask-submit', ask).each((_, el) => bindSubmit(el, this));
   });
 });
 
-function rewire(container: HTMLElement){
-  const ask = container.firstElementChild as HTMLElement;
+function rewire(container: Element): void {
+  const ask = container.firstElementChild;
+  if (!ask) return;
   $('.ask-xhr', ask).on('click', function (e: Event) {
     xhr.text((e.target as HTMLButtonElement).formAction, { method: 'post' }).then((frag: string) => {
       container!.innerHTML = frag;
       rewire(container);
     });
   });
-  return false;
 }
 
-function bindRankedAsk (_: any, ask: Element): void {
+function bindSubmit(button: Element, container: Element): void {
+  const ask = container.firstElementChild;
+  if (!ask) return;
+  $(button).on('click', () => {
+
+    const text = $('input.ask-text-field', ask).text();
+    console.log(`text = ${text}`);
+    xhr.text('/ask/feedback/' + ask.id, { 
+      method: 'post',
+      body: 'text=' + encodeURIComponent(text)
+    }).then((frag: string) => {
+      container!.innerHTML = frag;
+      rewire(container);
+    });
+  });
+}
+
+function bindRankedAsk(container: Element, askId: string): void {
   let dragging: Element|null = null;
-  let origAfter: Element|null = null;
-  let serverRanking = getRanking(ask);
-  const askId = ask.getAttribute('id');
-  
-  $('.ask-ranked-choice', ask)
+  let after: Element|null = null;
+  let serverRanking = getRanking(container);
+  $('.ask-ranked-choice', container)
     .on('dragstart', (e: DragEvent) => {
       dragging = e.target as Element;
-      origAfter = dragging.nextElementSibling;
+      after = dragging.nextElementSibling;
       e.dataTransfer!.effectAllowed = 'move';
       e.dataTransfer!.setData('text/plain', '');
     })
     .on('dragenter',  (e: DragEvent) => {
       if (dragging == e.target) return;
       const target = e.target as Element;
-      target.parentNode?.insertBefore(dragging!, isBefore(dragging!, target) ? target : target?.nextSibling);
+      const before = isBefore(dragging!, target) ? target : target?.nextSibling;
+      target.parentNode?.insertBefore(dragging!, before);
     })
     .on('dragover', (e: DragEvent) => {
       e.preventDefault();
     })
     .on('dragend', () => {
-      dragging?.parentNode?.insertBefore(dragging, origAfter);
+      dragging?.parentNode?.insertBefore(dragging, after);
     })
     .on('drop', () => {
       dragging = null;
-      const ranking = getRanking(ask);
+      const ranking = getRanking(container);
       if (ranking != serverRanking) {
         xhr.text(`/ask/rank/${askId}/${ranking}`, { method: 'post' }).then(
           () => serverRanking = ranking,

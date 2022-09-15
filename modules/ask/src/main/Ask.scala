@@ -13,7 +13,7 @@ case class Ask(
     creator: User.ID,
     createdAt: DateTime,
     answer: Option[String],
-    reveal: Option[String],
+    footer: Option[String], // reveal text for quizzes or optional text prompt for feedbacks
     picks: Option[Ask.Picks],
     feedback: Option[Ask.Feedback],
     url: Option[String]
@@ -25,7 +25,7 @@ case class Ask(
       isPublic == a.isPublic &&
       isRanked == a.isRanked &&
       answer == a.answer &&
-      reveal == a.reveal
+      footer == a.footer
 
   def participants: Seq[User.ID] =
     picks match {
@@ -35,9 +35,9 @@ case class Ask(
 
   def isPublic: Boolean = tags contains "public"
   def isTally: Boolean = tags contains "tally"
-  def isConcluded: Boolean = tags contains "concluded"
-  def isRanked: Boolean = tags exists(_ startsWith "rank")
+  def isConcluded: Boolean = tags exists(_ startsWith "conclude")
   def isVertical: Boolean = tags exists(_ startsWith "vert")
+  def isStretch: Boolean = tags.exists(_ startsWith "stretch")
   def isFeedback: Boolean = tags contains "feedback"
 
   def hasPick(uid: User.ID): Boolean = picks exists(_ contains uid)
@@ -47,7 +47,7 @@ case class Ask(
   def getRanking(uid: User.ID): Option[List[Int]] =
     picks flatMap(_ get uid)
 
-  def hasFeedback(uid: User.ID): Boolean = feedback exists(_ contains uid)
+  def hasFeedbackFor(uid: User.ID): Boolean = feedback exists(_ contains uid)
   def getFeedback(uid: User.ID) : Option[String] = feedback flatMap(_ get uid)
 
   def count(choice: Int): Int    = picks.fold(0)(_.values.count(_.headOption contains choice))
@@ -62,7 +62,7 @@ case class Ask(
     }
 
   def isPoll: Boolean = answer isEmpty
-
+  def isRanked: Boolean = tags exists(_ startsWith "rank")
   def isQuiz: Boolean = answer nonEmpty
 }
 
@@ -82,7 +82,7 @@ object Ask {
       tags: Tags,
       creator: User.ID,
       answer: Option[String],
-      reveal: Option[String]
+      footer: Option[String]
   ) =
     Ask(
       _id = _id getOrElse(lila.common.ThreadLocalRandom nextString idSize),
@@ -93,7 +93,7 @@ object Ask {
       createdAt = DateTime.now(),
       creator = creator,
       answer = answer,
-      reveal = reveal,
+      footer = footer,
       picks = None,
       feedback = None,
       url = None
