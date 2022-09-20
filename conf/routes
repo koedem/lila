@@ -93,6 +93,7 @@ GET   /player/top/:nb/:perfKey         controllers.User.topNb(nb: Int, perfKey: 
 GET   /player/top/week                 controllers.User.topWeek
 GET   /player/online                   controllers.User.online
 GET   /player/autocomplete             controllers.User.autocomplete
+GET   /api/player                      controllers.User.apiList
 
 GET   /dasher                          controllers.Dasher.get
 
@@ -267,7 +268,8 @@ POST  /practice/complete/:chapterId/:moves        controllers.Practice.complete(
 # Streamer
 GET   /streamer                        controllers.Streamer.index(page: Int ?= 1)
 GET   /api/streamer/featured           controllers.Streamer.featured
-GET   /streamer/live                   controllers.Streamer.live
+GET   /api/streamer/live               controllers.Streamer.live
+GET   /streamer/live                   controllers.Main.movedPermanently(to: String = "/api/streamer/live")
 GET   /streamer/edit                   controllers.Streamer.edit
 POST  /streamer/new                    controllers.Streamer.create
 POST  /streamer/edit                   controllers.Streamer.editApply
@@ -710,6 +712,8 @@ GET   /api/status                      controllers.Api.status
 GET   /api/users/status                controllers.Api.usersStatus
 GET   /api/crosstable/:u1/:u2          controllers.Api.crosstable(u1: String, u2: String)
 POST  /api/stream/games-by-users       controllers.Api.gamesByUsersStream
+POST  /api/stream/games/:streamId      controllers.Api.gamesByIdsStream(streamId: String)
+POST  /api/stream/games/:streamId/add  controllers.Api.gamesByIdsStreamAddIds(streamId: String)
 GET   /api/stream/event                controllers.Api.eventStream
 GET   /api/stream/game/:id             controllers.Api.moveStream(id: String)
 GET   /api/account                     controllers.Account.apiMe
