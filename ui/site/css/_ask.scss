@@ -1,211 +1,245 @@
-.ask {
-  $hue-pick: hue($c-primary);
-  $hue-correct: hue($c-secondary);
-  $c-contrast-font: if($theme-light, #444, #ddd);
+// Intruders! all css class rules here are for div elements unless qualified
 
-  font-size: 14px;
+$hue-pick: hue($c-primary);
+$hue-correct: hue($c-secondary);
+$c-contrast-font: if($theme-light, #444, #ddd);
+$spc: 8px;
+
+fieldset.ask {
+  margin-bottom: 1em;
+  font-size: 1em;
+  padding: 0 3 * $spc $spc 2 * $spc;
   line-height: normal;
+  border: solid 1px if($theme-light, #ddd, #444);
+}
 
-  .ask-action {
-    @media (hover: hover) {
-      visibility: hidden;
-    }
+legend.ask__header {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  margin-top: 1em;
+
+  label {
+    font-size: 1.4em;
+    padding: 0 0 $spc 0;
+    margin: 0 $spc;
   }
+}
 
-  &:hover .ask-action {
-    visibility: visible;
+.ask__body {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  margin: $spc 0 $spc 0;
+}
+
+.ask__footer {
+  margin: $spc 0 $spc;
+  label {
+    display: inline-block;
+    margin: 0 0 $spc $spc;
   }
-
-  div.ask-header {
+  div {
     display: flex;
     flex-flow: row wrap;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: nowrap;
-    margin: 0 0 0.6em 0;
 
-    p.ask-question {
-      font-size: 1.4em;
-      margin: 0 0 0.2em 0;
-    }
-
-    div.ask-actions {
-      display: flex;
-      flex-flow: row-reverse nowrap;
-
-      button.ask-action {
-        @extend %button-none;
-        color: $c-primary;
-        background: none;
-        box-shadow: none;
-        font-size: 0.9em;
-        padding: 0.6em 0.8em 0.6em 0.8em;
-        margin: 0 0 0.3em 0;
-
-        &:hover {
-          box-shadow: inherit;
-          color: mix($c-primary, $c-contrast-font, 50%);
-          background: mix($c-primary, $c-bg-box, if($theme-light, 10%, 20%));
-        }
-      }
-    }
-  }
-
-  div.ask-ranked {
-    display: flex;
-    flex-flow: row wrap;
-    align-items: flex-start;
-    margin: 0 0 0.5em 0;
-
-    &:last-child {
-      margin-right: 0;
-    }
-    div.ask-ranked-choice {
-      @extend %metal, %box-radius;
-      flex: initial;
-      text-align: center;
-      display: inline-block;
-      padding: 0.6em 1.8em;
-      margin: 0 0 0.5em 0.5em;
-      white-space: nowrap;
-      user-select: none;
-      cursor: move;
-    }
-  }
-
-  div.ask-footer {
-    p.ask-prompt {
-    }
-    div.ask-footer-box {
-      margin: 0 0 1em 0.3em;
-      display: flex;
-      flex-flow: row wrap;
-      input.ask-text-field {
-        flex: auto;
-        margin-right: 1em;
-      }
-      input.ask-submit {
-        flex: initial;
-      }
-    }
-  }
-
-  div.ask-choices {
-    display: flex;
-    flex-flow: row wrap;
-    align-items: flex-start;
-    overflow: hidden;
-    margin: 0 0 0.5em 0;
-
-    div {
-      flex: initial;
-      position: relative;
-      border: none;
-      margin: 0 0 0.5em 0.5em;
-    }
-
-    button {
-      position: absolute;
-      left: -99999px;
-    }
-
-    label {
-      @extend %metal;
-      display: flex;
-      flex-flow: row wrap;
-      justify-content: center;
-      align-content: center;
-      cursor: default;
-      user-select: none;
-      color: $c-font;
-      background: none;
-      padding: 0.6em 1.8em;
-      margin: 0;
-      height: 100%;
-      text-shadow: #888 0 0 0;
-    }
-
-    %lighten-hover {
-      cursor: pointer;
-      color: $c-contrast-font;
-
-      &:hover {
-        box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
-      }
-    }
-
-    label.ask-enabled {
-      @extend %lighten-hover;
-      @if $theme-light {
-        background: linear-gradient(hsl(0deg, 0%, 96%) 0%, hsl(0deg, 0%, 90%) 100%);
-      } @else if $theme == 'dark' {
-        background: linear-gradient(hsl(0deg, 0%, 27%) 0%, hsl(0deg, 0%, 19%) 100%);
-      } @else {
-        background: hsla(0deg, 0%, 50%, 0.3);
-      }
-    }
-
-    label.ask-vote {
-      @extend %lighten-hover;
-      color: white;
-      background: linear-gradient(hsl(209, 79%, 58%) 0%, hsl(209, 79%, 52%) 100%);
-    }
-
-    label.ask-correct {
-      color: white;
-      background: linear-gradient(hsl(88deg, 62%, 44%) 0%, hsl(88deg, 62%, 38%) 100%);
-    }
-
-    label.ask-wrong {
-      &:before, // transforms for the red x on wrong answers
-      &:after {
-        position: absolute;
-        content: '';
-        background: hsla(0, 100%, 60%, 0.5);
-        width: 6em;
-        height: 4px;
-        transform: rotate(-20deg);
-      }
-
-      &:after {
-        transform: rotate(20deg);
-      }
-    }
-  }
-
-  div.ask-bar-graph {
-    * {
-      box-sizing: border-box;
-    }
-
-    table {
-      border-collapse: collapse;
-
-      .ask-votes-bar {
-        min-width: 0.2em;
-        background: $c-primary;
-      }
-
-      td {
-        padding: 0 0 0.4em 0;
-        white-space: nowrap;
-      }
-
-      td:first-child {
-        width: 0;
-        padding-left: 0.6em;
-        padding-right: 1.6em;
-      }
-      td:nth-child(2) {
-        width: 0;
-        padding-right: 1.6em;
-        text-align: right;
-      }
-      td:last-child {
-        width: 100%;
-        user-select: none;
-        padding-right: 0.6em;
-      }
+    input.feedback {
+      margin: 0 0 $spc $spc;
+      padding: 0.4em 0.4em;
+      flex: auto;
     }
   }
 }
+
+.ask__choices {
+  flex: auto;
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
+
+  .choice,
+  .xhr-choice,
+  .ranked-choice {
+    @extend %metal, %box-radius;
+    flex: initial;
+    text-align: center;
+    display: inline-block;
+    padding: $spc 2 * $spc;
+    margin: 0 0 $spc $spc;
+    white-space: nowrap;
+    user-select: none;
+    & label {
+      pointer-events: none;
+    }
+    &.stretch {
+      flex: auto;
+    }
+  }
+
+  %lighten-hover {
+    color: $c-contrast-font;
+    &:hover {
+      box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
+    }
+  }
+
+  .ranked-choice {
+    @extend %lighten-hover;
+    cursor: move;
+    &.dragging {
+      box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
+    }
+  }
+
+  .enabled,
+  .selected {
+    @extend %lighten-hover;
+    cursor: pointer;
+    @if $theme-light {
+      background: linear-gradient(hsl(0deg, 0%, 96%) 0%, hsl(0deg, 0%, 90%) 100%);
+    } @else if $theme == 'dark' {
+      background: linear-gradient(hsl(0deg, 0%, 27%) 0%, hsl(0deg, 0%, 19%) 100%);
+    } @else {
+      background: hsla(0deg, 0%, 50%, 0.3);
+    }
+  }
+
+  .selected {
+    color: white;
+    background: linear-gradient(hsl(209, 79%, 58%) 0%, hsl(209, 79%, 52%) 100%);
+  }
+
+  .disabled,
+  .wrong {
+    background: none;
+  }
+
+  .correct {
+    color: white;
+    background: linear-gradient(hsl(88deg, 62%, 44%) 0%, hsl(88deg, 62%, 38%) 100%);
+  }
+
+  .wrong {
+    // transforms for the red x on wrong answers
+    position: relative;
+    &:before,
+    &:after {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 6em;
+      height: 4px;
+      background: hsla(0, 100%, 60%, 0.5);
+      transform: translate(-50%, -50%) rotate(-20deg);
+      content: '';
+    }
+    &:after {
+      transform: translate(-50%, -50%) rotate(20deg);
+    }
+  }
+
+  &.stretch {
+    align-items: stretch;
+  }
+  &.vertical {
+    flex-flow: column;
+  }
+}
+
+.ask__bar-graph {
+  * {
+    box-sizing: border-box;
+  }
+
+  .bar {
+    min-width: 0.2em;
+    background: $c-primary;
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  td {
+    padding: 0 0 0.4em 0;
+    white-space: nowrap;
+  }
+
+  td:first-child {
+    width: 0;
+    padding-left: 0.6em;
+    padding-right: 1.6em;
+  }
+
+  td:nth-child(2) {
+    width: 0;
+    padding-right: 1.6em;
+    text-align: right;
+  }
+
+  td:last-child {
+    width: 100%;
+    user-select: none;
+    padding-right: 0.6em;
+  }
+}
+
+.ask__submit {
+  @extend %data-icon, %flex-around;
+  flex: initial;
+  visibility: hidden;
+
+  input {
+    padding: $spc 1.2em;
+    margin: 0 0 $spc 2 * $spc;
+    font-size: 1em;
+  }
+
+  &.success {
+    visibility: visible;
+    color: $c-secondary;
+    & > input {
+      visibility: hidden;
+    }
+    &::after {
+      position: absolute;
+      content: '';
+    }
+  }
+  &.dirty {
+    visibility: visible;
+  }
+}
+
+.ask__action {
+  @media (hover: hover) {
+    visibility: hidden;
+  }
+  &:hover .ask__action {
+    visibility: visible;
+  }
+}
+
+.ask__actions {
+  display: flex;
+  flex-flow: row-reverse nowrap;
+}
+
+/*button {
+    @extend %button-none;
+    color: $c-primary;
+    background: none;
+    box-shadow: none;
+    font-size: 0.9em;
+    padding: 0.6em 0.8em 0.6em 0.8em;
+    margin: 0 0 0.3em 0;
+
+    &:hover {
+      box-shadow: inherit;
+      color: mix($c-primary, $c-contrast-font, 50%);
+      background: mix($c-primary, $c-bg-box, if($theme-light, 10%, 20%));
+    }
+  }*/

@@ -100,7 +100,7 @@ final private[forum] class TopicApi(
           postRepo.coll.insert.one(post) >>
             topicRepo.coll.insert.one(topic withPost post) >>
             categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>
-              askApi.commit(frozen, s"/forum/redirect/post/${post._id}".some) >>- {
+            askApi.commit(frozen, s"/forum/redirect/post/${post._id}".some) >>- {
               !categ.quiet ?? (indexer ! InsertPost(post))
               promotion.save(me, post.text)
               shutup ! {

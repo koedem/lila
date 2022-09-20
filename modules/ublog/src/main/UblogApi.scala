@@ -27,7 +27,7 @@ final class UblogApi(
 
   def create(data: UblogForm.UblogPostData, user: User): Fu[UblogPost] = {
     val frozen = askApi.freeze(data.markdown.value, user)
-    val post = data.create(user, Markdown(frozen.text))
+    val post   = data.create(user, Markdown(frozen.text))
     askApi.commit(frozen, s"/ublog/${post._id}/redirect".some) >>
       colls.post.insert.one(
         postBSONHandler.writeTry(post).get ++ $doc(

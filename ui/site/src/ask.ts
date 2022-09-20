@@ -1,86 +1,123 @@
 import * as xhr from 'common/xhr';
 
-lichess.load.then(() => {
-  $('div.ask-container').each(function (this: HTMLElement) {
-    rewire(this);
-    const ask = this.firstElementChild as HTMLElement;
-    $('.ask-ranked', ask).each((_, el) => bindRankedAsk(el, ask.id));
-    $('.ask-submit', ask).each((_, el) => bindSubmit(el, this));
-  });
-});
+lichess.load.then(() => $('.ask-container').each((_, e: EleLoose) => new Ask(e.firstElementChild!)));
+class Ask {
+  el: Element;
+  submitEl?: Element;
+  feedbackEl?: HTMLInputElement;
+  isExclusive = false;
+  isRanked = false;
 
-function rewire(container: Element): void {
-  const ask = container.firstElementChild;
-  if (!ask) return;
-  $('.ask-xhr', ask).on('click', function (e: Event) {
-    xhr.text((e.target as HTMLButtonElement).formAction, { method: 'post' }).then((frag: string) => {
-      container!.innerHTML = frag;
-      rewire(container);
-    });
-  });
+  constructor(askEl: Element) {
+    this.el = askEl;
+    wireExclusiveChoices(this);
+    wireRankedChoices(this);
+    wireFeedback(this);
+    wireSubmit(this);
+  }
+  ranking = (): string => Array.from($('.ranked-choice', this.el), e => e?.getAttribute('value')).join('-');
+
+  setState = (state: 'clean' | 'dirty' | 'success') => {
+    this.submitEl?.classList.remove('dirty', 'success');
+    if (state != 'clean') this.submitEl?.classList.add(state);
+  };
 }
 
-function bindSubmit(button: Element, container: Element): void {
-  const ask = container.firstElementChild;
-  if (!ask) return;
-  $(button).on('click', () => {
+const rewire = (container: Element | null, frag: string): Ask | undefined => {
+  while (container && !container.classList.contains('ask-container')) {
+    container = container.parentElement;
+  }
+  if (container && frag) {
+    container.innerHTML = frag;
+    return new Ask(container.firstElementChild!);
+  }
+};
 
-    const text = $('input.ask-text-field', ask).text();
-    console.log(`text = ${text}`);
-    xhr.text('/ask/feedback/' + ask.id, { 
-      method: 'post',
-      body: 'text=' + encodeURIComponent(text)
-    }).then((frag: string) => {
-      container!.innerHTML = frag;
-      rewire(container);
-    });
-  });
-}
+const failure = (reason: any): void => {
+  console.log(`Ask XHR failed with: ${reason}`); // TODO - error handling
+};
 
-function bindRankedAsk(container: Element, askId: string): void {
-  let dragging: Element|null = null;
-  let after: Element|null = null;
-  let serverRanking = getRanking(container);
-  $('.ask-ranked-choice', container)
-    .on('dragstart', (e: DragEvent) => {
-      dragging = e.target as Element;
-      after = dragging.nextElementSibling;
-      e.dataTransfer!.effectAllowed = 'move';
-      e.dataTransfer!.setData('text/plain', '');
-    })
-    .on('dragenter',  (e: DragEvent) => {
-      if (dragging == e.target) return;
+const wireExclusiveChoices = (ask: Ask): void => {
+  ask.isExclusive =
+    $('.xhr-choice', ask.el).on('click', function (e: Event) {
       const target = e.target as Element;
-      const before = isBefore(dragging!, target) ? target : target?.nextSibling;
-      target.parentNode?.insertBefore(dragging!, before);
+      const body = ask.feedbackEl && xhr.form({ text: ask.feedbackEl.value });
+      const value = target.classList.contains('selected') ? '' : target?.getAttribute('value');
+      xhr
+        .text(`/ask/${ask.el.id}?picks=${value}`, { method: 'post', body: body })
+        .then((frag: string) => rewire(ask.el, frag)?.setState('success'), failure);
+    }).length > 0;
+};
+
+const wireRankedChoices = (ask: Ask): void => {
+  const isBefore = (dragging: Element, target: Element | null): boolean => {
+    if (dragging.parentElement == target?.parentElement)
+      for (let it = dragging.previousSibling; it; it = it.previousSibling) if (it === target) return true;
+    return false;
+  };
+  let dragging: Element | null = null;
+  let after: Element | null = null;
+  ask.isRanked =
+    $('.ranked-choice', ask.el)
+      .on('dragstart', (e: DragEvent) => {
+        dragging = e.target as Element;
+        dragging.classList.add('dragging');
+        after = dragging.nextElementSibling;
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('text/plain', '');
+      })
+      .on('dragenter', (e: DragEvent) => {
+        const target = e.target as Element;
+        if (target.parentElement != dragging?.parentElement) return;
+        const before = isBefore(dragging!, target) ? target : target?.nextSibling;
+        target.parentNode?.insertBefore(dragging!, before);
+      })
+      .on('dragover', (e: DragEvent) => {
+        e.preventDefault();
+      })
+      .on('dragend', () => {
+        dragging?.classList.remove('dragging');
+        dragging?.parentNode?.insertBefore(dragging, after);
+      })
+      .on('drop', () => {
+        dragging?.classList.remove('dragging');
+        dragging = null;
+        ask.setState(ask.ranking() == initialOrder ? 'clean' : 'dirty');
+      }).length > 0;
+  const initialOrder = ask.ranking();
+};
+
+// optional feedbackEl text field
+const wireFeedback = (ask: Ask): void => {
+  ask.feedbackEl = $('.feedback', ask.el)
+    .on('input', () => {
+      console.log(ask.el);
+      ask.setState(ask.feedbackEl?.value == initialFeedback ? 'clean' : 'dirty');
     })
-    .on('dragover', (e: DragEvent) => {
+    .on('keypress', (e: KeyboardEvent) => {
+      if (
+        e.key != 'Enter' ||
+        e.shiftKey ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.metaKey ||
+        !ask.submitEl?.classList.contains('dirty')
+      )
+        return;
+      $('input', ask.submitEl).trigger('click');
       e.preventDefault();
     })
-    .on('dragend', () => {
-      dragging?.parentNode?.insertBefore(dragging, after);
-    })
-    .on('drop', () => {
-      dragging = null;
-      const ranking = getRanking(container);
-      if (ranking != serverRanking) {
-        xhr.text(`/ask/rank/${askId}/${ranking}`, { method: 'post' }).then(
-          () => serverRanking = ranking,
-          (rsp: string) => console.log(`XHR error: ${rsp}`));
-      }
-    });
-}
+    .get(0) as HTMLInputElement;
+  const initialFeedback = ask.feedbackEl?.value;
+};
 
-function getRanking(ask: Element): string {
-  return Array.from(
-    $('.ask-ranked-choice', ask), 
-    e => e?.getAttribute('value')
-  ).join('-');
-}
-
-function isBefore(dragging: Element, target: Element|null) {
-  if (dragging.parentElement == target?.parentElement)
-    for (let it = dragging.previousSibling; it; it = it.previousSibling)
-      if (it === target) return true;
-  return false;
-}
+// submit button for feedback and/or ranked (non-xhr) choices
+const wireSubmit = (ask: Ask): void => {
+  ask.submitEl = $('.ask__submit', ask.el).get(0);
+  $('input', ask.submitEl).on('click', () => {
+    const path = `/ask/${ask.el.id}` + (ask.isRanked ? `?picks=${ask.ranking()}` : '');
+    xhr
+      .text(path, { method: 'post', body: xhr.form({ text: ask.feedbackEl?.value }) })
+      .then((frag: string) => rewire(ask.el, frag)?.setState('success'), failure);
+  });
+};

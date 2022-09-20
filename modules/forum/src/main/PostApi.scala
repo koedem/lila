@@ -38,12 +38,11 @@ final class PostApi(
       data: ForumForm.PostData,
       me: User
   ): Fu[Post] =
-    detectLanguage(data.text) zip recentUserIds(topic, topic.nbPosts) flatMap {
-      case (lang, topicUserIds) =>
+    detectLanguage(data.text) zip recentUserIds(topic, topic.nbPosts) flatMap { case (lang, topicUserIds) =>
       val publicMod = MasterGranter(_.PublicMod)(me)
       val modIcon   = ~data.modIcon && (publicMod || MasterGranter(_.SeeReport)(me))
       val anonMod   = modIcon && !publicMod
-      val frozen = askApi.freeze(spam.replace(data.text), me)
+      val frozen    = askApi.freeze(spam.replace(data.text), me)
       val post = Post.make(
         topicId = topic.id,
         author = none,
@@ -64,7 +63,7 @@ final class PostApi(
               shouldHideOnPost(topic) ?? topicRepo.hide(topic.id, value = true)
             } >>
             categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>
-              askApi.commit(frozen, s"/forum/redirect/post/${post._id}".some) >>- {
+            askApi.commit(frozen, s"/forum/redirect/post/${post._id}".some) >>- {
               !categ.quiet ?? (indexer ! InsertPost(post))
               promotion.save(me, post.text)
               shutup ! {

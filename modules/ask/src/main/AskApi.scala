@@ -9,11 +9,11 @@ import lila.user.User
 
 import lila.security.Granter
 
-/* an ASK is an object that represents a single poll or quiz question.  MARKUP means the ask
- * definition language.  the FREEZE process transforms form text prior to database storage and
- * updates collection objects with ask markup.  freeze methods return FROZEN replacement text
- * with magic/id tags substituted for markup. UNFREEZE methods allow editing by substituting the
- * markup back into a previously frozen text.   everything else should be pretty self explanatory
+/* an ASK is an object that represents a single poll, quiz, or feedback.  in this file the term
+ * MARKUP refers to the ask definition syntax.  the FREEZE process transforms form text prior to
+ * database storage and updates collection objects with ask markup.  freeze methods return FROZEN
+ * replacement text with magic{id} tags substituted for markup. UNFREEZE methods allow editing by
+ * substituting the markup back into a previously frozen text.
  */
 
 final class AskApi(
@@ -27,34 +27,29 @@ final class AskApi(
 
   def get(id: Ask.ID): Fu[Option[Ask]] = coll.byId[Ask](id)
 
-  def pick(id: Ask.ID, uid: User.ID, pick: Option[Int]): Fu[Option[Ask]] =
+  // passing None for ranking means don't mess with picks whereas feedback is always either set or unset
+  def update(
+      id: Ask.ID,
+      uid: User.ID,
+      ranking: Option[List[Int]],
+      feedback: Option[String]
+  ): Fu[Option[Ask]] = {
+    val sets   = mutable.ListBuffer[ElementProducer]()
+    val unsets = mutable.ListBuffer[String]()
+    ranking map { r =>
+      if (r nonEmpty) sets addOne (s"picks.$uid" -> r) else unsets addOne s"picks.$uid"
+    }
+    if (feedback.isDefined) sets addOne s"feedback.$uid" -> feedback.get.pp
+    else unsets addOne s"feedback.$uid"
     coll.ext.findAndUpdate[Ask](
       selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
-      update = { pick.fold($unset(s"picks.$uid"))(p => $set(s"picks.$uid" -> List(p))) },
+      update = $set(sets.toSeq: _*) ++ $unset(unsets),
       fetchNewObject = true
     ) flatMap {
-      case None => get(id) // concluded prior to the pick? look up the ask.
+      case None => get(id) // in case it's concluded, look it up for the xhr response
       case ask  => fuccess(ask)
     }
-
-  def rank(id: Ask.ID, uid: User.ID, ranking: List[Int]): Funit = {
-    val (selector, updater) =
-      if (ranking == Nil) (
-        $and($id(id), $doc("tags" -> $ne("concluded"))),
-        $unset(s"picks.$uid")
-      ) else (
-        $and($id(id), $doc("tags" -> $ne("concluded"))),
-        $set(s"picks.$uid" -> ranking)
-      )
-    coll.ext.findAndUpdate[Ask](selector = selector, update = updater).void
   }
-
-  def feedback(id: Ask.ID, uid: User.ID, text: String): Fu[Option[Ask]] =
-    coll.ext.findAndUpdate[Ask](
-      selector = $id(id),
-      update = if (text.isEmpty) $unset(s"feedback.$uid") else $set(s"feedback.$uid" -> text),
-      fetchNewObject = true
-    )
 
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
@@ -96,7 +91,7 @@ final class AskApi(
     Frozen(sb.toString, asks)
   }
 
-  // commit flushes the asks to the db and optionally sets the timeline entry link at poll conclusion
+  // commit flushes the asks to the db and optionally sets the timeline entry link (used on poll conclusion)
   def commit(frozen: Frozen, url: Option[String] = None): Fu[Iterable[Ask]] = {
     frozen.asks map { ask =>
       upsert(ask.copy(url = url))
@@ -105,7 +100,7 @@ final class AskApi(
 
   // freezeAsync is freeze & commit together without the url.  call setUrl once you know it
   def freezeAsync(text: String, creator: User): Fu[Frozen] = {
-    val askIntervals                = getMarkupIntervals(text)
+    val askIntervals = getMarkupIntervals(text)
     askIntervals.map { case (start, end) =>
       // rarely more than a few of these in a text, otherwise this should be batched
       upsert(
@@ -212,34 +207,34 @@ object AskApi {
       _id = extractIdFromParams(params),
       question = extractQuestion(segment),
       choices = extractChoices(segment),
-      tags = extractTagsFromParams(params map(_ toLowerCase)),
+      tags = extractTagsFromParams(params map (_ toLowerCase)),
       creator = creator.id,
       answer = extractAnswer(segment),
       footer = extractFooter(segment)
     )
   }
 
-  // keep track of index pairs for value equality on match boundaries
+  // keep track of index pairs for value equality on matches
   type Interval  = (Int, Int) // [start, end)
   type Intervals = List[Interval]
 
   // return list of (start, end) indices of ask markups in text.
   private def getMarkupIntervals(t: String): Intervals =
-    askRe findAllMatchIn t map(m => (m.start, m.end)) toList
+    askRe findAllMatchIn t map (m => (m.start, m.end)) toList
 
   // return subs and their complement in [0, upper)
   private def intervalClosure(subs: Intervals, upper: Int): Intervals = {
     val points = (0 :: subs.flatten(i => List(i._1, i._2)) ::: upper :: Nil).distinct.sorted
-    points zip(points tail)
+    points zip (points tail)
   }
 
   // extractIds is called often - don't use regex for simple processing that should be fast
   // magic/id in a frozen text looks like:  ﷖﷔﷒﷐{8_charId}
   private def extractIds(t: String): List[Ask.ID] = {
-    var i = t indexOf frozenIdMagic
+    var i   = t indexOf frozenIdMagic
     val ids = mutable.ListBuffer[String]()
-    while (i != -1 && i < t.length - 13) {    // 14 is total magic length
-      ids addOne t.substring(i + 5, i + 13)   // (5, 13) delimit id within magic
+    while (i != -1 && i <= t.length - 14) { // 14 is total v1 magic length
+      ids addOne t.substring(i + 5, i + 13) // (5, 13) delimit id within v1 magic
       i = t.indexOf(frozenIdMagic, i + 14)
     }
     ids toList
@@ -253,35 +248,38 @@ object AskApi {
     questionInAskRe.findFirstMatchIn(t).get group 1 trim // NPE is desired if we fail here
 
   private def extractParams(t: String): Option[String] =
-    paramsInAskRe findFirstMatchIn t map(_ group 1)
+    paramsInAskRe findFirstMatchIn t map (_ group 1)
 
   private def extractIdFromParams(o: Option[String]): Option[String] =
-    o flatMap(idInParamsRe findFirstMatchIn _ map(_ group 1))
+    o flatMap (idInParamsRe findFirstMatchIn _ map (_ group 1))
 
   private def extractTagsFromParams(o: Option[String]): Ask.Tags =
-    o.fold(Set.empty[String])(tagsInParamsRe findAllMatchIn _ collect(_ group 1) toSet) filterNot(_ startsWith "id{")
+    o.fold(Set.empty[String])(
+      tagsInParamsRe findAllMatchIn _ collect (_ group 1) toSet
+    ) filterNot (_.pp startsWith "id{")
 
   private def extractChoices(t: String): Ask.Choices =
-    (choicesInAskRe findAllMatchIn t map(_ group 1 trim) distinct) toVector
+    (choicesInAskRe findAllMatchIn t map (_ group 1 trim) distinct) toVector
 
   private def extractAnswer(t: String): Option[String] =
-    answerInAskRe findFirstMatchIn t map(_ group 1 trim)
+    answerInAskRe findFirstMatchIn t map (_ group 1 trim)
 
   private def extractFooter(t: String): Option[String] =
-    footerInAskRe findFirstMatchIn t map(_ group 1 trim)
+    footerInAskRe findFirstMatchIn t map (_ group 1 trim)
 
-  // markup
+  // markup, there is no nesting so parse with regex for now.
   private val askRe = (
-    raw"(?m)^\?\?\h*\S.*\R"         // match "?? <question>"
-      + raw"(\?=.*\R)?"             // match optional "?= <params>"
-      + raw"(\?[#@]\h*\S.*\R?){2,}" // match 2 or more "?# <choice>" or "?@ <choice>"
-      + raw"(\?!.*\R?)?"            // match option "?! <trailer>"
-  ).r
+    raw"(?m)^\?\?\h*\S.*\R"         // match "?? <question>" line and (
+      + raw"((\?=.*\R?)?"           //      (match optional "?= <params>" line and
+      + raw"(\?[#@]\h*\S.*\R?){2,}" //       match two+ "?# <choice>"/"?@ <choice>" lines and
+      + raw"(\?!.*\R?)?"            //       match optional "?! <footer>" line)
+      + raw"|\?=.*feedback.*\R?)"   //   or: match ?= with "feedback" param (a feedback-only ask)
+  ).r                               // )
   private val questionInAskRe = raw"^\?\?(.*)".r
   private val paramsInAskRe   = raw"(?m)^\?=(.*)".r
   private val idInParamsRe    = raw"\bid\{(\S{8})}".r
   private val tagsInParamsRe  = raw"\h*(\S+)".r
   private val choicesInAskRe  = raw"(?m)^\?[#@](.*)".r
   private val answerInAskRe   = raw"(?m)^\?@(.*)".r
-  private val footerInAskRe  = raw"(?m)^\?!(.*)".r
+  private val footerInAskRe   = raw"(?m)^\?!(.*)".r
 }

@@ -8,7 +8,6 @@ case class Ask(
     _id: Ask.ID,
     question: String,
     choices: Ask.Choices,
-    numChoices: Int, // redundant, for rank update validation without aggregation
     tags: Ask.Tags,
     creator: User.ID,
     createdAt: DateTime,
@@ -33,22 +32,22 @@ case class Ask(
       case None    => Nil
     }
 
-  def isPublic: Boolean = tags contains "public"
-  def isTally: Boolean = tags contains "tally"
-  def isConcluded: Boolean = tags exists(_ startsWith "conclude")
-  def isVertical: Boolean = tags exists(_ startsWith "vert")
-  def isStretch: Boolean = tags.exists(_ startsWith "stretch")
-  def isFeedback: Boolean = tags contains "feedback"
+  def isPublic: Boolean    = tags contains "public"
+  def isTally: Boolean     = tags contains "tally"
+  def isConcluded: Boolean = tags contains "concluded"
+  def isVertical: Boolean  = tags exists (_ startsWith "vert")
+  def isStretch: Boolean   = tags.exists(_ startsWith "stretch")
+  def isFeedback: Boolean  = tags contains "feedback"
 
-  def hasPick(uid: User.ID): Boolean = picks exists(_ contains uid)
+  def hasPick(uid: User.ID): Boolean = picks exists (_ contains uid)
   def getPick(uid: User.ID): Option[Int] =
-    picks flatMap(_ get uid flatMap(_ headOption))
+    picks flatMap (_ get uid flatMap (_ headOption))
 
   def getRanking(uid: User.ID): Option[List[Int]] =
-    picks flatMap(_ get uid)
+    picks flatMap (_ get uid)
 
-  def hasFeedbackFor(uid: User.ID): Boolean = feedback exists(_ contains uid)
-  def getFeedback(uid: User.ID) : Option[String] = feedback flatMap(_ get uid)
+  def hasFeedbackFor(uid: User.ID): Boolean     = feedback exists (_ contains uid)
+  def getFeedback(uid: User.ID): Option[String] = feedback flatMap (_ get uid)
 
   def count(choice: Int): Int    = picks.fold(0)(_.values.count(_.headOption contains choice))
   def count(choice: String): Int = count(choices indexOf choice)
@@ -61,13 +60,13 @@ case class Ask(
       case None => Nil
     }
 
-  def isPoll: Boolean = answer isEmpty
-  def isRanked: Boolean = tags exists(_ startsWith "rank")
-  def isQuiz: Boolean = answer nonEmpty
+  def isPoll: Boolean   = answer isEmpty
+  def isRanked: Boolean = tags exists (_ startsWith "rank")
+  def isQuiz: Boolean   = answer nonEmpty
 }
 
 object Ask {
-  val idSize    = 8
+  val idSize = 8
 
   type ID       = String
   type Tags     = Set[String]
@@ -85,10 +84,9 @@ object Ask {
       footer: Option[String]
   ) =
     Ask(
-      _id = _id getOrElse(lila.common.ThreadLocalRandom nextString idSize),
+      _id = _id getOrElse (lila.common.ThreadLocalRandom nextString idSize),
       question = question,
       choices = choices,
-      numChoices = choices.size,
       tags = tags,
       createdAt = DateTime.now(),
       creator = creator,
