@@ -23,18 +23,16 @@ class Ask {
   };
 }
 
-const rewire = (container: Element | null, frag: string): Ask | undefined => {
-  while (container && !container.classList.contains('ask-container')) {
-    container = container.parentElement;
-  }
-  if (container && frag) {
-    container.innerHTML = frag;
-    return new Ask(container.firstElementChild!);
+const rewire = (el: Element | null, frag: string): Ask | undefined => {
+  while (el && !el.classList.contains('ask-container')) el = el.parentElement;
+  if (el && frag) {
+    el.innerHTML = frag;
+    return new Ask(el.firstElementChild!);
   }
 };
 
 const failure = (reason: any): void => {
-  console.log(`Ask XHR failed with: ${reason}`); // TODO - error handling
+  console.log(`Ask XHR failed with: ${reason}`);
 };
 
 const wireExclusiveChoices = (ask: Ask): void => {
@@ -50,9 +48,9 @@ const wireExclusiveChoices = (ask: Ask): void => {
 };
 
 const wireRankedChoices = (ask: Ask): void => {
-  const isBefore = (dragging: Element, target: Element | null): boolean => {
-    if (dragging.parentElement == target?.parentElement)
-      for (let it = dragging.previousSibling; it; it = it.previousSibling) if (it === target) return true;
+  const isBefore = (lhs: Element, rhs: Element | null): boolean => {
+    if (lhs.parentElement != rhs?.parentElement) return false;
+    for (let it = lhs.previousSibling; it; it = it.previousSibling) if (it === rhs) return true;
     return false;
   };
   let dragging: Element | null = null;

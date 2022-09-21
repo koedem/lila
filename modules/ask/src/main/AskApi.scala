@@ -17,7 +17,7 @@ import lila.security.Granter
  */
 
 final class AskApi(
-    coll: Coll,
+    yolo: lila.db.AsyncColl,
     timeline: lila.hub.actors.Timeline
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
@@ -25,7 +25,9 @@ final class AskApi(
 
   implicit val AskBSONHandler: BSONDocumentHandler[Ask] = Macros.handler[Ask]
 
-  def get(id: Ask.ID): Fu[Option[Ask]] = coll.byId[Ask](id)
+  def get(id: Ask.ID): Fu[Option[Ask]] = yolo { coll =>
+    coll.byId[Ask](id)
+  }
 
   // passing None for ranking means don't mess with picks whereas feedback is always either set or unset
   def update(
@@ -41,40 +43,49 @@ final class AskApi(
     }
     if (feedback.isDefined) sets addOne s"feedback.$uid" -> feedback.get.pp
     else unsets addOne s"feedback.$uid"
-    coll.ext.findAndUpdate[Ask](
-      selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
-      update = $set(sets.toSeq: _*) ++ $unset(unsets),
-      fetchNewObject = true
-    ) flatMap {
-      case None => get(id) // in case it's concluded, look it up for the xhr response
-      case ask  => fuccess(ask)
+    yolo { coll =>
+      coll.ext.findAndUpdate[Ask](
+        selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
+        update = $set(sets.toSeq: _*) ++ $unset(unsets),
+        fetchNewObject = true
+      ) flatMap {
+        case None => get(id) // in case it's concluded, look it up for the xhr response
+        case ask => fuccess(ask)
+      }
     }
   }
 
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
   def conclude(id: Ask.ID): Fu[Option[Ask]] =
-    coll.ext.findAndUpdate[Ask]($id(id), $addToSet("tags" -> "concluded"), fetchNewObject = true) collect {
-      case Some(ask) =>
-        timeline ! Propagate(AskConcluded(ask.creator, ask.question, ~ask.url))
-          .toUsers(ask.participants.toList)
-          .exceptUser(ask.creator)
-        ask.some
+    yolo { coll =>
+      coll.ext.findAndUpdate[Ask]($id(id), $addToSet("tags" -> "concluded"), fetchNewObject = true) collect {
+        case Some(ask) =>
+          timeline ! Propagate(AskConcluded(ask.creator, ask.question, ~ask.url))
+            .toUsers(ask.participants.toList)
+            .exceptUser(ask.creator)
+          ask.some
+      }
     }
 
   def reset(ask: Ask): Fu[Option[Ask]] = reset(ask._id)
 
-  def reset(id: Ask.ID): Fu[Option[Ask]] =
+  def reset(id: Ask.ID): Fu[Option[Ask]] = yolo { coll =>
     coll.ext.findAndUpdate[Ask]($id(id), $unset("picks"), fetchNewObject = true)
+  }
 
-  def byUser(uid: User.ID): Fu[List[Ask]] =
+  def byUser(uid: User.ID): Fu[List[Ask]] = yolo { coll =>
     coll.find($doc("creator" -> uid)).sort($sort desc "createdAt").cursor[Ask]().list(1000)
+  }
 
-  def deleteAll(text: String): Funit = coll.delete.one($inIds(extractIds(text))).void
+  def deleteAll(text: String): Funit = yolo { coll =>
+    coll.delete.one($inIds(extractIds(text))).void
+  }
 
   // None values in the asksIn list are still important for sequencing
-  def asksIn(text: String): Fu[List[Option[Ask]]] =
+  def asksIn(text: String): Fu[List[Option[Ask]]] = yolo { coll =>
     coll.optionsByOrderedIds[Ask, Ask.ID](extractIds(text))(_._id)
+  }
 
   // freeze is synchronous but requires a subsequent async "commit" step that actually stores the asks
   def freeze(text: String, creator: User): Frozen = {
@@ -102,7 +113,7 @@ final class AskApi(
   def freezeAsync(text: String, creator: User): Fu[Frozen] = {
     val askIntervals = getMarkupIntervals(text)
     askIntervals.map { case (start, end) =>
-      // rarely more than a few of these in a text, otherwise this should be batched
+      // rarely more than a few of these in a text, no need to batch em
       upsert(
         textToAsk(text.substring(start, end), creator)
       )
@@ -118,9 +129,10 @@ final class AskApi(
   }
 
   // TODO should probably call this after freezeAsync on form submission for edits
-  def setUrl(frozen: String, url: Option[String]): Funit =
+  def setUrl(frozen: String, url: Option[String]): Funit = yolo { coll =>
     if (!hasAskId(frozen)) funit
     else coll.update.one($inIds(extractIds(frozen)), $set("url" -> url), multi = true).void
+  }
 
   // unfreeze replaces embedded ids in text with ask markup to allow user edits
   def unfreeze(text: String, asks: Iterable[Option[Ask]]): String =
@@ -135,19 +147,17 @@ final class AskApi(
     if (!hasAskId(text)) fuccess(text)
     else asksIn(text) map (asks => unfreeze(text, asks))
 
-  // these just redirect to the object for convenience
+  // convenience redirects to AskApi object
   def hasAskId(text: String): Boolean = AskApi.hasAskId(text)
-
   def stripAsks(text: String, n: Int = -1): String = AskApi.stripAsks(text, n)
-
   def renderAsks(text: String, askFrags: Iterable[String]): String =
     AskApi.renderAsks(text, askFrags)
 
   // only preserve votes if important fields haven't been altered
-  private def upsert(ask: Ask): Fu[Ask] =
+  private def upsert(ask: Ask): Fu[Ask] = yolo { coll =>
     coll.byId[Ask](ask._id) flatMap {
       case Some(dbAsk) =>
-        if (dbAsk.equivalent(ask)) fuccess(dbAsk)
+        if (dbAsk equivalent ask) fuccess(dbAsk)
         else {
           val askWithUrl = ask.copy(url = dbAsk.url)
           // TODO - should probably call setUrl from ublog & post after updates in case a new ask was added
@@ -156,8 +166,11 @@ final class AskApi(
       case None =>
         coll.insert.one(ask) inject ask
     }
+  }
 
-  private def delete(id: Ask.ID): Funit = coll.delete.one($id(id)).void
+  private def delete(id: Ask.ID): Funit = yolo { coll =>
+    coll.delete.one($id(id)).void
+  }
 }
 
 object AskApi {
