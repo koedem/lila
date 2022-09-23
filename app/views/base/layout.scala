@@ -1,14 +1,15 @@
 package views.html.base
 
+import controllers.report.routes.{ Report => reportRoutes }
 import controllers.routes
 import play.api.i18n.Lang
 
 import lila.api.{ AnnounceStore, Context }
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
+import lila.common.base.StringUtils.escapeHtmlRaw
 import lila.common.String.html.safeJsonValue
 import lila.common.{ ContentSecurityPolicy, Nonce }
-import lila.common.base.StringUtils.escapeHtmlRaw
 
 object layout {
 
@@ -209,6 +210,7 @@ object layout {
   val dataSoundSet              = attr("data-sound-set")
   val dataTheme                 = attr("data-theme")
   val dataDirection             = attr("data-direction")
+  val dataBoardTheme            = attr("data-board-theme")
   val dataPieceSet              = attr("data-piece-set")
   val dataAssetUrl              = attr("data-asset-url")      := netConfig.assetBaseUrl.value
   val dataAssetVersion          = attr("data-asset-version")
@@ -306,6 +308,7 @@ object layout {
           dataAssetVersion := assetVersion.value,
           dataNonce        := ctx.nonce.ifTrue(sameAssetDomain).map(_.value),
           dataTheme        := ctx.currentBg,
+          dataBoardTheme   := ctx.currentTheme.name,
           dataPieceSet     := ctx.currentPieceSet.name,
           dataAnnounce     := AnnounceStore.get.map(a => safeJsonValue(a.json)),
           style            := zoomable option s"--zoom:${ctx.zoom}"
@@ -379,7 +382,7 @@ object layout {
                 "report-score--low"                        -> (score <= mid)
               ),
               title     := "Moderation",
-              href      := routes.Report.list,
+              href      := reportRoutes.list,
               dataCount := score,
               dataIcon  := ""
             )

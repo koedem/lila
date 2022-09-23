@@ -227,6 +227,23 @@
   <string name="email">דוא״ל</string>
   <string name="passwordReset">איפוס סיסמה</string>
   <string name="forgotPassword">שכחת סיסמה?</string>
+  <string name="emailConfirmHelp">עזרה עם אימייל האישור</string>
+  <string name="emailConfirmNotReceived">לא קיבלת מייל אישור לאחר שנרשמת?</string>
+  <string name="whatSignupUsername">עם איזה שם משתמש נרשמת?</string>
+  <string name="usernameNotFound">לא מצאנו את שם המשתמש: %s.</string>
+  <string name="usernameCanBeUsedForNewAccount">תוכל/י ליצור חשבון חדש עם שם המשתמש הזה</string>
+  <string name="emailSent">שלחנו מייל ל־%s.</string>
+  <string name="emailCanTakeSomeTime">יתכן שלהודעה יקח זמן־מה להגיע.</string>
+  <string name="refreshInboxAfterFiveMinutes">חכו 5 דקות ולאחר מכן בצעו ריענון לתיבת המייל.</string>
+  <string name="checkSpamFolder">בדקו גם את תיבת דואר הזבל (״ספאם״). יתכן שההודעה הגיעה לשם בטעות. אם זה מה שקרה, סמנו אותה כלא־ספאם.</string>
+  <string name="emailForSignupHelp">אם עדיין לא הצלחתם לפתור את הבעיה, שלחו לנו את המייל הבא:</string>
+  <string name="copyTextToEmail">הדביקו את הטקסט הנ״ל ושלחו אותו ל־%s</string>
+  <string name="waitForSignupHelp">אנו נחזור אליכם בהקדם כדי לסייע לכם להשלים את ההרשמה.</string>
+  <string name="accountConfirmed">המשתמש %s אושר בהצלחה.</string>
+  <string name="accountCanLogin">כעת תוכל/י להתחבר כ־%s.</string>
+  <string name="accountConfirmationEmailNotNeeded">אין צורך במייל אישור.</string>
+  <string name="accountClosed">החשבון %s סגור.</string>
+  <string name="accountRegisteredWithoutEmail">החשבון %s נפתח ללא כתובת מייל.</string>
   <string name="rank">מיקום</string>
   <string name="rankX">מיקום: %s</string>
   <plurals name="rankIsUpdatedEveryNbMinutes">
@@ -423,7 +440,7 @@
   <string name="thisIsAChessCaptcha">זה CAPTCHA של שחמט.</string>
   <string name="clickOnTheBoardToMakeYourMove">לחץ/י על הלוח כדי לעשות מהלך, כדי להוכיח שאת/ה בן אנוש.</string>
   <string name="captcha.fail">אנא בצע/י את המהלך הנכון בלוח ה-Captcha.</string>
-  <string name="notACheckmate">לא מט.</string>
+  <string name="notACheckmate">לא מט</string>
   <string name="whiteCheckmatesInOneMove">מט ב-1 ללבן</string>
   <string name="blackCheckmatesInOneMove">מט ב-1 לשחור</string>
   <string name="retry">נסו שוב</string>
@@ -610,7 +627,7 @@
   <string name="always">תמיד</string>
   <string name="never">אף פעם</string>
   <string name="xCompetesInY">%1$s מתחרה ב-%2$s</string>
-  <string name="victory">ניצחון!</string>
+  <string name="victory">ניצחון</string>
   <string name="defeat">הפסד</string>
   <string name="victoryVsYInZ">%1$s נגד %2$s ב%3$s</string>
   <string name="defeatVsYInZ">%1$s נגד %2$s ב%3$s</string>
@@ -822,6 +839,7 @@
   <string name="bestWasX">המהלך הטוב ביותר היה %s</string>
   <string name="youBrowsedAway">גלשתם למחוזות אחרים</string>
   <string name="resumePractice">המשיכו להתאמן</string>
+  <string name="drawByFiftyMoves">המשחק הסתיים בתיקו בשל חוק 50 המסעים.</string>
   <string name="theGameIsADraw">המשחק הסתיים בתיקו.</string>
   <string name="computerThinking">המחשב חושב ...</string>
   <string name="seeBestMove">הראה את המהלך הטוב היותר</string>
@@ -939,7 +957,8 @@
   <string name="streamerManager">אזור ניהול משדר</string>
   <string name="cancelTournament">ביטול הטורניר</string>
   <string name="tournDescription">תיאור הטורניר</string>
-  <string name="tournDescriptionHelp">יש לך משהו להגיד למשתתפים? עדיף בקיצור. קישורים לעיצוב התיאור זמינים.[name](https://url)</string>
+  <string name="tournDescriptionHelp">יש לך משהו להגיד למשתתפים? עדיף בקיצור. קישורים אינטראקטיביים של Markdown זמינים.
+[name](https://url)</string>
   <string name="ratedFormHelp">המשחקים מדורגים 
 ומשפיעים על דירוגם של השחקנים</string>
   <string name="onlyMembersOfTeam">רק חברי הקבוצה</string>
@@ -951,8 +970,8 @@
   <string name="onlyTitledHelp">רק שחקנים עם תואר</string>
   <string name="positionInputHelp">הדביקו FEN חוקי כדי להתחיל כל משחק מעמדה נתונה.
 שדה זה עובד רק עבור משחקים סטנדרטיים, לא עבור וריאנטים.
-את/ה יכול/ה להשתמש ב-%s כדי ליצור מיקום FEN, ואז להדביק אותו כאן.
-השאירו את השדה הזה ריק כדי להתחיל משחקים מהמיקום ההתחלתי הרגיל.</string>
+את/ה יכול/ה להשתמש ב%s כדי ליצור עמדת FEN, ואז להדביק אותה כאן.
+השאירו את השדה הזה ריק כדי להתחיל משחקים מהעמדה ההתחלתית הרגילה.</string>
   <string name="cancelSimul">ביטול המשחק הסימולטני</string>
   <string name="simulHostcolor">צבע מנחה המשחק</string>
   <string name="estimatedStart">זמן התחלה משוער</string>
