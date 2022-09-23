@@ -1,16 +1,17 @@
-// Intruders! all css class rules here are for div elements unless qualified
+// css classes here are for div elements if not qualified
 
 $hue-pick: hue($c-primary);
 $hue-correct: hue($c-secondary);
 $c-contrast-font: if($theme-light, #444, #ddd);
-$spc: 8px;
+$c-box-border: if($theme-light, #ddd, #444);
+$gap: 8px;
 
 fieldset.ask {
   margin-bottom: 1em;
   font-size: 1em;
-  padding: 0 3 * $spc $spc 2 * $spc;
+  padding: 0 (3*$gap) $gap (2*$gap);
   line-height: normal;
-  border: solid 1px if($theme-light, #ddd, #444);
+  border: solid 1px $c-box-border;
 }
 
 legend.ask__header {
@@ -21,10 +22,10 @@ legend.ask__header {
   flex-wrap: nowrap;
   margin-top: 1em;
 
-  label {
+  a, label {
     font-size: 1.4em;
-    padding: 0 0 $spc 0;
-    margin: 0 $spc;
+    padding: 0 0 $gap 0;
+    margin: 0 $gap;
   }
 }
 
@@ -32,14 +33,14 @@ legend.ask__header {
   display: flex;
   flex-flow: row nowrap;
   align-items: center;
-  margin: $spc 0 $spc 0;
+  margin: $gap 0 $gap 0;
 }
 
 .ask__footer {
-  margin: $spc 0 $spc;
+  margin: $gap 0 $gap;
   label {
     display: inline-block;
-    margin: 0 0 $spc $spc;
+    margin: 0 0 $gap $gap;
   }
   div {
     display: flex;
@@ -47,7 +48,7 @@ legend.ask__header {
     align-items: center;
 
     input.feedback {
-      margin: 0 0 $spc $spc;
+      margin: 0 0 $gap $gap;
       padding: 0.4em 0.4em;
       flex: auto;
     }
@@ -67,8 +68,8 @@ legend.ask__header {
     flex: initial;
     text-align: center;
     display: inline-block;
-    padding: $spc 2 * $spc;
-    margin: 0 0 $spc $spc;
+    padding: $gap (2 * $gap);
+    margin: 0 0 $gap $gap;
     white-space: nowrap;
     user-select: none;
     & label {
@@ -150,6 +151,7 @@ legend.ask__header {
 }
 
 .ask__bar-graph {
+  flex: auto;
   * {
     box-sizing: border-box;
   }
@@ -193,8 +195,8 @@ legend.ask__header {
   visibility: hidden;
 
   input {
-    padding: $spc 1.2em;
-    margin: 0 0 $spc 2 * $spc;
+    padding: $gap 1.2em;
+    margin: 0 0 $gap (2 * $gap);
     font-size: 1em;
   }
 

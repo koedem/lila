@@ -7,9 +7,11 @@ class Ask {
   feedbackEl?: HTMLInputElement;
   isExclusive = false;
   isRanked = false;
+  hasValue = false;
 
   constructor(askEl: Element) {
     this.el = askEl;
+    this.hasValue = this.el.getAttribute('value') != null;
     wireExclusiveChoices(this);
     wireRankedChoices(this);
     wireFeedback(this);
@@ -19,6 +21,7 @@ class Ask {
 
   setState = (state: 'clean' | 'dirty' | 'success') => {
     this.submitEl?.classList.remove('dirty', 'success');
+    if (state == 'clean' && this.isRanked && !this.hasValue) state = 'dirty';
     if (state != 'clean') this.submitEl?.classList.add(state);
   };
 }

@@ -150,8 +150,8 @@ final class AskApi(
   // convenience redirects to AskApi object
   def hasAskId(text: String): Boolean = AskApi.hasAskId(text)
   def stripAsks(text: String, n: Int = -1): String = AskApi.stripAsks(text, n)
-  def renderAsks(text: String, askFrags: Iterable[String]): String =
-    AskApi.renderAsks(text, askFrags)
+  def bake(text: String, askFrags: Iterable[String]): String =
+    AskApi.bake(text, askFrags)
 
   // only preserve votes if important fields haven't been altered
   private def upsert(ask: Ask): Fu[Ask] = yolo { coll =>
@@ -184,8 +184,8 @@ object AskApi {
   def stripAsks(text: String, n: Int = -1): String =
     frozenIdRe.replaceAllIn(text, "").take(if (n == -1) text.length else n)
 
-  // combine ask html fragments with frozen text
-  def renderAsks(text: String, askFrags: Iterable[String]): String = {
+  // combine text (html) fragments with frozen text in proper order
+  def bake(text: String, askFrags: Iterable[String]): String = {
     val sb = new java.lang.StringBuilder(text.length + askFrags.foldLeft(0)((x, y) => x + y.length))
     val it = askFrags.iterator
     val magicIntervals = frozenIdRe.findAllMatchIn(text).map(m => (m.start, m.end)).toList
