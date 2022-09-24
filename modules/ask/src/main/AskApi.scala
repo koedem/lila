@@ -241,8 +241,8 @@ object AskApi {
     points zip (points tail)
   }
 
-  // extractIds is called often - don't use regex for simple processing that should be fast
-  // magic/id in a frozen text looks like:  ﷖﷔﷒﷐{8_charId}
+  // extractIds is called often - don't use regex for simple processing that should be fast.
+  // magic/id in a frozen text looks like:  ﷖﷔﷒﷐{8 char id}
   private def extractIds(t: String): List[Ask.ID] = {
     var i   = t indexOf frozenIdMagic
     val ids = mutable.ListBuffer[String]()
@@ -253,7 +253,7 @@ object AskApi {
     ids toList
   }
 
-  // magic "non characters" for private use in unicode https://www.unicode.org/faq/private_use.html
+  // non characters for private use in unicode https://www.unicode.org/faq/private_use.html
   private val frozenIdMagic = "\ufdd6\ufdd4\ufdd2\ufdd0"
   private val frozenIdRe    = s"$frozenIdMagic\\{(\\S{8})}".r
 

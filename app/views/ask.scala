@@ -152,7 +152,7 @@ object ask {
           cls := s"ranked-choice${ask.isStretch ?? " stretch"}",
           value := choice,
           draggable := "true"
-        )(label(ask.choices(choice)))
+        )(label(ask.choices(choice)), i(dataIcon :='\ue071'))
       }
     ),
     (!ask.isFeedback && !ask.isConcluded) option submitBtn(ask)
