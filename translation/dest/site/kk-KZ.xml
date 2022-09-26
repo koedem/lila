@@ -205,6 +205,23 @@
   <string name="email">Пошта</string>
   <string name="passwordReset">Құпиясөзді қайта орнату</string>
   <string name="forgotPassword">Құпиясөзді ұмытып қалдыңыз ба?</string>
+  <string name="emailConfirmHelp">Поштаны растау туралы көмек</string>
+  <string name="emailConfirmNotReceived">Тіркелуден кейін поштаңызға растау хаты келмеді ме?</string>
+  <string name="whatSignupUsername">Қай атпен тіркелдіңіз?</string>
+  <string name="usernameNotFound">%s – осы аты бар ешбір қолданушыны таба алмадық.</string>
+  <string name="usernameCanBeUsedForNewAccount">Осы атты жаңа тіркелгі жасау үшін қолдансаңыз болады</string>
+  <string name="emailSent">%s поштасына хат жібердік.</string>
+  <string name="emailCanTakeSomeTime">Жетуіне біршама уақыт керек.</string>
+  <string name="refreshInboxAfterFiveMinutes">5 минут күтіп, поштаңыздың бетін жаңартып көріңіз.</string>
+  <string name="checkSpamFolder">Сонымен қатар, Спам қалтасында қарап көріңіз. Хат сонда болса, \"Спам емес\" деп белгілеу жөн болар.</string>
+  <string name="emailForSignupHelp">Егер де осы амалдардың бәрі жарамаса, бізге осындай хат жіберіңіз:</string>
+  <string name="copyTextToEmail">Осы мәтінді көшіріп, %s жіберіңіз</string>
+  <string name="waitForSignupHelp">Тіркелуді аяқтау үшін біз тез арада жауап береміз.</string>
+  <string name="accountConfirmed">%s тіркелгісі расталды.</string>
+  <string name="accountCanLogin">%s атымен дәл қазір тіркелкіге кіре аласыз.</string>
+  <string name="accountConfirmationEmailNotNeeded">Сізге растау хаты керек емес.</string>
+  <string name="accountClosed">%s деген тіркелгі жабылды.</string>
+  <string name="accountRegisteredWithoutEmail">%s тіркелгісі поштасыз тіркелген.</string>
   <string name="rank">Орын</string>
   <string name="rankX">Орын: %s</string>
   <plurals name="rankIsUpdatedEveryNbMinutes">
@@ -234,7 +251,7 @@
   <string name="accept">Келісу</string>
   <string name="decline">Келіспеу</string>
   <string name="playingRightNow">Қазір ойнап отыр</string>
-  <string name="eventInProgress">Қазір ойнап отыр</string>
+  <string name="eventInProgress">Қазір болып жатыр</string>
   <string name="finished">Аяқталды</string>
   <string name="finishesX">аяқталуына %s қалды</string>
   <string name="abortGame">Ойынды тоқтату</string>
@@ -636,6 +653,7 @@
   <string name="tournamentFAQ">Алаң жарысының ЖҚС</string>
   <string name="timeBeforeTournamentStarts">Жарыс басталуына қалған уақыт</string>
   <string name="averageCentipawnLoss">Қателіктердің орташа мәні</string>
+  <string name="accuracy">Дәлдік</string>
   <string name="keyboardShortcuts">Пернетақта пәрмендері</string>
   <string name="keyMoveBackwardOrForward">алға/артқа жүру</string>
   <string name="keyGoToStartOrEnd">басына/аяғына жүру</string>
@@ -746,6 +764,7 @@
   <string name="bestWasX">Үздігі %s</string>
   <string name="youBrowsedAway">Аяғына жеттіңіз</string>
   <string name="resumePractice">Жаттығуды жалғастыру</string>
+  <string name="drawByFiftyMoves">\"50 жүріс\" ережесіне сәйкес ойын тепе-теңдікпен аяқталды.</string>
   <string name="theGameIsADraw">Ойын тең аяқталды.</string>
   <string name="computerThinking">Компьютер ойлануда ...</string>
   <string name="seeBestMove">Үздік жүрісті көру</string>
@@ -903,7 +922,7 @@
   <string name="sentEmailWithLink">Біз сілтемесі бар хат жібереміз.</string>
   <string name="tournamentEntryCode">Жарысқа кіру коды</string>
   <string name="hangOn">Тоқтаңыз!</string>
-  <string name="gameInProgress">Сіз қазір %s-мен ойнап отырсыз.</string>
+  <string name="gameInProgress">%s сізді қазір ойында күтіп тұр.</string>
   <string name="abortTheGame">Ойынды үзу</string>
   <string name="resignTheGame">Берілу</string>
   <string name="youCantStartNewGame">Бұл ойын аяқталмағанша, сіз жаңа ойын бастай алмайсыз.</string>

@@ -230,7 +230,7 @@
   <string name="waitForSignupHelp">Vom reveni în curând cu un răspuns pentru a vă ajuta să finalizați înregistrarea.</string>
   <string name="accountConfirmed">Utilizatorul %s a fost confirmat cu succes.</string>
   <string name="accountCanLogin">Vă puteți autentifica chiar acum ca %s.</string>
-  <string name="accountConfirmationEmailNotNeeded">Nu aveţi nevoie de un email de confirmare.</string>
+  <string name="accountConfirmationEmailNotNeeded">Nu aveți nevoie de un email de confirmare.</string>
   <string name="accountClosed">Contul %s este închis.</string>
   <string name="accountRegisteredWithoutEmail">Contul %s a fost înregistrat fără o adresă de email.</string>
   <string name="rank">Clasificare</string>
@@ -801,6 +801,7 @@
   <string name="bestWasX">Cea mai bună mutare este: %s</string>
   <string name="youBrowsedAway">Ați părăsit jocul cu computer-ul</string>
   <string name="resumePractice">Reia antrenamentul</string>
+  <string name="drawByFiftyMoves">Partida s-a terminat remiză din cauza regulii de 50 de mutări.</string>
   <string name="theGameIsADraw">Remiză.</string>
   <string name="computerThinking">Calculatorul se gândește ...</string>
   <string name="seeBestMove">Vezi cea mai bună mutare</string>

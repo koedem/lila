@@ -34,6 +34,8 @@ object mon {
       counter("http.csrf.error").withTags(Map("type" -> tpe, "action" -> action, "client" -> client))
     val fingerPrint          = timer("http.fingerPrint.time").withoutTags()
     def jsmon(event: String) = counter("http.jsmon").withTag("event", event)
+    val requestHandler       = timer("http.requestHandler").withoutTags()
+    val router               = timer("http.router").withoutTags()
   }
   object syncache {
     def miss(name: String)    = counter("syncache.miss").withTag("name", name)
@@ -334,8 +336,8 @@ object mon {
       val prints = gauge("security.firewall.prints").withoutTags()
     }
     object proxy {
-      def reason(reason: String) = counter("security.proxy.reason").withTag("reason", reason)
-      val request                = future("security.proxy.time")
+      val request                   = future("security.proxy.time")
+      def result(r: Option[String]) = counter("security.proxy.result").withTag("result", r getOrElse "none")
     }
     def rateLimit(key: String)        = counter("security.rateLimit.count").withTag("key", key)
     def concurrencyLimit(key: String) = counter("security.concurrencyLimit.count").withTag("key", key)

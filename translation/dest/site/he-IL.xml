@@ -302,7 +302,7 @@
   <string name="confirmMove">אישור המהלך</string>
   <string name="play">שחקו</string>
   <string name="inbox">תיבת דואר</string>
-  <string name="chatRoom">חדר צא\'ט</string>
+  <string name="chatRoom">חדר צ\'אט</string>
   <string name="loginToChat">התחבר/י כדי לדבר בצ\'אט</string>
   <string name="youHaveBeenTimedOut">הושעית משיחה בצ׳אט.</string>
   <string name="spectatorRoom">חדר צופים</string>
@@ -405,8 +405,8 @@
   <string name="yourPerfRatingIsTooHigh">דירוגך ב%1$s גבוה מדי (%2$s)</string>
   <string name="yourTopWeeklyPerfRatingIsTooHigh">דירוגך השבועי ב%1$s גבוה מדי (%2$s)</string>
   <string name="yourPerfRatingIsTooLow">דירוגך ב%1$s נמוך מדי (%2$s)</string>
-  <string name="ratedMoreThanInPerf">מדורג ≥ %1$s ב%2$s</string>
-  <string name="ratedLessThanInPerf">מדורג ≤ %1$s ב%2$s בשבוע האחרון</string>
+  <string name="ratedMoreThanInPerf">מדורג/ת ≥ %1$s ב%2$s</string>
+  <string name="ratedLessThanInPerf">מדורג/ת ≤ %1$s ב%2$s בשבוע האחרון</string>
   <string name="mustBeInTeam">חובה להיות בקבוצה %s</string>
   <string name="youAreNotInTeam">את/ה לא נמצא/ת בקבוצה %s</string>
   <string name="backToGame">חזור למשחק</string>
@@ -548,7 +548,7 @@
   <string name="oneUrlPerLine">שורה עבור כל כתובת.</string>
   <string name="inlineNotation">תיאור מהלכים בשורה</string>
   <string name="savingMoves">אחסון מהלכים זמני</string>
-  <string name="savingMovesHelp">אנו מאחסנים את המהלכים שלך במחסנית של הדפדפן.</string>
+  <string name="savingMovesHelp">אנו תמיד מאחסנים את המהלכים שלך במחסנית של הדפדפן.</string>
   <string name="makeAStudy">כדי לשמור ולשתף, תוכל/י ליצור לוח למידה.</string>
   <string name="clearSavedMoves">הסרת המהלכים</string>
   <string name="previouslyOnLichessTV">לאחרונה בטלוויזיה של ליצ\'ס</string>
@@ -594,7 +594,7 @@
   <string name="other">אחר</string>
   <string name="reportDescriptionHelp">הדביקו את הקישור למשחק(ים) והסבירו מה לא בסדר בהתנהגות המשתמש. אל תכתבו סתם ״השחקן/ית מרמה״, הסבירו לנו כיצד הגעתם למסקנה הזו. הדיווח יטופל מהר יותר אם ייכתב באנגלית.</string>
   <string name="error.provideOneCheatedGameLink">בבקשה לספק לפחות קישור אחד למשחק עם רמאות.</string>
-  <string name="by">על-ידי %s</string>
+  <string name="by">על־ידי %s</string>
   <string name="importedByX">יובא ע\"י %s</string>
   <string name="thisTopicIsNowClosed">הנושא לא מקבל יותר תגובות.</string>
   <string name="blog">בלוג</string>
@@ -982,8 +982,8 @@
   <string name="markdownAvailable">%s זמין לתחביר מתקדם יותר.</string>
   <string name="embedsAvailable">הדביקו כתובת משחק (URL) או כתובת של פרק לוח למידה כדי להטמיע אותם.</string>
   <string name="inYourLocalTimezone">באזור הזמן שלך</string>
-  <string name="tournChat">צ\'אט טורניר</string>
-  <string name="noChat">בטל אפשרות צ\'אט</string>
+  <string name="tournChat">שליחת הודעה</string>
+  <string name="noChat">ביטול אפשרות הצ\'אט</string>
   <string name="onlyTeamLeaders">רק ראשי קבוצות</string>
   <string name="onlyTeamMembers">רק חברי קבוצות</string>
   <string name="navigateMoveTree">נווט ברשימת המהלכים</string>
