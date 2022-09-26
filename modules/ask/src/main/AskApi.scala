@@ -29,7 +29,42 @@ final class AskApi(
     coll.byId[Ask](id)
   }
 
+  def setPicks(
+      id: Ask.ID,
+      uid: User.ID,
+      ranking: Option[List[Int]],
+  ): Fu[Option[Ask]] = {
+    yolo { coll =>
+      coll.ext.findAndUpdate[Ask](
+        selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
+        update = ranking.fold($unset(s"picks.$uid"))(r => $set(s"picks.$uid" -> r)),
+        fetchNewObject = true
+      ) flatMap {
+        case None => get(id) // in case it's concluded, look it up for the xhr response
+        case ask => fuccess(ask)
+      }
+    }
+  }
+
+  def setFeedback(
+      id: Ask.ID,
+      uid: User.ID,
+      feedback: Option[String]
+  ): Fu[Option[Ask]] = {
+    yolo { coll =>
+      coll.ext.findAndUpdate[Ask](
+        selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
+        update = feedback.fold($unset(s"feedback.$uid"))(f => $set(s"feedback.$uid" -> f)),
+        fetchNewObject = true
+      ) flatMap {
+        case None => get(id) // in case it's concluded, look it up for the xhr response
+        case ask => fuccess(ask)
+      }
+    }
+  }
+
   // passing None for ranking means don't mess with picks whereas feedback is always either set or unset
+  /*
   def update(
       id: Ask.ID,
       uid: User.ID,
@@ -54,6 +89,8 @@ final class AskApi(
       }
     }
   }
+
+   */
 
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
@@ -128,7 +165,7 @@ final class AskApi(
     }
   }
 
-  // TODO should probably call this after freezeAsync on form submission for edits
+  // call this after freezeAsync on form submission for edits
   def setUrl(frozen: String, url: Option[String]): Funit = yolo { coll =>
     if (!hasAskId(frozen)) funit
     else coll.update.one($inIds(extractIds(frozen)), $set("url" -> url), multi = true).void
@@ -157,18 +194,16 @@ final class AskApi(
   private def upsert(ask: Ask): Fu[Ask] = yolo { coll =>
     coll.byId[Ask](ask._id) flatMap {
       case Some(dbAsk) =>
-        if (dbAsk equivalent ask) fuccess(dbAsk)
-        else {
-          val askWithUrl = ask.copy(url = dbAsk.url)
-          // TODO - should probably call setUrl from ublog & post after updates in case a new ask was added
-          coll.update.one($id(ask._id), askWithUrl) inject askWithUrl
-        }
+        val mergedAsk = ask.merge(dbAsk)
+        if (dbAsk eq mergedAsk) fuccess(dbAsk)
+        else coll.update.one($id(ask._id), mergedAsk) inject mergedAsk
+        // TODO - should probably call setUrl from ublog & post after updates in case a new ask was added
       case None =>
         coll.insert.one(ask) inject ask
     }
   }
 
-  private def delete(id: Ask.ID): Funit = yolo { coll =>
+  def delete(id: Ask.ID): Funit = yolo { coll =>
     coll.delete.one($id(id)).void
   }
 }
@@ -206,8 +241,8 @@ object AskApi {
     sb ++= s"?? ${ask.question}\n"
     sb ++= s"?= id{${ask._id}}"
     sb ++= s"${ask.isPublic ?? " public"}${ask.isTally ?? " tally"}${ask.isRanked ?? " rank"}"
-    sb ++= s"${ask.isConcluded ?? " concluded"}${ask.isVertical ?? " vertical"}"
-    sb ++= s"${ask.isStretch ?? " stretch"}${ask.isFeedback ?? " feedback"}\n"
+    sb ++= s"${ask.isVertical ?? " vertical"}${ask.isCenter ?? " center"}${ask.isStretch ?? " stretch"}"
+    sb ++= s"${ask.isFeedback ?? " feedback"}${ask.isConcluded ?? " concluded"}\n"
     sb ++= ask.choices.map(c => s"?${if (ask.answer.contains(c)) "@" else "#"} $c\n").mkString
     sb ++= s"${ask.footer.fold("")(r => s"?! $r\n")}"
     sb.toString
@@ -269,7 +304,7 @@ object AskApi {
   private def extractTagsFromParams(o: Option[String]): Ask.Tags =
     o.fold(Set.empty[String])(
       tagsInParamsRe findAllMatchIn _ collect (_ group 1) toSet
-    ) filterNot (_.pp startsWith "id{")
+    ) filterNot (_ startsWith "id{")
 
   private def extractChoices(t: String): Ask.Choices =
     (choicesInAskRe findAllMatchIn t map (_ group 1 trim) distinct) toVector

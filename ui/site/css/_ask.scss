@@ -3,49 +3,57 @@
 $hue-pick: hue($c-primary);
 $hue-correct: hue($c-secondary);
 $c-contrast-font: if($theme-light, #444, #ddd);
-$c-box-border: if($theme-light, #ddd, #444);
+$c-box-border: if($theme-light, #ddd, #484848);
 $gap: 8px;
+
+div.ask-container {
+  display: flex;
+  &.stretch {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 
 fieldset.ask {
   margin-bottom: 1em;
-  font-size: 1em;
   padding: 0 (3*$gap) $gap (2*$gap);
+  font-size: 1em;
   line-height: normal;
   border: solid 1px $c-box-border;
+  & > * {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+  }
 }
 
 legend.ask__header {
-  display: flex;
-  flex-flow: row wrap;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: nowrap;
   margin-top: 1em;
-
+  
   a, label {
-    font-size: 1.4em;
-    padding: 0 0 $gap 0;
     margin: 0 $gap;
+    padding: 0 0 $gap 0;
+    font-size: 1.4em;
   }
 }
 
-.ask__body {
-  display: flex;
-  flex-flow: row nowrap;
-  align-items: center;
+div.ask__body {
   margin: $gap 0 $gap 0;
 }
 
-.ask__footer {
+div.ask__footer {
   margin: $gap 0 $gap;
+  flex-direction: column;
+  align-items: stretch;
+
   label {
-    display: inline-block;
     margin: 0 0 $gap $gap;
   }
-  div {
+
+  & > div {
     display: flex;
-    flex-flow: row wrap;
     align-items: center;
+    //flex: 1 0 100%;
 
     input.feedback {
       margin: 0 0 $gap $gap;
@@ -55,24 +63,50 @@ legend.ask__header {
   }
 }
 
-.ask__choices {
-  flex: auto;
+div.ask__submit {
+  @extend %data-icon, %flex-around;
+  flex: initial;
+  visibility: hidden;
+
+  input {
+    margin: 0 0 $gap (2 * $gap);
+    padding: $gap 1.2em;
+    font-size: 1em;
+  }
+
+  &.success {
+    visibility: visible;
+    color: $c-secondary;
+    & > input {
+      visibility: hidden;
+    }
+    &::after {
+      position: absolute;
+      content: '';
+    }
+  }
+  &.dirty {
+    visibility: visible;
+  }
+}
+
+div.ask__choices {
   display: flex;
   flex-flow: row wrap;
   align-items: flex-start;
 
   .choice,
-  .xhr-choice,
+  .exclusive-choice,
   .ranked-choice {
     @extend %metal, %box-radius;
-    flex: initial;
-    text-align: center;
-    display: inline-block;
-    padding: $gap (2 * $gap);
     margin: 0 0 $gap $gap;
+    padding: $gap (2 * $gap);
+    flex: initial;
+    display: inline-block;
+    text-align: center;
     white-space: nowrap;
     user-select: none;
-    & label {
+    label {
       pointer-events: none;
     }
     &.stretch {
@@ -90,6 +124,7 @@ legend.ask__header {
   .ranked-choice {
     @extend %lighten-hover;
     display: flex;
+    justify-content: center;
     align-items: center;
     cursor: move;
     &.dragging {
@@ -97,7 +132,6 @@ legend.ask__header {
     }
     i {
       margin: 0 (-$gap) 0 $gap;
-
       font-family: lichess;
       font-size: 1.0em;
       color: if($theme-light, #ccc, #777);
@@ -140,7 +174,7 @@ legend.ask__header {
       position: absolute;
       left: 50%;
       top: 50%;
-      width: 6em;
+      width: 5em;
       height: 4px;
       background: hsla(0, 100%, 60%, 0.5);
       transform: translate(-50%, -50%) rotate(-20deg);
@@ -157,9 +191,13 @@ legend.ask__header {
   &.vertical {
     flex-flow: column;
   }
+  &.center {
+    align-items: center;
+    justify-content: center;
+  }
 }
 
-.ask__bar-graph {
+div.ask__bar-graph {
   flex: auto;
   * {
     box-sizing: border-box;
@@ -198,59 +236,51 @@ legend.ask__header {
   }
 }
 
-.ask__submit {
-  @extend %data-icon, %flex-around;
-  flex: initial;
-  visibility: hidden;
-
-  input {
-    padding: $gap 1.2em;
-    margin: 0 0 $gap (2 * $gap);
-    font-size: 1em;
+div.ask-admin {
+  font-size: 1.2em;
+  div.header {
+    font-size: 1.8em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-
-  &.success {
-    visibility: visible;
-    color: $c-secondary;
-    & > input {
-      visibility: hidden;
-    }
-    &::after {
-      position: absolute;
-      content: '';
+  div.actions {
+    display: flex;
+    flex-flow: row-reverse nowrap;
+    button {
+      font-size: 16px;
+      color: $c-primary;
+      background: none;
+      box-shadow: none;
+      border: none;
+      outline: none;
+      padding: 0.6em 0.8em;
+      margin: 0;
+      &:hover {
+        color: mix($c-primary, $c-contrast-font, 50%);
+        background: mix($c-primary, $c-bg-box, if($theme-light, 10%, 20%));
+      }
     }
   }
-  &.dirty {
-    visibility: visible;
+  .prop {
+    font-size: 20px;
+    display: flex;
+    flex-flow: row nowrap;
+    .name {
+      width: 140px;
+    }
+    .value {
+      font-style: bold;
+      flex: auto;
+    }
+  }
+  .inset {
+    margin: 1em;
+  }
+  .inset-box {
+    padding: 1em;
+    border: solid 1px #777;
+    box-shadow: inset -1px -1px #555;
+    background: #2d2d2d;
   }
 }
-
-.ask__action {
-  @media (hover: hover) {
-    visibility: hidden;
-  }
-  &:hover .ask__action {
-    visibility: visible;
-  }
-}
-
-.ask__actions {
-  display: flex;
-  flex-flow: row-reverse nowrap;
-}
-
-/*button {
-    @extend %button-none;
-    color: $c-primary;
-    background: none;
-    box-shadow: none;
-    font-size: 0.9em;
-    padding: 0.6em 0.8em 0.6em 0.8em;
-    margin: 0 0 0.3em 0;
-
-    &:hover {
-      box-shadow: inherit;
-      color: mix($c-primary, $c-contrast-font, 50%);
-      background: mix($c-primary, $c-bg-box, if($theme-light, 10%, 20%));
-    }
-  }*/

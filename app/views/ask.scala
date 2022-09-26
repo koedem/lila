@@ -14,48 +14,6 @@ object ask {
 
   import RenderType._
 
-  def report(asks: List[Ask], user: lila.common.LightUser)(implicit ctx: Context): Frag = {
-    views.html.base.layout(
-      title = s"${user.titleName} polls",
-      moreJs = jsModule("ask"),
-      moreCss = cssTag("ask"),
-      csp = defaultCsp.withInlineIconFont.some
-    ) {
-      main(cls := "page-small box box-pad")(
-        h1(
-          s"${user.titleName} polls"
-        ),
-        div(cls := "ask__report")(
-          asks map { ask =>
-            div(
-              table(
-                th(td, td, td),
-                tr(td("id:", ask._id)),
-                tr(td("question:", ask.question)),
-                ask.url map { url =>
-                  tr(td("url:", url))
-                },
-                tr(td("created:"), ask.createdAt.toString()),
-                ask.answer map (a => tr(td("answer:"), td(a))),
-                ask.footer map (f => tr(td("footer:"), td(f))),
-                ask.choices map { c =>
-                  tr(td(c), td(ask.count(c)), td(ask.whoPicked(c)))
-                },
-                ask.feedback.fold(emptyFrag)(x =>
-                  for ((uid, fb) <- x) {
-                    tr(td, td(uid), td(fb))
-                  }
-                )
-              ),
-              //barGraph(ask),
-              renderInner(ask)
-            )
-          }
-        )
-      )
-    }
-  }
-
   def render(frag: Frag, asks: Iterable[Option[Ask]])(implicit ctx: Context): Frag =
     if (asks.isEmpty) frag
     else
@@ -63,8 +21,10 @@ object ask {
         AskApi.bake(
           frag.render,
           asks.map {
-            case Some(ask) => div(cls := "ask-container", renderInner(ask)) render
-            case None => AskApi.askNotFoundFrag
+            case Some(ask) =>
+              div(cls := s"ask-container${ask.isStretch ?? " stretch"}", renderInner(ask)) render
+            case None =>
+              AskApi.askNotFoundFrag
           }
         )
       )
@@ -72,7 +32,13 @@ object ask {
   def renderInner(ask: Ask)(implicit ctx: Context): Frag =
     fieldset(cls := "ask", id := ask._id, hasValue(ask) option (value := ""))(
       header(ask),
-      body(ask),
+      RenderType(ask) match {
+        case POLL => pollBody(ask)
+        case RANK => rankBody(ask)
+        case QUIZ => quizBody(ask)
+        case BAR => barGraphBody(ask)
+        case RANKBAR => rankGraphBody(ask)
+      },
       footer(ask)
     )
 
@@ -80,22 +46,9 @@ object ask {
     legend(cls := "ask__header")(
       label(ask.question),
       ctx.me.exists(_ is ask.creator) option
-        a(href := routes.Ask.byUser(ask.creator), title := trans.edit.txt(), dataIcon := '\ue019')
+        a(href := s"${routes.Ask.admin(ask.creator)}#${ask._id}", title := trans.edit.txt(), dataIcon := '\ue019')
     )
 
-  private def body(ask: Ask)(implicit ctx: Context): Frag =
-    ask.choices.nonEmpty option div(cls := "ask__body")(
-      RenderType(ask) match {
-        case QUIZ => quizChoices(ask)
-        case POLL => pollChoices(ask)
-        case RANK => rankChoices(ask)
-        case BAR => barGraph(ask)
-        case RANKBAR => rankGraph(ask)
-      },
-    )
-
-  // if it's a quiz, only show the footer if the answer has been attempted. if not,
-  // only show the footer if it's a feedback prompt. otherwise footer text is ignored
   private def footer(ask: Ask)(implicit ctx: Context): Frag =
     ask.isFeedback || (ask.isQuiz && getPick(ask).nonEmpty && ask.footer.nonEmpty) option
       div(cls := "ask__footer")(
@@ -109,35 +62,17 @@ object ask {
               placeholder := "80 characters max",
               value := ask.feedbackFor(u.id)
             ),
-            submitBtn(ask)
+            div(cls := "ask__submit")(input(cls := "button", tpe := "button", value := "Submit"))
           )
         )
       )
 
-  private def quizChoices(ask: Ask)(implicit ctx: Context): Frag = {
-    val pick = getPick(ask)
-    choiceContainer(ask)(
-      ask.choices.zipWithIndex map { case (choiceText, i) =>
-        val prefix =
-          if (pick isEmpty) "enabled xhr-"
-          else if (ask.answer map (a => ask.choices indexOf a) contains i) "correct "
-          else if (pick contains i) "wrong "
-          else "disabled "
-        div(
-          title := tooltip(ask, choiceText.some),
-          cls := s"${prefix}choice${ask.isStretch ?? " stretch"}",
-          value := i
-        )(label(choiceText))
-      }
-    )
-  }
-
-  private def pollChoices(ask: Ask)(implicit ctx: Context): Frag = frag {
+  private def pollBody(ask: Ask)(implicit ctx: Context): Frag = frag {
     val pick = getPick(ask)
     choiceContainer(ask)(
       ask.choices.zipWithIndex map { case (choiceText, i) =>
         div(
-          cls := s"xhr-choice ${if (pick.contains(i)) "selected" else "enabled"}${ask.isStretch ?? " stretch"}",
+          cls := s"exclusive-choice ${if (pick.contains(i)) "selected" else "enabled"}${ask.isStretch ?? " stretch"}",
           title := tooltip(ask, choiceText.some),
           value := i
         )(label(choiceText))
@@ -145,20 +80,37 @@ object ask {
     )
   }
 
-  private def rankChoices(ask: Ask)(implicit ctx: Context): Seq[Frag] = Seq[Frag](
+  private def rankBody(ask: Ask)(implicit ctx: Context): Seq[Frag] = Seq[Frag](
     choiceContainer(ask)(
       validRanking(ask) map { choice =>
         div(
           cls := s"ranked-choice${ask.isStretch ?? " stretch"}",
           value := choice,
-          draggable := "true"
+          ctx.me.isDefined option (draggable := "true")
         )(label(ask.choices(choice)), i(dataIcon :='\ue071'))
       }
-    ),
-    (!ask.isFeedback && !ask.isConcluded) option submitBtn(ask)
+    )
   )
 
-  private def barGraph(ask: Ask)(implicit ctx: Context): Frag =
+  private def quizBody(ask: Ask)(implicit ctx: Context): Frag = {
+    val pick = getPick(ask)
+    choiceContainer(ask)(
+      ask.choices.zipWithIndex map { case (choiceText, i) =>
+        val classes =
+          if (pick isEmpty) "exclusive-choice enabled"
+          else if (ask.answer map (a => ask.choices indexOf a) contains i) "choice correct"
+          else if (pick contains i) "choice wrong"
+          else "choice disabled"
+        div(
+          title := tooltip(ask, choiceText.some),
+          cls := s"$classes${ask.isStretch ?? " stretch"}",
+          value := i
+        )(label(choiceText))
+      }
+    )
+  }
+
+  def barGraphBody(ask: Ask)(implicit ctx: Context): Frag =
     div(cls := "ask__bar-graph")(
       table(
         tbody(frag {
@@ -177,7 +129,7 @@ object ask {
       )
     )
 
-  private def rankGraph(ask: Ask)(implicit ctx: Context): Frag =
+  def rankGraphBody(ask: Ask)(implicit ctx: Context): Frag =
     div(cls := "ask__bar-graph")(
       table(
         tbody(frag {
@@ -197,17 +149,15 @@ object ask {
       )
     )
 
-  private def submitBtn(ask: Ask)(implicit ctx: Context): Frag =
-    ctx.me.fold(emptyFrag)(u =>
-      div(cls := s"ask__submit${(ask.isRanked && !ask.hasPickFor(u.id)) ?? " dirty"}")(
-        input(cls := "button", tpe := "button", value := "Submit")
-      )
-    )
+  private def choiceContainer(ask: Ask): scalatags.Text.TypedTag[String] = {
+    val sb = new StringBuilder("ask__choices")
+    if (ask.isVertical) sb ++= " vertical"
+    if (ask.isStretch) sb ++= " stretch"
+    else if (ask.isCenter) sb ++= " center" // stretch overrides center
+    div(cls := sb.toString)
+  }
 
-  private def choiceContainer(ask: Ask): scalatags.Text.TypedTag[String] =
-    div(cls := s"ask__choices ${ask.isVertical ?? "vertical"} ${ask.isStretch ?? "stretch"}")
-
-  private def tooltip(ask: Ask, choice: Option[String])(implicit ctx: Context): String =
+  def tooltip(ask: Ask, choice: Option[String])(implicit ctx: Context): String =
     choice ?? { choiceText =>
       val sb = new mutable.StringBuilder(256);
       val pick = getPick(ask)
@@ -260,11 +210,9 @@ object ask {
     val initialOrder = (0 until ask.choices.size).toVector
     getRanking(ask).fold(initialOrder) { r =>
       if (r == Nil || r.distinct.sorted != initialOrder) {
-        // it's a little late for this but i think it beats counting the choices in an
+        // it's late to be doing this but i think it beats counting the choices in an
         // aggregation stage in every db update or storing choices.size in a redundant field
-        ctx.me.map(u =>
-          env.ask.api.update(ask._id, u.id, Some(Nil), ask.feedbackFor(u.id))
-        ) // blow away the bad value
+        ctx.me.map(u => env.ask.api.setPicks(ask._id, u.id, Some(Nil))) // blow away the bad
         initialOrder
       } else r
     }

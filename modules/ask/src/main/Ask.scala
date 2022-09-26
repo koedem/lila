@@ -18,13 +18,21 @@ case class Ask(
     url: Option[String]
 ) {
 
-  def equivalent(a: Ask): Boolean =
+  // changes to any of the fields checked in compatible will invalidate votes and feedback
+  def compatible(a: Ask): Boolean =
     question == a.question &&
       choices == a.choices &&
-      isPublic == a.isPublic &&
-      isRanked == a.isRanked &&
       answer == a.answer &&
-      footer == a.footer
+      footer == a.footer &&
+      creator == a.creator &&
+      isPublic == a.isPublic &&
+      isRanked == a.isRanked
+
+  def merge(dbAsk: Ask): Ask =
+    if (this.compatible(dbAsk)) // keep votes & feedback
+      if (tags equals dbAsk.tags) dbAsk
+      else dbAsk.copy(tags = tags)
+    else copy(url = dbAsk.url) // discard votes & feedback
 
   def participants: Seq[User.ID] =
     picks match {
@@ -35,6 +43,7 @@ case class Ask(
   def isPublic: Boolean    = tags contains "public"
   def isTally: Boolean     = tags contains "tally"
   def isConcluded: Boolean = tags contains "concluded"
+  def isCenter: Boolean    = tags contains "center"
   def isVertical: Boolean  = tags exists (_ startsWith "vert")
   def isStretch: Boolean   = tags.exists(_ startsWith "stretch")
   def isFeedback: Boolean  = tags contains "feedback"

@@ -553,10 +553,12 @@ GET   /api/stream/irwin                controllers.Irwin.eventStream
 GET   /kaladin                         controllers.Irwin.kaladin
 
 # Ask
-POST  /ask/:id                         controllers.Ask.submit(id: String, picks: Option[String])
+POST  /ask/:id                         controllers.Ask.picks(id: String, picks: Option[String])
+POST  /ask/feedback/:id                controllers.Ask.feedback(id: String)
 POST  /ask/conclude/:id                controllers.Ask.conclude(id: String)
 POST  /ask/reset/:id                   controllers.Ask.reset(id: String)
-GET   /ask/list/:uid                   controllers.Ask.byUser(uid: String)
+POST  /ask/delete/:id                  controllers.Ask.delete(id: String)
+GET   /ask/admin/:uid                  controllers.Ask.admin(uid: String)
 
 # Forum
 GET   /forum                           controllers.ForumCateg.index
