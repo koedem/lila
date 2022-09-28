@@ -1,5 +1,5 @@
 import * as xhr from 'common/xhr';
-
+//import throttle from 'common/throttle';
 lichess.load.then(() => $('.ask-container').each((_, e: EleLoose) => new Ask(e.firstElementChild!)));
 
 // i have yet to be accused me of proper OOP
@@ -48,46 +48,25 @@ const wireExclusiveChoices = (ask: Ask): void => {
 };
 
 const wireRankedChoices = (ask: Ask): void => {
-
-  const isBefore = (lhs: Element, rhs: Element | null): boolean => {
-    if (lhs.parentElement != rhs?.parentElement) return false;
-    for (let it = lhs.previousSibling; it; it = it.previousSibling) 
-      if (it === rhs) return true;
-    return false;
-  };
-  let dragging: Element | null = null;
-  let after: Element | null = null;
+  
+  let ctx: DragContext;
   let initialOrder = ask.ranking();
 
-  $('.ranked-choice', ask.el)
+  $('.ranked-choice', ask.el) // for each draggable
     .on('dragstart', (e: DragEvent) => {
-      dragging = e.target as Element;
-      dragging.classList.add('dragging');
-      after = dragging.nextElementSibling;
-      e.dataTransfer!.effectAllowed = 'move';
-      e.dataTransfer!.setData('text/plain', '');
+      ctx = new DragContext( e, true, false);
     })
-    .on('dragenter', (e: DragEvent) => {
-      const target = e.target as Element;
-      if (target.parentElement != dragging?.parentElement) return;
-      const before = isBefore(dragging!, target) ? target : target?.nextSibling;
-      target.parentNode?.insertBefore(dragging!, before);
-    })
-    .on('dragover', (e: DragEvent) => {
-      e.preventDefault();
-    })
-    .on('dragend', () => {
-      dragging?.classList.remove('dragging');
-      dragging?.parentNode?.insertBefore(dragging, after);
-    })
-    .on('drop', () => {
-      dragging?.classList.remove('dragging');
-      dragging = null;
+    .on('dragend', (e: DragEvent) => {
+      if (!ctx.drop(e)) return;
       const newOrder = ask.ranking();
       if (newOrder == initialOrder) return;
       const path = `/ask/${ask.el.id}?picks=${newOrder}`;
       xhr.text(path, { method: 'post' }).then(() => { initialOrder = newOrder; });
     });
+
+  $('.ask__choices', ask.el) // and for the container
+    .on('dragover', (e: MouseEvent) => ctx.updateCursor(e))
+    .on('dragleave', (e: MouseEvent) => ctx.updateCursor(e));
 };
 
 const wireFeedback = (ask: Ask): HTMLInputElement|undefined => {
@@ -130,3 +109,84 @@ const wireSubmit = (ask: Ask): Element|undefined => {
   });
   return submitEl
 };
+  class DragContext {
+    dragging: Element;
+    parent: Element;
+    box: DOMRect;
+    originalNext: Element|null;
+    cursorDiv: Element;
+    breakDiv: HTMLElement;
+    vertical: boolean;
+    stretch: boolean;
+    rtl: boolean;
+    choices: Array<Element>;
+    mouse: {x:number, y:number};
+
+    constructor(e: DragEvent, vertical: boolean, stretch: boolean) {
+      this.dragging = e.target as Element;
+      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.setData('text/plain', '');
+      this.dragging.classList.add('dragging');
+      this.parent = this.dragging.parentElement!;
+      this.box = this.parent.getBoundingClientRect();
+      this.cursorDiv = document.createElement('div');
+      this.cursorDiv.classList.add('cursor');
+      this.breakDiv = document.createElement('div');
+      this.breakDiv.style.flexBasis = '100%';
+      const label = document.createElement('label');
+      label.innerText = '\ue072';
+      this.cursorDiv.appendChild(label);
+
+      this.vertical = vertical;
+      this.stretch = stretch;
+      this.choices = Array.from($('.ranked-choice', this.parent), e => e!);
+      this.mouse = {x:0, y:0};
+    }
+
+    drop(e: DragEvent): boolean {
+      e.preventDefault();
+      this.dragging.classList.remove('dragging');
+      if (this.cursorDiv.parentElement == this.parent) {
+        this.parent.insertBefore(this.dragging, this.cursorDiv);
+      }
+      //else this.parent.insertBefore
+        this.clearCursor();
+      return true;
+    }
+    // need a separate version of this function for rtl layouts
+    updateCursor(e: MouseEvent) {
+      e.preventDefault();
+      if (this.mouse.x == e.x && this.mouse.y == e.y) return;
+      this.mouse = {x:e.x, y:e.y};
+      const box = this.box;
+      if (e.x <= box.left || e.x >= box.right || e.y <= box.top || e.y >= box.bottom) {
+        this.clearCursor();
+        return;
+      }
+      type Target = { el: Element|null, break: undefined|'beforebegin'|'afterend' }
+      let target: Target|null = null;
+      for (let i = 0, lastY = 0; !target && i < this.choices.length; i++ ) {
+        const r = this.choices[i].getBoundingClientRect();
+        const el = this.choices[i];
+        const x = r.right - r.width / 2;
+        const y = r.bottom + 4;
+        if (i > 0 && y != lastY && e.x <= box.right && e.y <= lastY)
+          target = { el: el, break: 'afterend' };
+        else if (e.x <= x && e.y <= y)
+          target = { el: el, break: (i > 0 && y != lastY) ? 'beforebegin' : undefined };
+        lastY = y;
+      }
+      if (target) {
+        this.parent.insertBefore(this.cursorDiv, target.el);
+        if (target.break)
+          this.cursorDiv.insertAdjacentElement(target.break, this.breakDiv);
+        else if (this.breakDiv.parentNode)
+          this.parent.removeChild(this.breakDiv);
+      }
+      else this.parent.insertBefore(this.cursorDiv, null);
+    }
+    clearCursor(): void {
+      if (this.cursorDiv.parentNode) this.parent.removeChild(this.cursorDiv);
+      if (this.breakDiv.parentNode) this.parent.removeChild(this.breakDiv);
+    }
+  }

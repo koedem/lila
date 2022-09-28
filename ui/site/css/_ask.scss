@@ -125,13 +125,32 @@ div.ask__choices {
     align-items: center;
     cursor: move;
     &.dragging {
-      box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
+      opacity: 0.3;
+      // box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
     }
     i {
       margin: 0 (-$gap) 0 $gap;
       font-family: lichess;
       font-size: 1.0em;
       color: if($theme-light, #ccc, #777);
+    }
+  }
+
+  .cursor {
+    margin: 0 0 0 $gap;
+    padding: 0;
+    width: 2*$gap;
+    background: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    label {
+      margin: 0;
+      padding: 0;
+      font-family: lichess;
+      font-size: 2.1em;
+      color: $c-font;
+      text-align: center;
     }
   }
 
@@ -230,54 +249,5 @@ div.ask__bar-graph {
     width: 100%;
     user-select: none;
     padding-right: 0.6em;
-  }
-}
-
-div.ask-admin {
-  font-size: 1.2em;
-  div.header {
-    font-size: 1.8em;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  div.actions {
-    display: flex;
-    flex-flow: row-reverse nowrap;
-    button {
-      font-size: 16px;
-      color: $c-primary;
-      background: none;
-      box-shadow: none;
-      border: none;
-      outline: none;
-      padding: 0.6em 0.8em;
-      margin: 0;
-      &:hover {
-        color: mix($c-primary, $c-contrast-font, 50%);
-        background: mix($c-primary, $c-bg-box, if($theme-light, 10%, 20%));
-      }
-    }
-  }
-  .prop {
-    font-size: 20px;
-    display: flex;
-    flex-flow: row nowrap;
-    .name {
-      width: 140px;
-    }
-    .value {
-      font-style: bold;
-      flex: auto;
-    }
-  }
-  .inset {
-    margin: 1em;
-  }
-  .inset-box {
-    padding: 1em;
-    border: solid 1px #777;
-    box-shadow: inset -1px -1px #555;
-    background: #2d2d2d;
   }
 }
