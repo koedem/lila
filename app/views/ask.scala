@@ -33,10 +33,10 @@ object ask {
     fieldset(cls := "ask", id := ask._id, hasValue(ask) option (value := ""))(
       header(ask),
       RenderType(ask) match {
-        case POLL => pollBody(ask)
-        case RANK => rankBody(ask)
-        case QUIZ => quizBody(ask)
-        case BAR => barGraphBody(ask)
+        case POLL    => pollBody(ask)
+        case RANK    => rankBody(ask)
+        case QUIZ    => quizBody(ask)
+        case BAR     => barGraphBody(ask)
         case RANKBAR => rankGraphBody(ask)
       },
       footer(ask)
@@ -46,7 +46,11 @@ object ask {
     legend(cls := "ask__header")(
       label(ask.question),
       ctx.me.exists(_ is ask.creator) option
-        a(href := s"${routes.Ask.admin(ask.creator)}#${ask._id}", title := trans.edit.txt(), dataIcon := '\ue019')
+        a(
+          href     := s"${routes.Ask.admin(ask.creator)}#${ask._id}",
+          title    := trans.edit.txt(),
+          dataIcon := '\ue019'
+        )
     )
 
   private def footer(ask: Ask)(implicit ctx: Context): Frag =
@@ -56,11 +60,11 @@ object ask {
         ask.isFeedback && !ask.isConcluded option ctx.me.fold(emptyFrag)(u =>
           div(
             input(
-              cls := "feedback",
-              tpe := "text",
-              maxlength := 80,
+              cls         := "feedback",
+              tpe         := "text",
+              maxlength   := 80,
               placeholder := "80 characters max",
-              value := ask.feedbackFor(u.id)
+              value       := ask.feedbackFor(u.id)
             ),
             div(cls := "ask__submit")(input(cls := "button", tpe := "button", value := "Submit"))
           )
@@ -82,12 +86,12 @@ object ask {
 
   private def rankBody(ask: Ask)(implicit ctx: Context): Seq[Frag] = Seq[Frag](
     choiceContainer(ask)(
-      validRanking(ask) map { choice =>
+      validRanking(ask).zipWithIndex map { case (choice, index) =>
         div(
-          cls := s"ranked-choice${ask.isStretch ?? " stretch"}",
-          value := choice,
+          cls                                := s"ranked-choice${ask.isStretch ?? " stretch"}",
+          value                              := choice,
           ctx.me.isDefined option (draggable := "true")
-        )(label(ask.choices(choice)), i(dataIcon :='\ue071'))
+        )(div(cls := "rank-badge")(s"${index + 1}"), label(ask.choices(choice)))
       }
     )
   )
@@ -103,7 +107,7 @@ object ask {
           else "choice disabled"
         div(
           title := tooltip(ask, choiceText.some),
-          cls := s"$classes${ask.isStretch ?? " stretch"}",
+          cls   := s"$classes${ask.isStretch ?? " stretch"}",
           value := i
         )(label(choiceText))
       }
@@ -133,17 +137,16 @@ object ask {
     div(cls := "ask__bar-graph")(
       table(
         tbody(frag {
-          ask.averageRank.zipWithIndex.sortWith((i, j) => i._1 < j._1) map {
-            case (avgIndex, choice) =>
-              val lastIndex = ask.choices.size - 1
-              val pct = (lastIndex - avgIndex) / lastIndex * 100
-              val choiceText = ask.choices(choice)
-              tr(
-                title := tooltip(ask, choiceText.some),
-                td(choiceText),
-                td,
-                td(div(cls := "bar", css("width") := s"$pct%")(nbsp))
-              )
+          ask.averageRank.zipWithIndex.sortWith((i, j) => i._1 < j._1) map { case (avgIndex, choice) =>
+            val lastIndex  = ask.choices.size - 1
+            val pct        = (lastIndex - avgIndex) / lastIndex * 100
+            val choiceText = ask.choices(choice)
+            tr(
+              title := tooltip(ask, choiceText.some),
+              td(choiceText),
+              td,
+              td(div(cls := "bar", css("width") := s"$pct%")(nbsp))
+            )
           }
         })
       )
@@ -159,11 +162,11 @@ object ask {
 
   def tooltip(ask: Ask, choice: Option[String])(implicit ctx: Context): String =
     choice ?? { choiceText =>
-      val sb = new mutable.StringBuilder(256);
-      val pick = getPick(ask)
-      val count = ask.count(choiceText)
+      val sb        = new mutable.StringBuilder(256);
+      val pick      = getPick(ask)
+      val count     = ask.count(choiceText)
       val hasChoice = pick.nonEmpty
-      val isAuthor = ctx.me.exists(_.id == ask.creator)
+      val isAuthor  = ctx.me.exists(_.id == ask.creator)
       val isShusher = ctx.me ?? Granter(Permission.Shusher)
 
       RenderType(ask) match {
@@ -220,14 +223,15 @@ object ask {
 
   sealed abstract class RenderType()
   object RenderType {
-    case object POLL   extends RenderType
-    case object RANK   extends RenderType
-    case object QUIZ   extends RenderType
-    case object BAR    extends RenderType
+    case object POLL    extends RenderType
+    case object RANK    extends RenderType
+    case object QUIZ    extends RenderType
+    case object BAR     extends RenderType
     case object RANKBAR extends RenderType
     def apply(ask: Ask): RenderType =
       if (ask.isQuiz) QUIZ
       else if (ask.isRanked) if (ask.isConcluded) RANKBAR else RANK
-      else if (ask.isConcluded) BAR else POLL
+      else if (ask.isConcluded) BAR
+      else POLL
   }
 }

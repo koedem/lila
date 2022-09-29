@@ -1,8 +1,8 @@
 import * as xhr from 'common/xhr';
-//import throttle from 'common/throttle';
-lichess.load.then(() => $('.ask-container').each((_, e: EleLoose) => new Ask(e.firstElementChild!)));
 
-// i have yet to be accused me of proper OOP
+// i have never been accused me of proper OOP
+
+lichess.load.then(() => $('.ask-container').each((_, e: EleLoose) => new Ask(e.firstElementChild!)));
 
 class Ask {
   el: Element;
@@ -16,8 +16,7 @@ class Ask {
     this.feedbackEl = wireFeedback(this);
     this.submitEl = wireSubmit(this);
   }
-  ranking = (): string => 
-    Array.from($('.ranked-choice', this.el), e => e?.getAttribute('value')).join('-');
+  ranking = (): string => Array.from($('.ranked-choice', this.el), e => e?.getAttribute('value')).join('-');
 
   setState = (state: 'clean' | 'dirty' | 'success') => {
     this.submitEl?.classList.remove('dirty', 'success');
@@ -43,37 +42,13 @@ const wireExclusiveChoices = (ask: Ask): void => {
     const value = target.classList.contains('selected') ? '' : target?.getAttribute('value');
     xhr
       .text(`/ask/${ask.el.id}?picks=${value}`, { method: 'post' })
-      .then((frag: string) => rewire(ask.el, frag));
+      .then((frag: string) => rewire(ask.el, frag), failure);
   });
 };
 
-const wireRankedChoices = (ask: Ask): void => {
-  
-  let ctx: DragContext;
-  let initialOrder = ask.ranking();
-
-  $('.ranked-choice', ask.el) // for each draggable
-    .on('dragstart', (e: DragEvent) => {
-      ctx = new DragContext( e, true, false);
-    })
-    .on('dragend', (e: DragEvent) => {
-      if (!ctx.drop(e)) return;
-      const newOrder = ask.ranking();
-      if (newOrder == initialOrder) return;
-      const path = `/ask/${ask.el.id}?picks=${newOrder}`;
-      xhr.text(path, { method: 'post' }).then(() => { initialOrder = newOrder; });
-    });
-
-  $('.ask__choices', ask.el) // and for the container
-    .on('dragover', (e: MouseEvent) => ctx.updateCursor(e))
-    .on('dragleave', (e: MouseEvent) => ctx.updateCursor(e));
-};
-
-const wireFeedback = (ask: Ask): HTMLInputElement|undefined => {
+const wireFeedback = (ask: Ask): HTMLInputElement | undefined => {
   const feedbackEl = $('.feedback', ask.el)
-    .on('input', () => 
-      ask.setState(ask.feedbackEl?.value == initialFeedback ? 'clean' : 'dirty')
-    )
+    .on('input', () => ask.setState(ask.feedbackEl?.value == initialFeedback ? 'clean' : 'dirty'))
     .on('keypress', (e: KeyboardEvent) => {
       if (
         e.key != 'Enter' ||
@@ -92,101 +67,134 @@ const wireFeedback = (ask: Ask): HTMLInputElement|undefined => {
   return feedbackEl;
 };
 
-const wireSubmit = (ask: Ask): Element|undefined => {
+const wireSubmit = (ask: Ask): Element | undefined => {
   const submitEl = $('.ask__submit', ask.el).get(0);
   $('input', submitEl).on('click', () => {
     const path = `/ask/feedback/${ask.el.id}`;
     xhr
       .text(path, {
-        method: 'post', 
-        body: ask.feedbackEl?.value && xhr.form({ text: ask.feedbackEl?.value })
+        method: 'post',
+        body: ask.feedbackEl?.value && xhr.form({ text: ask.feedbackEl?.value }),
       })
-      .then(
-        (frag: string) =>
-          rewire(ask.el, frag)?.setState(ask.feedbackEl?.value ? 'success' : 'clean'),
-        failure
-      );
+      .then((frag: string) => rewire(ask.el, frag)?.setState(ask.feedbackEl?.value ? 'success' : 'clean'), failure);
   });
-  return submitEl
+  return submitEl;
 };
-  class DragContext {
-    dragging: Element;
-    parent: Element;
-    box: DOMRect;
-    originalNext: Element|null;
-    cursorDiv: Element;
-    breakDiv: HTMLElement;
-    vertical: boolean;
-    stretch: boolean;
-    rtl: boolean;
-    choices: Array<Element>;
-    mouse: {x:number, y:number};
 
-    constructor(e: DragEvent, vertical: boolean, stretch: boolean) {
-      this.dragging = e.target as Element;
+const wireRankedChoices = (ask: Ask): void => {
+  let initialOrder = ask.ranking();
+  let d: DragContext;
+
+  const vertical: boolean = $('.ask__choices', ask.el) // wire the container
+    .on('dragover', (e: DragEvent) => updateCursor(d, e))
+    .on('dragleave', (e: DragEvent) => updateCursor(d, e))
+    .hasClass('vertical');
+
+  const [cursorEl, breakEl] = createCursor(vertical);
+  const updateCursor: (d: DragContext, e: DragEvent) => void = vertical ? updateCursorV : updateCursorH;
+
+  $('.ranked-choice', ask.el) // wire each draggable
+    .on('dragstart', (e: DragEvent) => {
       e.dataTransfer!.effectAllowed = 'move';
       e.dataTransfer!.setData('text/plain', '');
-      this.dragging.classList.add('dragging');
-      this.parent = this.dragging.parentElement!;
-      this.box = this.parent.getBoundingClientRect();
-      this.cursorDiv = document.createElement('div');
-      this.cursorDiv.classList.add('cursor');
-      this.breakDiv = document.createElement('div');
-      this.breakDiv.style.flexBasis = '100%';
-      const label = document.createElement('label');
-      label.innerText = '\ue072';
-      this.cursorDiv.appendChild(label);
-
-      this.vertical = vertical;
-      this.stretch = stretch;
-      this.choices = Array.from($('.ranked-choice', this.parent), e => e!);
-      this.mouse = {x:0, y:0};
-    }
-
-    drop(e: DragEvent): boolean {
+      const dragEl = e.target as Element;
+      dragEl.classList.add('dragging');
+      d = {
+        dragEl: dragEl,
+        parentEl: dragEl.parentElement!,
+        box: dragEl.parentElement!.getBoundingClientRect(),
+        cursorEl: cursorEl!,
+        breakEl: breakEl,
+        choices: Array.from($('.ranked-choice', ask.el), e => e!),
+      };
+    })
+    .on('dragend', (e: DragEvent) => {
       e.preventDefault();
-      this.dragging.classList.remove('dragging');
-      if (this.cursorDiv.parentElement == this.parent) {
-        this.parent.insertBefore(this.dragging, this.cursorDiv);
-      }
-      //else this.parent.insertBefore
-        this.clearCursor();
-      return true;
-    }
-    // need a separate version of this function for rtl layouts
-    updateCursor(e: MouseEvent) {
-      e.preventDefault();
-      if (this.mouse.x == e.x && this.mouse.y == e.y) return;
-      this.mouse = {x:e.x, y:e.y};
-      const box = this.box;
-      if (e.x <= box.left || e.x >= box.right || e.y <= box.top || e.y >= box.bottom) {
-        this.clearCursor();
-        return;
-      }
-      type Target = { el: Element|null, break: undefined|'beforebegin'|'afterend' }
-      let target: Target|null = null;
-      for (let i = 0, lastY = 0; !target && i < this.choices.length; i++ ) {
-        const r = this.choices[i].getBoundingClientRect();
-        const el = this.choices[i];
-        const x = r.right - r.width / 2;
-        const y = r.bottom + 4;
-        if (i > 0 && y != lastY && e.x <= box.right && e.y <= lastY)
-          target = { el: el, break: 'afterend' };
-        else if (e.x <= x && e.y <= y)
-          target = { el: el, break: (i > 0 && y != lastY) ? 'beforebegin' : undefined };
-        lastY = y;
-      }
-      if (target) {
-        this.parent.insertBefore(this.cursorDiv, target.el);
-        if (target.break)
-          this.cursorDiv.insertAdjacentElement(target.break, this.breakDiv);
-        else if (this.breakDiv.parentNode)
-          this.parent.removeChild(this.breakDiv);
-      }
-      else this.parent.insertBefore(this.cursorDiv, null);
-    }
-    clearCursor(): void {
-      if (this.cursorDiv.parentNode) this.parent.removeChild(this.cursorDiv);
-      if (this.breakDiv.parentNode) this.parent.removeChild(this.breakDiv);
-    }
+      d.dragEl.classList.remove('dragging');
+      if (d.cursorEl.parentElement != d.parentEl) return;
+      d.parentEl.insertBefore(d.dragEl, d.cursorEl);
+      clearCursor(d);
+
+      const newOrder = ask.ranking();
+      if (newOrder == initialOrder) return;
+      const path = `/ask/${ask.el.id}?picks=${newOrder}`;
+      xhr.text(path, { method: 'post' }).then(() => {
+        initialOrder = newOrder;
+        updateBadges(ask);
+      }, failure);
+    });
+};
+
+type DragContext = {
+  dragEl: Element;
+  parentEl: Element;
+  box: DOMRect;
+  cursorEl: Element;
+  breakEl: Element | null; // null if vertical
+  choices: Array<Element>;
+};
+
+const createCursor = (vertical: boolean) => {
+  if (vertical) return [document.createElement('hr'), null];
+
+  const cursorEl = document.createElement('div');
+  cursorEl.classList.add('cursor');
+  const breakEl = document.createElement('div');
+  breakEl.style.flexBasis = '100%';
+  return [cursorEl, breakEl];
+};
+
+const clearCursor = (d: DragContext): void => {
+  if (d.cursorEl.parentNode) d.parentEl.removeChild(d.cursorEl);
+  if (d.breakEl?.parentNode) d.parentEl.removeChild(d.breakEl);
+};
+
+const updateCursorH = (d: DragContext, e: MouseEvent): void => {
+  e.preventDefault();
+
+  if (e.x <= d.box.left || e.x >= d.box.right || e.y <= d.box.top || e.y >= d.box.bottom) {
+    clearCursor(d);
+    return;
   }
+  const rtl = document.dir == 'rtl';
+  let target: { el: Element | null; break: 'beforebegin' | 'afterend' | null } | null = null;
+  for (let i = 0, lastY = 0; i < d.choices.length && !target; i++) {
+    const r = d.choices[i].getBoundingClientRect();
+    const x = r.right - r.width / 2;
+    const y = r.bottom + 4; // +4 because there's about 8 device px between rows
+    const rowBreak = i > 0 && y != lastY;
+    if (rowBreak && e.y <= lastY && (rtl ? e.x >= d.box.left : e.x <= d.box.right))
+      target = { el: d.choices[i], break: 'afterend' };
+    else if (e.y <= y && (rtl ? e.x >= x : e.x <= x))
+      target = { el: d.choices[i], break: rowBreak ? 'beforebegin' : null };
+    lastY = y;
+  }
+  if (!target) {
+    d.parentEl.insertBefore(d.cursorEl, null);
+    return;
+  }
+  d.parentEl.insertBefore(d.cursorEl, target.el);
+
+  if (target.break) d.cursorEl.insertAdjacentElement(target.break, d.breakEl!);
+  else if (d.breakEl!.parentNode) d.parentEl.removeChild(d.breakEl!);
+};
+
+const updateCursorV = (d: DragContext, e: DragEvent): void => {
+  e.preventDefault();
+  if (e.x <= d.box.left || e.x >= d.box.right || e.y <= d.box.top || e.y >= d.box.bottom) {
+    clearCursor(d);
+    return;
+  }
+  let target: Element | null = null;
+  for (let i = 0; i < d.choices.length && !target; i++) {
+    const r = d.choices[i].getBoundingClientRect();
+    if (e.y < r.top + r.height / 2) target = d.choices[i];
+  }
+  d.parentEl.insertBefore(d.cursorEl, target);
+};
+
+const updateBadges = (ask: Ask): void => {
+  $('.rank-badge', ask.el).each((index: number, el: HTMLElement) => {
+    el.innerText = `${index + 1}`;
+  });
+};

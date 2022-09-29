@@ -1,4 +1,4 @@
-$c-contrast-font: $c-font-clear;//if($theme-light, #444, #ddd);
+$c-contrast-font: $c-font-clear; //if($theme-light, #444, #ddd);
 $c-box-border: if($theme-light, #ddd, #484848);
 
 div.ask-admin {
@@ -45,7 +45,7 @@ div.ask-admin {
   .inset-box {
     padding: 1em;
     border: solid 1px $c-box-border;
-    box-shadow: inset -1px -1px red;//$c-dimmer($c-box-border, 20%); 
+    box-shadow: inset -1px -1px red; //$c-dimmer($c-box-border, 20%);
     background: $c-bg-box;
   }
 }

@@ -32,7 +32,7 @@ final class AskApi(
   def setPicks(
       id: Ask.ID,
       uid: User.ID,
-      ranking: Option[List[Int]],
+      ranking: Option[List[Int]]
   ): Fu[Option[Ask]] = {
     yolo { coll =>
       coll.ext.findAndUpdate[Ask](
@@ -41,7 +41,7 @@ final class AskApi(
         fetchNewObject = true
       ) flatMap {
         case None => get(id) // in case it's concluded, look it up for the xhr response
-        case ask => fuccess(ask)
+        case ask  => fuccess(ask)
       }
     }
   }
@@ -58,7 +58,7 @@ final class AskApi(
         fetchNewObject = true
       ) flatMap {
         case None => get(id) // in case it's concluded, look it up for the xhr response
-        case ask => fuccess(ask)
+        case ask  => fuccess(ask)
       }
     }
   }
@@ -185,7 +185,7 @@ final class AskApi(
     else asksIn(text) map (asks => unfreeze(text, asks))
 
   // convenience redirects to AskApi object
-  def hasAskId(text: String): Boolean = AskApi.hasAskId(text)
+  def hasAskId(text: String): Boolean              = AskApi.hasAskId(text)
   def stripAsks(text: String, n: Int = -1): String = AskApi.stripAsks(text, n)
   def bake(text: String, askFrags: Iterable[String]): String =
     AskApi.bake(text, askFrags)
@@ -197,7 +197,7 @@ final class AskApi(
         val mergedAsk = ask.merge(dbAsk)
         if (dbAsk eq mergedAsk) fuccess(dbAsk)
         else coll.update.one($id(ask._id), mergedAsk) inject mergedAsk
-        // TODO - should probably call setUrl from ublog & post after updates in case a new ask was added
+      // TODO - should probably call setUrl from ublog & post after updates in case a new ask was added
       case None =>
         coll.insert.one(ask) inject ask
     }

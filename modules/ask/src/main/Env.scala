@@ -8,9 +8,7 @@ import lila.common.config._
 final class Env(
     db: lila.db.AsyncDb @@ lila.db.YoloDb,
     timeline: lila.hub.actors.Timeline
-)(implicit ec: scala.concurrent.ExecutionContext,
-  scheduler: akka.actor.Scheduler
-) {
+)(implicit ec: scala.concurrent.ExecutionContext, scheduler: akka.actor.Scheduler) {
   private lazy val coll = db(CollName("ask"))
   lazy val api          = wire[AskApi]
 }

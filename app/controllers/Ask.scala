@@ -24,7 +24,7 @@ final class Ask(env: Env) extends LilaController(env) {
       implicit val req = ctx.body
       env.ask.api.setFeedback(id, me.id, feedbackForm.bindFromRequest().value) map {
         case Some(ask) => Ok(views.html.ask.renderInner(ask))
-        case None => NotFound(s"Ask $id not found")
+        case None      => NotFound(s"Ask $id not found")
       }
     }
 

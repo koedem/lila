@@ -1,10 +1,11 @@
-// css classes here are for div elements if not qualified
+// css classes here are div elements if not qualified
 
 $hue-pick: hue($c-primary);
 $hue-correct: hue($c-secondary);
 $c-contrast-font: if($theme-light, #444, #ddd);
 $c-box-border: if($theme-light, #ddd, #484848);
-$gap: 8px;
+$c-neutral: if($theme-light, #ccc, #777);
+$gap: 8px; // needs to be independent of font-size, adjust to space things out.
 
 div.ask-container {
   display: flex;
@@ -16,7 +17,7 @@ div.ask-container {
 
 fieldset.ask {
   margin-bottom: 1em;
-  padding: 0 (3*$gap) $gap (2*$gap);
+  padding: 0 (3 * $gap) $gap (2 * $gap);
   font-size: 1em;
   line-height: normal;
   border: solid 1px $c-box-border;
@@ -29,8 +30,9 @@ fieldset.ask {
 
 legend.ask__header {
   margin-top: 1em;
-  
-  a, label {
+
+  a,
+  label {
     margin: 0 $gap;
     padding: 0 0 $gap 0;
     font-size: 1.4em;
@@ -49,7 +51,6 @@ div.ask__footer {
   & > div {
     display: flex;
     align-items: center;
-    //flex: 1 0 100%;
 
     input.feedback {
       margin: 0 0 $gap $gap;
@@ -73,14 +74,17 @@ div.ask__submit {
   &.success {
     visibility: visible;
     color: $c-secondary;
+
     & > input {
       visibility: hidden;
     }
+
     &::after {
       position: absolute;
       content: '';
     }
   }
+
   &.dirty {
     visibility: visible;
   }
@@ -103,9 +107,11 @@ div.ask__choices {
     text-align: center;
     white-space: nowrap;
     user-select: none;
+
     label {
       pointer-events: none;
     }
+
     &.stretch {
       flex: auto;
     }
@@ -113,6 +119,7 @@ div.ask__choices {
 
   %lighten-hover {
     color: $c-contrast-font;
+
     &:hover {
       box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
     }
@@ -124,33 +131,57 @@ div.ask__choices {
     justify-content: center;
     align-items: center;
     cursor: move;
+
     &.dragging {
       opacity: 0.3;
-      // box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
     }
-    i {
-      margin: 0 (-$gap) 0 $gap;
-      font-family: lichess;
-      font-size: 1.0em;
-      color: if($theme-light, #ccc, #777);
+
+    .rank-badge {
+      margin-#{$start-direction}: -$gap;
+      margin-#{$end-direction}: $gap;
+      border-radius: 60%;
+      width: 1.6em;
+      height: 1.6em;
+      background: #464646;
+      border: 1px solid #666;
+      color: $c-contrast-font;
+      text-align: center;
+      font-size: 0.7em;
     }
+
+    /*label::after {
+      @extend %data-icon;
+      margin-#{$start-direction}: $gap;
+      margin-#{$end-direction}: -$gap;
+      vertical-align: sub;
+      opacity: 1;
+      color: $c-neutral;
+      content: '';
+    }*/
+  }
+
+  hr {
+    margin: 0 0 $gap ($gap / 2);
+    width: 100%;
+    height: 2px;
+    display: block;
+    border-top: 1px solid $c-neutral;
+    border-bottom: 1px solid $c-box-border;
   }
 
   .cursor {
     margin: 0 0 0 $gap;
     padding: 0;
-    width: 2*$gap;
-    background: none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    label {
-      margin: 0;
-      padding: 0;
-      font-family: lichess;
+    width: 2 * $gap;
+    text-align: center;
+
+    &::after {
+      @extend %data-icon;
       font-size: 2.1em;
+      margin-#{$start-direction}: -$gap;
       color: $c-font;
       text-align: center;
+      content: '';
     }
   }
 
@@ -158,6 +189,7 @@ div.ask__choices {
   .selected {
     @extend %lighten-hover;
     cursor: pointer;
+
     @if $theme-light {
       background: linear-gradient(hsl(0deg, 0%, 96%) 0%, hsl(0deg, 0%, 90%) 100%);
     } @else if $theme == 'dark' {
@@ -185,6 +217,7 @@ div.ask__choices {
   .wrong {
     // transforms for the red x on wrong answers
     position: relative;
+
     &:before,
     &:after {
       position: absolute;
@@ -196,6 +229,7 @@ div.ask__choices {
       transform: translate(-50%, -50%) rotate(-20deg);
       content: '';
     }
+
     &:after {
       transform: translate(-50%, -50%) rotate(20deg);
     }
@@ -204,9 +238,11 @@ div.ask__choices {
   &.stretch {
     align-items: stretch;
   }
+
   &.vertical {
     flex-flow: column;
   }
+
   &.center {
     align-items: center;
     justify-content: center;
@@ -215,6 +251,7 @@ div.ask__choices {
 
 div.ask__bar-graph {
   flex: auto;
+
   * {
     box-sizing: border-box;
   }

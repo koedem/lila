@@ -63,17 +63,17 @@ case class Ask(
 
   def whoPicked(choice: String): List[User.ID] = whoPicked(choices indexOf choice)
   def whoPicked(choice: Int): List[User.ID] =
-    picks getOrElse(Nil) collect {
+    picks getOrElse (Nil) collect {
       case (uid, ls) if ls.headOption contains choice => uid
     } toList
 
   def whoPickedAt(choice: Int, rank: Int): List[User.ID] =
-    picks getOrElse(Nil) collect {
+    picks getOrElse (Nil) collect {
       case (uid, ls) if ls.indexOf(choice) == rank => uid
     } toList
 
   @inline private def constrain(index: Int) =
-    index atMost (choices.size-1) atLeast 0
+    index atMost (choices.size - 1) atLeast 0
 
   // index of returned vector maps to choices list, value is from [0f, choices.size-1f] where 0 is "best" rank
   def averageRank: Vector[Float] =
