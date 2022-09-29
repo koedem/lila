@@ -8,17 +8,19 @@ class Ask {
   el: Element;
   submitEl?: Element;
   feedbackEl?: HTMLInputElement;
-
+  db: 'clean' | 'hasPicks'; // clean means no picks for this (ask, user) in the db
   constructor(askEl: Element) {
     this.el = askEl;
+    this.db = askEl.hasAttribute('value') ? 'hasPicks' : 'clean';
     wireExclusiveChoices(this);
     wireRankedChoices(this);
+    wireActions(this);
     this.feedbackEl = wireFeedback(this);
     this.submitEl = wireSubmit(this);
   }
   ranking = (): string => Array.from($('.ranked-choice', this.el), e => e?.getAttribute('value')).join('-');
 
-  setState = (state: 'clean' | 'dirty' | 'success') => {
+  feedbackState = (state: 'clean' | 'dirty' | 'success') => {
     this.submitEl?.classList.remove('dirty', 'success');
     if (state != 'clean') this.submitEl?.classList.add(state);
   };
@@ -32,23 +34,31 @@ const rewire = (el: Element | null, frag: string): Ask | undefined => {
   }
 };
 
-const failure = (reason: any): void => {
-  console.log(`Ask XHR failed with: ${reason}`);
-};
+const askXhr = (req: { ask: Ask; url: string; body?: FormData; process?: (_: Ask) => void }) =>
+  xhr.textRaw(req.url, { method: 'post', /*redirect: 'error',*/ body: req.body }).then(
+    async (rsp: Response) => {
+      if (rsp.redirected) {
+        if (rsp.url.startsWith(window.location.origin)) window.location.href = rsp.url;
+        else throw new Error(`Weirdness: ${rsp.url}`);
+      }
+      const newAsk = rewire(req.ask.el, await xhr.ensureOk(rsp).text());
+      if (req.process) req.process(newAsk!);
+    },
+    (rsp: Response) => {
+      console.log(`Ask XHR failed with ${rsp.status} ${rsp.statusText}`);
+    }
+  );
 
-const wireExclusiveChoices = (ask: Ask): void => {
+const wireExclusiveChoices = (ask: Ask): Cash =>
   $('.exclusive-choice', ask.el).on('click', function (e: Event) {
     const target = e.target as Element;
     const value = target.classList.contains('selected') ? '' : target?.getAttribute('value');
-    xhr
-      .text(`/ask/${ask.el.id}?picks=${value}`, { method: 'post' })
-      .then((frag: string) => rewire(ask.el, frag), failure);
+    askXhr({ ask: ask, url: `/ask/${ask.el.id}?picks=${value}` });
   });
-};
 
 const wireFeedback = (ask: Ask): HTMLInputElement | undefined => {
   const feedbackEl = $('.feedback', ask.el)
-    .on('input', () => ask.setState(ask.feedbackEl?.value == initialFeedback ? 'clean' : 'dirty'))
+    .on('input', () => ask.feedbackState(ask.feedbackEl?.value == initialFeedback ? 'clean' : 'dirty'))
     .on('keypress', (e: KeyboardEvent) => {
       if (
         e.key != 'Enter' ||
@@ -71,15 +81,21 @@ const wireSubmit = (ask: Ask): Element | undefined => {
   const submitEl = $('.ask__submit', ask.el).get(0);
   $('input', submitEl).on('click', () => {
     const path = `/ask/feedback/${ask.el.id}`;
-    xhr
-      .text(path, {
-        method: 'post',
-        body: ask.feedbackEl?.value && xhr.form({ text: ask.feedbackEl?.value }),
-      })
-      .then((frag: string) => rewire(ask.el, frag)?.setState(ask.feedbackEl?.value ? 'success' : 'clean'), failure);
+    const body = ask.feedbackEl?.value ? xhr.form({ text: ask.feedbackEl.value }) : undefined;
+    askXhr({
+      ask: ask,
+      url: path,
+      body: body,
+      process: ask => (ask.feedbackEl?.value ? 'success' : 'clean'),
+    });
   });
   return submitEl;
 };
+
+const wireActions = (ask: Ask): Cash =>
+  $('button.action', ask.el).on('click', (e: Event) =>
+    askXhr({ ask: ask, url: (e.target as HTMLButtonElement).formAction })
+  );
 
 const wireRankedChoices = (ask: Ask): void => {
   let initialOrder = ask.ranking();
@@ -118,10 +134,13 @@ const wireRankedChoices = (ask: Ask): void => {
       const newOrder = ask.ranking();
       if (newOrder == initialOrder) return;
       const path = `/ask/${ask.el.id}?picks=${newOrder}`;
-      xhr.text(path, { method: 'post' }).then(() => {
-        initialOrder = newOrder;
-        updateBadges(ask);
-      }, failure);
+      askXhr({
+        ask: ask,
+        url: path,
+        process: () => {
+          initialOrder = newOrder;
+        },
+      });
     });
 };
 
@@ -193,8 +212,9 @@ const updateCursorV = (d: DragContext, e: DragEvent): void => {
   d.parentEl.insertBefore(d.cursorEl, target);
 };
 
-const updateBadges = (ask: Ask): void => {
-  $('.rank-badge', ask.el).each((index: number, el: HTMLElement) => {
+/*const updateBadges = (ask: Ask): void => {
+  $('.ranked-choice', ask.el).each((index: number, el: HTMLElement) => {
+
     el.innerText = `${index + 1}`;
   });
-};
+};*/

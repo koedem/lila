@@ -28,6 +28,21 @@ final class Ask(env: Env) extends LilaController(env) {
       }
     }
 
+  def unset(id: String) =
+    AuthBody { implicit ctx => me =>
+      env.ask.api.unset(id, me.id) map {
+        case Some(ask) => Ok(views.html.ask.renderInner(ask))
+        case None      => NotFound(s"Ask $id not found")
+      }
+    }
+
+  /*def action(askAction: () => Fu[Option[lila.ask.Ask]]) =
+    AuthBody { implicit ctx => me =>
+    askAction() map {
+      case Some(ask) => Ok(views.html.ask.renderInner(ask))
+      case None => NotFound("Not found")
+    }}*/
+
   def admin(uid: String) =
     AuthBody { implicit ctx => me =>
       for {

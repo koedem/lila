@@ -556,6 +556,7 @@ GET   /kaladin                         controllers.Irwin.kaladin
 POST  /ask/:id                         controllers.Ask.picks(id: String, picks: Option[String])
 POST  /ask/feedback/:id                controllers.Ask.feedback(id: String)
 POST  /ask/conclude/:id                controllers.Ask.conclude(id: String)
+POST  /ask/unset/:id                   controllers.Ask.unset(id: String)
 POST  /ask/reset/:id                   controllers.Ask.reset(id: String)
 POST  /ask/delete/:id                  controllers.Ask.delete(id: String)
 GET   /ask/admin/:uid                  controllers.Ask.admin(uid: String)

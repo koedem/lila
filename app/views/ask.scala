@@ -30,7 +30,7 @@ object ask {
       )
 
   def renderInner(ask: Ask)(implicit ctx: Context): Frag =
-    fieldset(cls := "ask", id := ask._id, hasValue(ask) option (value := ""))(
+    fieldset(cls := "ask", id := ask._id, hasPick(ask) option (value := ""))(
       header(ask),
       RenderType(ask) match {
         case POLL    => pollBody(ask)
@@ -45,12 +45,16 @@ object ask {
   private def header(ask: Ask)(implicit ctx: Context): Frag =
     legend(cls := "ask__header")(
       label(ask.question),
-      ctx.me.exists(_ is ask.creator) option
-        a(
-          href     := s"${routes.Ask.admin(ask.creator)}#${ask._id}",
-          title    := trans.edit.txt(),
-          dataIcon := '\ue019'
-        )
+      ctx.me.exists(_ is ask.creator) option button(
+        cls        := "action admin",
+        formaction := s"${routes.Ask.admin(ask.creator)}#${ask._id}",
+        title      := trans.edit.txt()
+      ),
+      hasPick(ask) option button(
+        cls        := "action unset",
+        formaction := s"${routes.Ask.unset(ask._id)}",
+        title      := trans.delete.txt()
+      )
     )
 
   private def footer(ask: Ask)(implicit ctx: Context): Frag =
@@ -87,11 +91,12 @@ object ask {
   private def rankBody(ask: Ask)(implicit ctx: Context): Seq[Frag] = Seq[Frag](
     choiceContainer(ask)(
       validRanking(ask).zipWithIndex map { case (choice, index) =>
+        val clz = s"ranked-choice${ask.isStretch ?? " stretch"}${hasPick(ask) ?? " badge"}"
         div(
-          cls                                := s"ranked-choice${ask.isStretch ?? " stretch"}",
-          value                              := choice,
-          ctx.me.isDefined option (draggable := "true")
-        )(div(cls := "rank-badge")(s"${index + 1}"), label(ask.choices(choice)))
+          cls       := clz,
+          value     := choice,
+          draggable := "true"
+        )(div(s"${index + 1}"), label(ask.choices(choice)), div)
       }
     )
   )
@@ -198,8 +203,8 @@ object ask {
   private def getRanking(ask: Ask)(implicit ctx: Context): Option[Vector[Int]] =
     ctx.me.flatMap(u => ask.picks.flatMap(_ get u.id))
 
-  private def hasValue(ask: Ask)(implicit ctx: Context): Boolean =
-    ctx.me.exists(u => (ask.hasPickFor(u.id) || ask.hasFeedbackFor(u.id)))
+  private def hasPick(ask: Ask)(implicit ctx: Context): Boolean =
+    ctx.me.exists(u => ask.hasPickFor(u.id))
 
   private def pluralize(item: String, n: Int): String =
     if (n == 0) s"No ${item}s" else if (n == 1) s"1 ${item}" else s"$n ${item}s"

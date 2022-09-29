@@ -4,8 +4,17 @@ $hue-pick: hue($c-primary);
 $hue-correct: hue($c-secondary);
 $c-contrast-font: if($theme-light, #444, #ddd);
 $c-box-border: if($theme-light, #ddd, #484848);
+$c-bg-hover: $c-box-border;
 $c-neutral: if($theme-light, #ccc, #777);
 $gap: 8px; // needs to be independent of font-size, adjust to space things out.
+
+%lighten-hover {
+  color: $c-contrast-font;
+
+  &:hover {
+    box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
+  }
+}
 
 div.ask-container {
   display: flex;
@@ -29,13 +38,47 @@ fieldset.ask {
 }
 
 legend.ask__header {
+  display: block;
   margin-top: 1em;
 
-  a,
   label {
     margin: 0 $gap;
-    padding: 0 0 $gap 0;
+    padding-bottom: $gap;
     font-size: 1.4em;
+  }
+  button.action {
+    @extend %data-icon;
+    margin-#{$end-direction}: $gap / 2;
+    margin-bottom: $gap;
+    background: none;
+    border: none;
+    outline: none;
+    opacity: 1;
+    cursor: pointer;
+
+    &::before {
+      vertical-align: top;
+      font-size: 1.2em;
+    }
+
+    &.admin {
+      color: $c-primary;
+      &::before {
+        content: '';
+      }
+      &:hover {
+        color: $c-link-hover;
+      }
+    }
+    &.unset {
+      color: $c-bad;
+      &::before {
+        content: '';
+      }
+      &:hover {
+        color: mix($c-bad, #fff, 50%);
+      }
+    }
   }
 }
 
@@ -117,18 +160,10 @@ div.ask__choices {
     }
   }
 
-  %lighten-hover {
-    color: $c-contrast-font;
-
-    &:hover {
-      box-shadow: inset 0 0 1px 100px hsla(0, 0%, 100%, if($theme-light, 0.3, 0.1));
-    }
-  }
-
   .ranked-choice {
     @extend %lighten-hover;
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
     cursor: move;
 
@@ -136,20 +171,25 @@ div.ask__choices {
       opacity: 0.3;
     }
 
-    .rank-badge {
+    div {
+      margin: 0;
+      visibility: hidden;
+    }
+    &.badge > div:first-child {
       margin-#{$start-direction}: -$gap;
       margin-#{$end-direction}: $gap;
-      border-radius: 60%;
       width: 1.6em;
       height: 1.6em;
-      background: #464646;
+      visibility: visible;
+      border-radius: 60%;
+      background: $c-good; // #464646;
       border: 1px solid #666;
-      color: $c-contrast-font;
+      color: #000; //$c-contrast-font;
       text-align: center;
       font-size: 0.7em;
+      font-weight: bold;
     }
-
-    /*label::after {
+    &:not(.badge) > label::after {
       @extend %data-icon;
       margin-#{$start-direction}: $gap;
       margin-#{$end-direction}: -$gap;
@@ -157,7 +197,7 @@ div.ask__choices {
       opacity: 1;
       color: $c-neutral;
       content: '';
-    }*/
+    }
   }
 
   hr {

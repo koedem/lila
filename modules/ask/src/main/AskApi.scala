@@ -29,68 +29,14 @@ final class AskApi(
     coll.byId[Ask](id)
   }
 
-  def setPicks(
-      id: Ask.ID,
-      uid: User.ID,
-      ranking: Option[List[Int]]
-  ): Fu[Option[Ask]] = {
-    yolo { coll =>
-      coll.ext.findAndUpdate[Ask](
-        selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
-        update = ranking.fold($unset(s"picks.$uid"))(r => $set(s"picks.$uid" -> r)),
-        fetchNewObject = true
-      ) flatMap {
-        case None => get(id) // in case it's concluded, look it up for the xhr response
-        case ask  => fuccess(ask)
-      }
-    }
-  }
+  def setPicks(id: Ask.ID, uid: User.ID, ranking: Option[List[Int]]): Fu[Option[Ask]] =
+    update(id, ranking.fold($unset(s"picks.$uid"))(r => $set(s"picks.$uid" -> r)))
 
-  def setFeedback(
-      id: Ask.ID,
-      uid: User.ID,
-      feedback: Option[String]
-  ): Fu[Option[Ask]] = {
-    yolo { coll =>
-      coll.ext.findAndUpdate[Ask](
-        selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
-        update = feedback.fold($unset(s"feedback.$uid"))(f => $set(s"feedback.$uid" -> f)),
-        fetchNewObject = true
-      ) flatMap {
-        case None => get(id) // in case it's concluded, look it up for the xhr response
-        case ask  => fuccess(ask)
-      }
-    }
-  }
+  def unset(id: Ask.ID, uid: User.ID): Fu[Option[Ask]] =
+    update(id, $unset(s"feedback.$uid", s"picks.$uid"))
 
-  // passing None for ranking means don't mess with picks whereas feedback is always either set or unset
-  /*
-  def update(
-      id: Ask.ID,
-      uid: User.ID,
-      ranking: Option[List[Int]],
-      feedback: Option[String]
-  ): Fu[Option[Ask]] = {
-    val sets   = mutable.ListBuffer[ElementProducer]()
-    val unsets = mutable.ListBuffer[String]()
-    ranking map { r =>
-      if (r nonEmpty) sets addOne (s"picks.$uid" -> r) else unsets addOne s"picks.$uid"
-    }
-    if (feedback.isDefined) sets addOne s"feedback.$uid" -> feedback.get.pp
-    else unsets addOne s"feedback.$uid"
-    yolo { coll =>
-      coll.ext.findAndUpdate[Ask](
-        selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
-        update = $set(sets.toSeq: _*) ++ $unset(unsets),
-        fetchNewObject = true
-      ) flatMap {
-        case None => get(id) // in case it's concluded, look it up for the xhr response
-        case ask => fuccess(ask)
-      }
-    }
-  }
-
-   */
+  def setFeedback(id: Ask.ID, uid: User.ID, feedback: Option[String]): Fu[Option[Ask]] =
+    update(id, feedback.fold($unset(s"feedback.$uid"))(f => $set(s"feedback.$uid" -> f)))
 
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
@@ -107,9 +53,7 @@ final class AskApi(
 
   def reset(ask: Ask): Fu[Option[Ask]] = reset(ask._id)
 
-  def reset(id: Ask.ID): Fu[Option[Ask]] = yolo { coll =>
-    coll.ext.findAndUpdate[Ask]($id(id), $unset("picks"), fetchNewObject = true)
-  }
+  def reset(id: Ask.ID): Fu[Option[Ask]] = update(id, $unset("picks"))
 
   def byUser(uid: User.ID): Fu[List[Ask]] = yolo { coll =>
     coll.find($doc("creator" -> uid)).sort($sort desc "createdAt").cursor[Ask]().list(1000)
@@ -189,6 +133,21 @@ final class AskApi(
   def stripAsks(text: String, n: Int = -1): String = AskApi.stripAsks(text, n)
   def bake(text: String, askFrags: Iterable[String]): String =
     AskApi.bake(text, askFrags)
+
+  private def update(
+      id: Ask.ID,
+      update: BSONDocument
+  ): Fu[Option[Ask]] =
+    yolo { coll =>
+      coll.ext.findAndUpdate[Ask](
+        selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
+        update = update,
+        fetchNewObject = true
+      ) flatMap {
+        case None => get(id) // in case it's concluded, look it up for the xhr response
+        case ask  => fuccess(ask)
+      }
+    }
 
   // only preserve votes if important fields haven't been altered
   private def upsert(ask: Ask): Fu[Ask] = yolo { coll =>
