@@ -41,6 +41,7 @@ const askXhr = (req: { ask: Ask; url: string; body?: FormData; after?: (_: Ask) 
       if (rsp.redirected) {
         if (rsp.url.startsWith(window.location.origin)) window.location.href = rsp.url;
         else throw new Error(`Weirdness: ${rsp.url}`);
+        return
       }
       const newAsk = rewire(req.ask.el, await xhr.ensureOk(rsp).text());
       if (req.after) req.after(newAsk!);
