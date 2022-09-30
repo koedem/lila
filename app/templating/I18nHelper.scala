@@ -1,8 +1,9 @@
 package lila.app
 package templating
 
-import play.api.libs.json.JsObject
 import play.api.i18n.Lang
+import play.api.libs.json.JsObject
+import play.api.mvc.Call
 
 import lila.app.ui.ScalatagsTemplate._
 import lila.i18n.{ I18nKey, JsDump, LangList, MessageKey, Translator }
@@ -24,4 +25,13 @@ trait I18nHelper extends HasEnv with UserContext.ToLang {
   def shortLangName(str: String) = langName(str).takeWhile(','.!=)
 
   def isRTL(implicit lang: Lang) = lila.i18n.LangList.isRTL(lang)
+
+  def langHref(call: Call)(implicit ctx: lila.api.Context): String = langHref(call.url)
+  def langHref(path: String)(implicit ctx: lila.api.Context): String =
+    if (ctx.isAuth || ctx.lang.language == "en") path
+    else {
+      val code = lila.i18n.fixJavaLanguageCode(ctx.lang)
+      if (path == "/") s"/$code"
+      else s"/$code$path"
+    }
 }

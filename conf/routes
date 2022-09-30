@@ -8,6 +8,10 @@ GET   /lobby/seeks                     controllers.Lobby.seeks
 OPTIONS /                              controllers.Options.root
 OPTIONS /*url                          controllers.Options.all(url: String)
 
+GET   /swag                            controllers.Main.movedPermanently(to: String = "https://shop.spreadshirt.com/lichess-org")
+GET   /yt                              controllers.Main.movedPermanently(to: String = "https://www.youtube.com/c/LichessDotOrg")
+GET   /dmca                            controllers.Main.movedPermanently(to: String = "https://docs.google.com/forms/d/e/1FAIpQLSdRVaJ6Wk2KHcrLcY0BxM7lTwYSQHDsY2DsGwbYoLUBo3ngfQ/viewform")
+
 # Timeline
 GET   /timeline                        controllers.Timeline.home
 POST  /timeline/unsub/:channel         controllers.Timeline.unsub(channel: String)
@@ -36,6 +40,9 @@ GET   /games/:chanKey/replacement/$gameId<\w{8}> controllers.Tv.gameChannelRepla
 GET   /api/tv/channels                 controllers.Tv.channels
 GET   /api/tv/feed                     controllers.Tv.feed
 GET   /api/tv/:chanKey                 controllers.Tv.apiGamesChannel(chanKey: String)
+
+# hreflang home must be after the 2-letter routes
+GET   /$lang<\w\w>                     controllers.Lobby.homeLang(lang: String)
 
 # Relation
 POST  /rel/follow/:userId              controllers.Relation.follow(userId: String)
@@ -115,11 +122,13 @@ GET   /blog/community/:lang            controllers.Ublog.community(lang: String,
 GET   /blog/:id/:slug                  controllers.Blog.show(id: String, slug: String, ref: Option[String] ?= None)
 
 GET   /opening                         controllers.Opening.index
-GET   /opening/:key                    controllers.Opening.show(key: String)
+POST  /opening/config/*q               controllers.Opening.config(q: String)
+GET   /opening/*q                      controllers.Opening.query(q: String)
 
 # Training - Coordinate
 GET   /training/coordinate             controllers.Coordinate.home
 POST  /training/coordinate/score       controllers.Coordinate.score
+GET   /$lang<\w\w>/training/coordinate controllers.Coordinate.homeLang(lang)
 
 # Training - Puzzle
 GET   /training                        controllers.Puzzle.home
@@ -148,9 +157,13 @@ POST  /training/$id<\w{5}>/vote        controllers.Puzzle.vote(id: String)
 POST  /training/$id<\w{5}>/vote/:theme controllers.Puzzle.voteTheme(id: String, theme: String)
 POST  /training/complete/:theme/$id<\w{5}>  controllers.Puzzle.complete(theme: String, id: String)
 POST  /training/difficulty/:theme      controllers.Puzzle.setDifficulty(theme: String)
+GET   /$lang<\w\w>/training            controllers.Puzzle.homeLang(lang: String)
+GET   /$lang<\w\w>/training/themes     controllers.Puzzle.themesLang(lang: String)
+GET   /$lang<\w\w>/training/:angleOrId controllers.Puzzle.showLang(lang: String, angleOrId: String)
 
 # Puzzle Streak
 GET   /streak                           controllers.Puzzle.streak
+GET   /$lang<\w\w>/streak               controllers.Puzzle.streakLang(lang)
 
 # Puzzle Storm
 GET   /storm                            controllers.Storm.home
@@ -158,6 +171,7 @@ POST  /storm                            controllers.Storm.record
 GET   /storm/dashboard                  controllers.Storm.dashboard(page: Int ?= 1)
 GET   /storm/dashboard/:username        controllers.Storm.dashboardOf(username: String, page: Int ?= 1)
 GET   /api/storm/dashboard/:username    controllers.Storm.apiDashboardOf(username: String, days: Int ?= 30)
+GET   /$lang<\w\w>/storm                controllers.Storm.homeLang(lang)
 
 # Puzzle Racer
 GET   /racer                            controllers.Racer.home
@@ -166,10 +180,10 @@ POST  /api/racer                        controllers.Racer.apiCreate
 GET   /racer/:id                        controllers.Racer.show(id: String)
 GET   /racer/:id/rematch                controllers.Racer.rematch(id: String)
 POST  /racer/lobby                      controllers.Racer.lobby
+GET   /$lang<\w\w>/racer                controllers.Racer.homeLang(lang)
 
 # User Analysis
 GET   /analysis/help                   controllers.UserAnalysis.help
-GET   /analysis/external               controllers.UserAnalysis.external
 GET   /analysis/pgn/*pgn               controllers.UserAnalysis.pgn(pgn: String)
 GET   /analysis/*something             controllers.UserAnalysis.parseArg(something: String)
 GET   /analysis                        controllers.UserAnalysis.index
@@ -208,6 +222,7 @@ POST  /study/topic                     controllers.Study.setTopics
 GET   /study/topic/:topic/:order       controllers.Study.byTopic(topic: String, order: String, page: Int ?= 1)
 GET   /study/topic/autocomplete        controllers.Study.topicAutocomplete
 GET   /study/glyphs/:lang.json         controllers.Study.glyphs(lang)
+GET   /$lang<\w\w>/study               controllers.Study.homeLang(lang)
 GET   /api/study/$id<\w{8}>.pgn        controllers.Study.apiPgn(id: String)
 
 # Relay
@@ -236,6 +251,7 @@ GET   /api/stream/broadcast/round/$roundId<\w{8}>.pgn controllers.RelayRound.str
 GET   /learn                           controllers.Learn.index
 POST  /learn/score                     controllers.Learn.score
 POST  /learn/reset                     controllers.Learn.reset
+GET   /$lang<\w\w>/learn               controllers.Learn.indexLang(lang)
 
 # Patron
 GET   /patron                          controllers.Plan.index
@@ -334,6 +350,7 @@ GET   /tournament/help                        controllers.Tournament.help(system
 GET   /tournament/leaderboard                 controllers.Tournament.leaderboard
 GET   /tournament/shields                     controllers.Tournament.shields
 GET   /tournament/shields/:categ              controllers.Tournament.categShields(categ: String)
+GET   /$lang<\w\w>/tournament                 controllers.Tournament.homeLang(lang)
 
 # Tournament CRUD
 GET   /tournament/manager                     controllers.TournamentCrud.index(page: Int ?= 1)
@@ -359,6 +376,7 @@ GET   /swiss/$id<\w{8}>/standing/:page        controllers.Swiss.standing(id: Str
 GET   /swiss/$id<\w{8}>/page-of/:user         controllers.Swiss.pageOf(id: String, user: String)
 GET   /swiss/$id<\w{8}>/player/:user          controllers.Swiss.player(id: String, user: String)
 POST  /swiss/$id<\w{8}>/schedule-next-round   controllers.Swiss.scheduleNextRound(id: String)
+GET   /$lang<\w\w>/swiss                      controllers.Swiss.homeLang(lang)
 
 # Simul
 GET   /simul                                  controllers.Simul.home
@@ -375,6 +393,7 @@ POST  /simul/$id<\w{8}>/start                 controllers.Simul.start(id: String
 POST  /simul/$id<\w{8}>/abort                 controllers.Simul.abort(id: String)
 POST  /simul/$id<\w{8}>/join/:variant         controllers.Simul.join(id: String, variant: String)
 POST  /simul/$id<\w{8}>/withdraw              controllers.Simul.withdraw(id: String)
+GET   /$lang<\w\w>/simul                      controllers.Simul.homeLang(lang)
 
 # Team
 GET   /team                                   controllers.Team.home(page: Int ?= 1)
@@ -475,10 +494,12 @@ POST  /translation/select              controllers.I18n.select
 # Authentication
 GET   /login                           controllers.Auth.login
 POST  /login                           controllers.Auth.authenticate
+GET   /$lang<\w\w>/login               controllers.Auth.loginLang(lang)
 GET   /logout                          controllers.Auth.logoutGet
 POST  /logout                          controllers.Auth.logout
 GET   /signup                          controllers.Auth.signup
 POST  /signup                          controllers.Auth.signupPost
+GET   /$lang<\w\w>/signup              controllers.Auth.signupLang(lang)
 GET   /signup/check-your-email         controllers.Auth.checkYourEmail
 POST  /signup/fix-email                controllers.Auth.fixEmail
 GET   /signup/confirm/:token           controllers.Auth.signupConfirmEmail(token: String)
@@ -601,6 +622,7 @@ POST  /coach/mod-review/:id            controllers.Coach.modReview(id: String)
 GET   /coach/:username                 controllers.Coach.show(username: String)
 POST  /coach/:username/review          controllers.Coach.review(username: String)
 GET   /coach/:lang/:country/:order     controllers.Coach.search(lang: String, order: String, country: String, page: Int ?= 1)
+GET   /$lang<\w\w>/coach               controllers.Coach.homeLang(lang)
 
 # Paste
 GET   /paste                           controllers.Importer.importGame
@@ -780,6 +802,7 @@ POST  /event/manager                   controllers.Event.create
 GET   /captcha/$id<\w{8}>              controllers.Main.captchaCheck(id: String)
 GET   /developers                      controllers.Main.webmasters
 GET   /mobile                          controllers.Main.mobile
+GET   /$lang<\w\w>/mobile              controllers.Main.mobileLang(lang)
 GET   /lag                             controllers.Main.lag
 GET   /get-fishnet                     controllers.Main.getFishnet
 GET   /costs                           controllers.Main.costs
@@ -805,7 +828,6 @@ GET   /$bookmark<privacy|thanks|about|ads|changelog|nft> controllers.Page.menuBo
 GET   /contact                         controllers.Main.contact
 GET   /faq                             controllers.Main.faq
 GET   /source                          controllers.Page.source
-GET   /qa                              controllers.Main.movedPermanently(to: String = "/faq")
 GET   /help                            controllers.Main.movedPermanently(to: String = "/contact")
 GET   /support                         controllers.Main.movedPermanently(to: String = "/contact")
 GET   /qa/:id/:slug                    controllers.Main.legacyQaQuestion(id: Int, slug: String)
@@ -834,16 +856,10 @@ GET   /prismic-preview                 controllers.Blog.preview(token: String)
 POST  /jslog/$id<\w{12}>               controllers.Main.jslog(id: String)
 POST  /jsmon/:event                    controllers.Main.jsmon(event: String)
 
-GET   /swag                            controllers.Main.movedPermanently(to: String = "https://shop.spreadshirt.com/lichess-org")
-GET   /yt                              controllers.Main.movedPermanently(to: String = "https://www.youtube.com/c/LichessDotOrg")
-GET   /dmca                            controllers.Main.movedPermanently(to: String = "https://docs.google.com/forms/d/e/1FAIpQLSdRVaJ6Wk2KHcrLcY0BxM7lTwYSQHDsY2DsGwbYoLUBo3ngfQ/viewform")
-
 GET   /assets/_$v<\w{6}>/*file         controllers.Main.devAsset(v, path="public", file)
 GET   /assets/*file                    controllers.ExternalAssets.at(path="public", file)
 
 GET   /manifest.json                   controllers.Main.manifest
 GET   /robots.txt                      controllers.Main.robots
-
-GET   /$lang<\w\w>                     controllers.Lobby.homeLang(lang: String)
 
 GET   /$username<[\w-]{2,30}>          controllers.User.redirect(username: String)

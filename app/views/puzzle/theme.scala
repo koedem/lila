@@ -14,7 +14,8 @@ object theme {
   def list(all: PuzzleAngle.All)(implicit ctx: Context) =
     views.html.base.layout(
       title = trans.puzzle.puzzleThemes.txt(),
-      moreCss = cssTag("puzzle.page")
+      moreCss = cssTag("puzzle.page"),
+      withHrefLangs = lila.common.LangPath(routes.Puzzle.themes).some
     )(
       main(cls := "page-menu")(
         bits.pageMenu("themes", ctx.me),
@@ -50,7 +51,7 @@ object theme {
           val url =
             if (pt.theme == PuzzleTheme.mix) routes.Puzzle.home
             else routes.Puzzle.show(pt.theme.key.value)
-          a(cls := "puzzle-themes__link", href := (pt.count > 0).option(url.url))(
+          a(cls := "puzzle-themes__link", href := (pt.count > 0).option(langHref(url)))(
             span(
               h3(
                 pt.theme.name(),

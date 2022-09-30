@@ -1,55 +1,38 @@
 package lila.opening
 
-import com.softwaremill.tagging._
+import chess.opening.FullOpeningDB
+import play.api.mvc.RequestHeader
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
-import lila.common.{ LilaOpening, LilaOpeningFamily }
 import lila.db.dsl._
 import lila.memo.CacheApi
-import com.github.blemale.scaffeine.AsyncLoadingCache
 
 final class OpeningApi(
     cacheApi: CacheApi,
-    coll: Coll @@ OpeningColl,
-    allGamesHistory: AsyncLoadingCache[Unit, List[OpeningHistorySegment[Int]]] @@ AllGamesHistory
+    explorer: OpeningExplorer,
+    configStore: OpeningConfigStore
 )(implicit ec: ExecutionContext) {
 
-  def getPopular: Fu[PopularOpenings] = popularCache.get(())
+  def index(implicit req: RequestHeader): Fu[Option[OpeningPage]] = lookup("")
 
-  def find(key: String): Fu[Option[OpeningData.WithAll]] = apply(LilaOpening.Key(key))
+  def lookup(q: String)(implicit req: RequestHeader): Fu[Option[OpeningPage]] =
+    OpeningQuery(q, configStore.read) ?? lookup
 
-  def apply(key: LilaOpening.Key): Fu[Option[OpeningData.WithAll]] =
-    getPopular map {
-      _.byKey get key
-    } orElse {
-      coll.byId[OpeningData](key.value)
-    } flatMap {
-      _ ?? { opening =>
-        allGamesHistory.get(()) map { OpeningData.WithAll(opening, _).some }
-      }
+  def lookup(query: OpeningQuery): Fu[Option[OpeningPage]] =
+    explorer.stats(query) zip explorer.queryHistory(query) zip allGamesHistory.get(query.config) map {
+      case ((Some(stats), history), allHistory) =>
+        OpeningPage(query, stats, ponderHistory(history, allHistory)).some
+      case _ => none
     }
 
-  def variationsOf(fam: LilaOpeningFamily): Fu[List[OpeningData.Preview]] =
-    variationsCache.get(fam.key)
-
-  private val variationsCache =
-    cacheApi[LilaOpeningFamily.Key, List[OpeningData.Preview]](64, "opening.variations") {
-      _.expireAfterWrite(1 hour)
-        .buildAsyncFuture { key =>
-          coll
-            .find($doc("_id" $startsWith s"${key}_"), OpeningData.previewProjection.some)
-            .sort($sort desc "nbGames")
-            .cursor[OpeningData.Preview]()
-            .list(64)
-        }
+  private def ponderHistory(query: PopularityHistory, config: PopularityHistory): PopularityHistory =
+    query.zipAll(config, 0, 0) map {
+      case (_, 0)     => 0
+      case (cur, all) => ((cur * 10_000L) / all).toInt
     }
 
-  private val popularCache = cacheApi.unit[PopularOpenings] {
-    _.refreshAfterWrite(5 second)
-      .buildAsyncFuture { _ =>
-        import OpeningData.openingDataHandler
-        coll.find($empty).sort($sort desc "nbGames").cursor[OpeningData]().list(500) map PopularOpenings
-      }
+  private val allGamesHistory = cacheApi[OpeningConfig, PopularityHistory](32, "opening.allGamesHistory") {
+    _.expireAfterWrite(1 hour).buildAsyncFuture(explorer.configHistory)
   }
 }

@@ -15,6 +15,7 @@ final class Env(
     cacheApi: CacheApi,
     mongoCache: MongoCache.Api,
     appConfig: Configuration,
+    cookieBaker: lila.common.LilaCookie,
     ws: StandaloneWSClient
 )(implicit
     ec: scala.concurrent.ExecutionContext,
@@ -24,22 +25,11 @@ final class Env(
 
   private val explorerEndpoint = appConfig.get[String]("explorer.endpoint").taggedWith[ExplorerEndpoint]
 
-  private val openingColl = db(config.CollName("opening")).taggedWith[OpeningColl]
+  private lazy val explorer = wire[OpeningExplorer]
 
-  private lazy val update: OpeningUpdate = wire[OpeningUpdate]
-
-  private val allGamesHistory = cacheApi
-    .unit { _.refreshAfterWrite(1 hour).buildAsyncFuture { _ => update.fetchHistory(none) } }
-    .taggedWith[AllGamesHistory]
+  lazy val config = wire[OpeningConfigStore]
 
   lazy val api = wire[OpeningApi]
-
-  // api.updateOpenings.logFailure(logger).unit
-  scheduler.scheduleAtFixedRate(5 minutes, 7 day) { () =>
-    update.all.unit
-  }
 }
 
 trait ExplorerEndpoint
-trait OpeningColl
-trait AllGamesHistory

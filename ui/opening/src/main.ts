@@ -1,19 +1,23 @@
+import * as chart from 'chart.js';
 import Lpv from 'lichess-pgn-viewer';
-import { OpeningData } from './interfaces';
-import {
-  CategoryScale,
-  Chart,
-  LinearScale,
-  LineController,
-  PointElement,
-  LineElement,
-  Tooltip,
-  Filler,
-} from 'chart.js';
+import { initAll as initMiniBoards } from 'common/mini-board';
+import { OpeningPage } from './interfaces';
+import { addMonths } from 'date-fns';
+import 'chartjs-adapter-date-fns';
 
-Chart.register(LineController, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
+chart.Chart.register(
+  chart.LineController,
+  chart.CategoryScale,
+  chart.LinearScale,
+  chart.PointElement,
+  chart.LineElement,
+  chart.Tooltip,
+  chart.Filler,
+  chart.Title,
+  chart.TimeScale
+);
 
-export function family(data: OpeningData) {
+export function page(data: OpeningPage) {
   $('.opening__intro .lpv').each(function (this: HTMLElement) {
     Lpv(this, {
       pgn: this.dataset['pgn']!,
@@ -24,56 +28,36 @@ export function family(data: OpeningData) {
       menu: {
         getPgn: {
           enabled: true,
-          fileName: this.dataset['title'].replace(' ', '_') + '.pgn',
+          fileName: (this.dataset['title'] || this.dataset['pgn']).replace(' ', '_') + '.pgn',
         },
       },
     });
   });
-  lichess.requestIdleCallback(renderVariations);
+  initMiniBoards();
+  highlightNextPieces();
   lichess.requestIdleCallback(() => renderHistoryChart(data));
 }
 
-export const abstractFamily = () => renderVariations();
-
-const renderVariations = () =>
-  $('.opening__variations').each(function (this: HTMLElement) {
-    const lazyLoader = new IntersectionObserver(
-      (entries: any[]) => {
-        entries.forEach(e => {
-          if (e.intersectionRatio) {
-            renderVariation(e.target);
-            lazyLoader.unobserve(e.target);
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-    Array.from(this.querySelectorAll('.lpv')).forEach(c => lazyLoader.observe(c));
-
-    $(this).on('click', '.lpv__board', e =>
-      $(e.target).parents('.opening__variations__variation').find('a').trigger('click')
-    );
+const highlightNextPieces = () => {
+  $('.opening__next cg-board').each(function (this: HTMLElement) {
+    Array.from($(this).find('.last-move'))
+      .map(el => el.style.transform)
+      .forEach(transform => {
+        $(this).find(`piece[style="transform: ${transform};"]`).addClass('highlight');
+      });
   });
+};
 
-const renderVariation = (el: HTMLElement) =>
-  Lpv(el, {
-    pgn: el.dataset['pgn'],
-    showPlayers: false,
-    showMoves: false,
-    initialPly: 'last',
-    drawArrows: false,
-    scrollToMove: false,
-  });
-
-const renderHistoryChart = (data: OpeningData) => {
+const firstDate = new Date('2017-04-01');
+const renderHistoryChart = (data: OpeningPage) => {
   const canvas = document.querySelector('.opening__popularity__chart') as HTMLCanvasElement;
-  new Chart(canvas, {
+  new chart.Chart(canvas, {
     type: 'line',
     data: {
-      labels: data.history.map(s => s.month),
+      labels: data.history.map((_, i) => addMonths(firstDate, i)),
       datasets: [
         {
-          data: data.history.map(s => s.draws + s.black + s.white),
+          data: data.history.map(s => s / 100),
           borderColor: 'hsla(37,74%,43%,1)',
           backgroundColor: 'hsla(37,74%,43%,0.5)',
           fill: true,
@@ -83,13 +67,32 @@ const renderHistoryChart = (data: OpeningData) => {
     options: {
       animation: false,
       scales: {
-        y: {
-          min: 0,
-          // max: 20,
+        x: {
+          type: 'time',
+          time: {
+            tooltipFormat: 'MMMM yyyy',
+          },
+          display: false,
         },
-        x: {},
+        y: {
+          title: {
+            display: true,
+            text: 'Popularity over time, in %',
+          },
+        },
       },
-      responsive: true,
+      // https://www.chartjs.org/docs/latest/configuration/responsive.html
+      // responsive: false, // just doesn't work
+      hover: {
+        mode: 'index',
+        intersect: false,
+      },
+      plugins: {
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+        },
+      },
     },
   });
 };

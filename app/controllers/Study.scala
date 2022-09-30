@@ -45,22 +45,28 @@ final class Study(
       }
     }
 
+  def homeLang =
+    LangPage(routes.Study.allDefault())(allResults(Order.Hot.key, 1)(_)) _
+
   def allDefault(page: Int) = all(Order.Hot.key, page)
 
   def all(o: String, page: Int) =
     Open { implicit ctx =>
-      Reasonable(page) {
-        Order(o) match {
-          case order if !Order.withoutSelector.contains(order) =>
-            Redirect(routes.Study.allDefault(page)).fuccess
-          case order =>
-            env.study.pager.all(ctx.me, order, page) flatMap { pag =>
-              preloadMembers(pag) >> negotiate(
-                html = Ok(html.study.list.all(pag, order)).fuccess,
-                api = _ => apiStudies(pag)
-              )
-            }
-        }
+      allResults(o, page)
+    }
+
+  private def allResults(o: String, page: Int)(implicit ctx: Context) =
+    Reasonable(page) {
+      Order(o) match {
+        case order if !Order.withoutSelector.contains(order) =>
+          Redirect(routes.Study.allDefault(page)).fuccess
+        case order =>
+          env.study.pager.all(ctx.me, order, page) flatMap { pag =>
+            preloadMembers(pag) >> negotiate(
+              html = Ok(html.study.list.all(pag, order)).fuccess,
+              api = _ => apiStudies(pag)
+            )
+          }
       }
     }
 
@@ -210,14 +216,17 @@ final class Study(
       pov = userAnalysisC.makePov(chapter.root.fen.some, chapter.setup.variant)
       analysis <- chapter.serverEval.exists(_.done) ?? env.analyse.analyser.byId(chapter.id.value)
       division = analysis.isDefined option env.study.serverEvalMerger.divisionOf(chapter)
-      baseData = env.round.jsonView.userAnalysisJson(
-        pov,
-        ctx.pref,
-        chapter.root.fen.some,
-        chapter.setup.orientation,
-        owner = false,
-        me = ctx.me,
-        division = division
+      baseData <- env.api.roundApi.withExternalEngines(
+        ctx.me,
+        env.round.jsonView.userAnalysisJson(
+          pov,
+          ctx.pref,
+          chapter.root.fen.some,
+          chapter.setup.orientation,
+          owner = false,
+          me = ctx.me,
+          division = division
+        )
       )
       studyJson <- env.study.jsonView(study, chapters, chapter, ctx.me)
     } yield WithChapter(study, chapter) -> JsData(
