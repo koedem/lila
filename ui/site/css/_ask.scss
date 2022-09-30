@@ -1,4 +1,4 @@
-// css classes here are div elements if not qualified
+// css classes here are mostly on divs if not qualified
 
 $hue-pick: hue($c-primary);
 $hue-correct: hue($c-secondary);
@@ -62,7 +62,7 @@ legend.ask__header {
     }
 
     &.admin {
-      color: $c-primary;
+      color: $c-link;
       &::before {
         content: '';
       }
@@ -71,12 +71,12 @@ legend.ask__header {
       }
     }
     &.unset {
-      color: $c-bad;
+      color: if($theme-light, #f66, #c33);
       &::before {
         content: '';
       }
       &:hover {
-        color: mix($c-bad, #fff, 50%);
+        color: if($theme-light, #c33, #f66);
       }
     }
   }
@@ -178,13 +178,13 @@ div.ask__choices {
     &.badge > div:first-child {
       margin-#{$start-direction}: -$gap;
       margin-#{$end-direction}: $gap;
-      width: 1.6em;
-      height: 1.6em;
+      width: 1.7em;
+      height: 1.7em;
       visibility: visible;
-      border-radius: 60%;
-      background: $c-good; // #464646;
-      border: 1px solid #666;
-      color: #000; //$c-contrast-font;
+      border-radius: 100%;
+      background: $c-secondary; // #464646;
+      border: 1px solid if($theme-light, #aaa, #666);
+      color: if($theme-light, #ddd, #000); //$c-contrast-font;
       text-align: center;
       font-size: 0.7em;
       font-weight: bold;
@@ -197,6 +197,9 @@ div.ask__choices {
       opacity: 1;
       color: $c-neutral;
       content: '';
+    }
+    @if $theme == 'transp' {
+      background: hsla(0deg, 0%, 50%, 0.3);
     }
   }
 
@@ -219,7 +222,7 @@ div.ask__choices {
       @extend %data-icon;
       font-size: 2.1em;
       margin-#{$start-direction}: -$gap;
-      color: $c-font;
+      color: if($theme-light, #bbb, $c-font);
       text-align: center;
       content: '';
     }
