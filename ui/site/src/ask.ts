@@ -39,9 +39,9 @@ const askXhr = (req: { ask: Ask; url: string; body?: FormData; after?: (_: Ask) 
   xhr.textRaw(req.url, { method: 'post', /*redirect: 'error',*/ body: req.body }).then(
     async (rsp: Response) => {
       if (rsp.redirected) {
-        if (rsp.url.startsWith(window.location.origin)) window.location.href = rsp.url;
-        else throw new Error(`Weirdness: ${rsp.url}`);
-        return
+        if (!rsp.url.startsWith(window.location.origin)) throw new Error(`Weirdness: ${rsp.url}`);
+        window.location.href = rsp.url;
+        return; 
       }
       const newAsk = rewire(req.ask.el, await xhr.ensureOk(rsp).text());
       if (req.after) req.after(newAsk!);
@@ -107,8 +107,8 @@ const wireRankedChoices = (ask: Ask): void => {
   const vertical = container.hasClass('vertical');
   const [cursorEl, breakEl] = createCursor(vertical);
   const updateCursor = throttle(100, (d: DragContext, e: DragEvent) => {
-    if (!d.isDone) vertical ? updateVCursor(d, e) : updateHCursor(d, e);
     // avoid processing a delayed drag event after the drop
+    if (!d.isDone) vertical ? updateVCursor(d, e) : updateHCursor(d, e);
   });
 
   container
@@ -160,12 +160,12 @@ const wireRankedChoices = (ask: Ask): void => {
 
 type DragContext = {
   dragEl: Element; // we are dragging this
-  parentEl: Element; // ask__choices div
-  box: DOMRect; // the rectangle containing all choices
-  cursorEl: Element; // the I beam or <hr> depending on mode
-  breakEl: Element | null; // null if vertical
-  choices: Array<Element>;
-  isDone: boolean;
+  parentEl: Element; // the div.ask__chioces containing the draggables
+  box: DOMRect; // the rectangle containing all draggables
+  cursorEl: Element; // the insertion cursor (I beam div or <hr> depending on mode)
+  breakEl: Element | null; // null if vertical, a div {flex-basis: 100%} if horizontal
+  choices: Array<Element>; // the draggable elements
+  isDone: boolean; // emerge victorious after the onslaught of throttled dragover events
   data?: any; // used to track dirty state in updateHCursor
 };
 
@@ -198,7 +198,6 @@ const updateHCursor = (d: DragContext, e: MouseEvent): void => {
     const y = r.bottom + 4; // +4 because there's (currently) 8 device px between rows
     const rowBreak = i > 0 && y != lastY;
     if (rowBreak && e.y <= lastY)
-      // && (rtl ? e.x >= d.box.left : e.x <= d.box.right))
       target = { el: d.choices[i], break: 'afterend' };
     else if (e.y <= y && (rtl ? e.x >= x : e.x <= x))
       target = { el: d.choices[i], break: rowBreak ? 'beforebegin' : null };
@@ -214,7 +213,7 @@ const updateHCursor = (d: DragContext, e: MouseEvent): void => {
   }
   d.parentEl.insertBefore(d.cursorEl, target.el);
   if (target.break) {
-    // fix a problem when inserting the cursor at the end of a line with no room
+    // don't add break when inserting the cursor at the end of a line with no room
     if (target.break != 'afterend' || d.cursorEl.getBoundingClientRect().top < e.y)
       d.cursorEl.insertAdjacentElement(target.break, d.breakEl!);
   } else if (d.breakEl!.parentNode) d.parentEl.removeChild(d.breakEl!);
@@ -233,7 +232,8 @@ const updateVCursor = (d: DragContext, e: DragEvent): void => {
   d.parentEl.insertBefore(d.cursorEl, target);
 };
 
-/* // tried this but don't really like it too much.
+/* 
+// this does NOT seem to help convey how the flex layout is changing
 const insertAnimation = (d: DragContext): void => {
   const width = $(d.dragEl).innerWidth();
   const el = d.dragEl as HTMLElement;
