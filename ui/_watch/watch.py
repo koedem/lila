@@ -1,13 +1,38 @@
 #!/usr/bin/env python3
+import sys
+import time
+import logging
 import argparse
 from modules.env import e
-import modules.dir as dir
+from watchdog.observers import Observer
+from watchdog.events import LoggingEventHandler
+import modules.graph as graph
 import modules.util as util
 
 
 def main():
     e.set_args(_get_args())
-    dir.walk(e.src_path)
+    graph.walk(e.src_path)
+
+
+"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    path = sys.argv[1] if len(sys.argv) > 1 else "."
+    event_handler = LoggingEventHandler()
+    observer = Observer()
+    observer.schedule(event_handler, path, recursive=True)
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    finally:
+        observer.stop()
+        observer.join()
+"""
 
 
 def _get_args() -> argparse.Namespace:
