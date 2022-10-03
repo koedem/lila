@@ -31,7 +31,10 @@ ignore = [
     "@types",
     "_watch",
 ]
-rollupJsonRe = re.compile(r"rollupProject\((\{.+})\);", re.DOTALL)
+rollupForYamlRe = re.compile(r"rollupProject\((\{.+})\);", re.DOTALL)
+rollupExcludePluginsYamlRe = re.compile(
+    r"(?m)^    plugins: \[$.+^    ],$", re.DOTALL
+)
 
 
 class Node:
@@ -43,15 +46,21 @@ class Node:
                 if file.is_dir() and file.name not in ignore:
                     self.files[file.name] = Node(file)
                 elif file.suffix == ".mjs":
-                    # print(file.read_text())
-                    match = rollupJsonRe.search(file.read_text())
+                    txt = file.read_text()
+                    exclude = rollupExcludePluginsYamlRe.search(txt)
+                    if exclude != None:
+                        txt = txt[: exclude.start()] + txt[exclude.end() :]
+                        print(txt)
+                    match = rollupForYamlRe.search(txt)
                     if match != None:
                         try:
                             rollups.append(
                                 yaml.load(match.group(1), Loader=Loader)
                             )
                         except BaseException:
-                            print("ohnoes")
+                            print(
+                                f"Broken watch:  Error parsing rollup config:  {file.as_posix()}"
+                            )
 
 
 #                        print(json)
