@@ -11,7 +11,7 @@ from pathlib import Path
 class Env:
     def __init__(self):
         self.args = None  # will be argparse.Namespace
-        self.src_path = Path(*Path(__file__).parts[:-3])
+        self.src_path = Path(*Path(__file__).parts[:-3])  # [:-3])
 
     def set_args(self, args: argparse.Namespace):
         self.args = args

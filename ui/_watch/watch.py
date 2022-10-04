@@ -5,7 +5,7 @@ import logging
 import argparse
 from modules.env import e
 from watchdog.observers import Observer
-from watchdog.events import LoggingEventHandler
+from watchdog.events import LoggingEventHandler, PatternMatchingEventHandler
 import modules.graph as graph
 import modules.util as util
 
@@ -13,6 +13,7 @@ import modules.util as util
 def main():
     e.set_args(_get_args())
     graph.walk(e.src_path)
+    print(e.src_path)
 
 
 """
@@ -21,8 +22,8 @@ def main():
         format="%(asctime)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    path = sys.argv[1] if len(sys.argv) > 1 else "."
-    event_handler = LoggingEventHandler()
+    path = "/Users/gamblej/ws/lichess/lila-local/node_modules"  # e.src_path
+    event_handler = PatternMatchingEventHandler()
     observer = Observer()
     observer.schedule(event_handler, path, recursive=True)
     observer.start()
@@ -33,6 +34,21 @@ def main():
         observer.stop()
         observer.join()
 """
+
+node_modules_watch = [
+    "lichess_pgn_viewer",
+    "chess.js",
+    "chessground",
+    "chessops",
+    "mithril",
+]
+
+
+class UpdateHandler(PatternMatchingEventHandler):
+    def __init__(self):
+        super(UpdateHandler, self).__init__(
+            patterns=[".*", "app", "modules", ""]
+        )
 
 
 def _get_args() -> argparse.Namespace:
