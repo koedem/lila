@@ -15,11 +15,19 @@ from yaml import Loader
 
 flatmap = {}
 rollups = []
+
+module_filter = [
+    "lichess_pgn_viewer",
+    "chess.js",
+    "chessground",
+    "chessops",
+    "mithril",
+]
 deps = {}
 
 
 def walk(p: Path):
-    files = Node(p)
+    files = GraphBuilder(p)
     for name in deps.keys():
         for dep in deps[name]:
             print(f"{name} -> {dep}")
@@ -32,6 +40,7 @@ ignore = [
     "@build",
     "@types",
     "_watch",
+    "node_modules",
 ]
 rollupForYamlRe = re.compile(r"rollupProject\((\{.+})\);", re.DOTALL)
 rollupExcludePluginsYamlRe = re.compile(
@@ -39,24 +48,43 @@ rollupExcludePluginsYamlRe = re.compile(
 )
 
 
-class Node:
+class GraphBuilder:
     def __init__(self, node: Path):
         self.node = node
-        if node.is_dir():
-            self.files = {}
-            for file in node.iterdir():
-                if file.is_dir() and file.name not in ignore:
-                    self.files[file.name] = Node(file)
-                elif file.suffix == ".mjs":
-                    self.rollup_config(file)
-                elif file.name == "package.json":
-                    self.package_json(file)
+        for file in node.iterdir():
+            if (
+                file.is_dir()
+                and file.name[0] != "."
+                and file.name not in ignore
+            ):
+                module_filter.append(file.name)
+                print(file.name)
+        self.build(node)
+
+    def build(self, file: Path):
+        if file.suffix == ".mjs":
+            self.rollup_config(file)
+        elif file.name == "package.json":
+            self.package_json(file)
+        elif file.suffix == ".ts":
+            self.module_src(file)
+        elif file.is_dir():
+            for f in file.iterdir():
+                self.build(f)
+
+    def module_src(self, file: Path):
+        module = file.relative_to(e.src_path).parts[0]
+        print(module)
 
     def package_json(self, file: Path):
         dep_json = json.loads(file.read_text())
         # print(dep_json)
         try:
-            deps[file.parent.name] = dep_json["dependencies"]
+            deps = dep_json["dependencies"]
+            deps[file.parent.name] = filter(
+                lambda dep: dep in module_filter, deps
+            )
+
         except BaseException:
             print(f"{file.as_posix()}")
 
@@ -71,9 +99,7 @@ class Node:
             try:
                 rollups.append(yaml.load(match.group(1), Loader=Loader))
             except BaseException:
-                print(
-                    f"Broken watch:  Error parsing rollup config:  {file.as_posix()}"
-                )
+                print(f"Error parsing:  {file.as_posix()}")
 
 
 #                        print(json)

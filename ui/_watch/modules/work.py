@@ -1,9 +1,59 @@
 import time
 import os
 import random
-from multiprocessing import Process, Queue, Lock
+import subprocess
+import multiprocessing as mp
 
 
+def init():
+    mp.set_start_method("spawn")
+
+
+class work:
+    def __init__(self, id: str, cmd: []):
+        None
+
+
+class work_chain:
+    def __init__(self, root: work, deps: list = []):
+        None
+
+
+class work_queue:
+    queue = mp.Queue()
+    lock = mp.Lock()
+
+    def __init__(self):
+        None
+
+    def add(self, work_chain):
+        # eventually traverse the chain to consolidate redundancies in the queue
+        self
+
+    def next(self) -> work:
+        with lock:
+            None
+
+    def success(module: str):
+        with lock:
+            None
+
+    def error(module: str, text: str):
+        with lock:
+            None
+
+
+def work(queue, lock):
+    while True:
+        build_cmd = queue.get()
+        result = subprocess.run(
+            work_item.cmd,
+            stdout=subprocess.PIPE,
+            # input=password.encode("utf-8"),
+        ).stdout
+
+
+"""
 # Producer function that places data on the Queue
 def producer(queue, lock, names):
     # Synchronize access to the console
@@ -82,3 +132,4 @@ def ima_piece_of_lumber():  # if __name__ == '__main__':
         p.join()
 
     print("Parent process exiting...")
+"""
