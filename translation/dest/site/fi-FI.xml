@@ -94,6 +94,7 @@
   <string name="dtzWithRounding">DTZ50\'\' pyöristettynä, puolisiirtojen määrä seuraavaan lyöntiin tai sotilaan siirtoon</string>
   <string name="noGameFound">Pelejä ei löytynyt</string>
   <string name="maybeIncludeMoreGamesFromThePreferencesMenu">Voisit sisällyttää lisää pelejä asetusvalikosta?</string>
+  <string name="openings" comment="openings&#10;Heading for a statistics page featuring different openings.">Avaukset</string>
   <string name="openingExplorer">Avaustietokanta</string>
   <string name="openingEndgameExplorer">Avaus- ja loppupeliselain</string>
   <string name="xOpeningExplorer">%s -avaustietokanta</string>
@@ -763,6 +764,7 @@
   <string name="bestWasX">Paras oli %s</string>
   <string name="youBrowsedAway">Selailit pois</string>
   <string name="resumePractice">Jatka harjoitusta</string>
+  <string name="drawByFiftyMoves">Peli päättyi tasapeliin 50 siirron säännön perusteella.</string>
   <string name="theGameIsADraw">Peli on tasapeli.</string>
   <string name="computerThinking">Tietokone miettii...</string>
   <string name="seeBestMove">Katso paras siirto</string>

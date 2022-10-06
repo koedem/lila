@@ -4,6 +4,7 @@ import chess.opening.{ FullOpening, FullOpeningDB }
 import java.text.Normalizer
 
 import lila.common.base.StringUtils.levenshtein
+import lila.common.Chronometer
 import lila.common.Heapsort.implicits._
 import lila.memo.CacheApi
 
@@ -13,68 +14,108 @@ final class OpeningSearch(cacheApi: CacheApi, explorer: OpeningExplorer) {
 
   val max = 32
 
-  def apply(q: String): Fu[List[OpeningSearchResult]] = fuccess {
+  private val cache = cacheApi.scaffeine
+    .maximumSize(1024)
+    .build[String, List[OpeningSearchResult]](doSearch _)
+
+  def apply(q: String): List[OpeningSearchResult] = cache get q
+
+  def doSearch(q: String): List[OpeningSearchResult] =
     OpeningSearch(q, max).map(OpeningSearchResult)
-  }
 }
 
+// linear performance but it's fine for 3,067 unique openings
 object OpeningSearch {
 
-  private val openings: Vector[FullOpening] = Opening.shortestLines.values.toVector
+  private val openings: Vector[FullOpening] = FullOpeningDB.shortestLines.values.toVector
 
-  private type Token    = String
-  private type Position = Int
+  private type Token = String
+  private type Score = Int
 
   private[opening] object tokenize {
-    private val nonLetterRegex = """[^a-zA-Z]+""".r
+    private val nonLetterRegex = """[^a-zA-Z0-9]+""".r
     private val exclude        = Set("opening", "variation")
-    def apply(str: String): List[Token] = {
+    def apply(str: String): Set[Token] = {
       str
         .take(200)
+        .replace("_", " ")
+        .replace("-", " ")
         .split(' ')
         .view
         .map(_.trim)
         .filter(_.nonEmpty)
         .take(6)
-        .toList
         .map { token =>
           Normalizer
             .normalize(token, Normalizer.Form.NFD)
             .toLowerCase
             .replaceAllIn(nonLetterRegex, "")
         }
-        .filterNot(exclude.contains)
+        .toSet
+        .diff(exclude)
     }
-    def apply(opening: FullOpening): List[Token] =
-      opening.key.toLowerCase.split('_').view.filterNot(exclude.contains).toList
+    def apply(opening: FullOpening): Set[Token] =
+      opening.key.toLowerCase.replace("-", "_").split('_').view.filterNot(exclude.contains).toSet +
+        opening.eco.toLowerCase ++
+        opening.pgn.split(' ').take(6).toSet
   }
 
-  private val index: Map[Token, Set[Position]] =
-    openings.zipWithIndex.foldLeft(Map.empty[Token, Set[Position]]) { case (index, (opening, position)) =>
-      tokenize(opening).foldLeft(index) { case (index, token) =>
-        index.updatedWith(token) {
-          case None            => Set(position).some
-          case Some(positions) => (positions + position).some
+  private case class Query(raw: String, numberedPgn: String, tokens: Set[Token])
+  private def makeQuery(userInput: String) = {
+    val clean = userInput.trim.toLowerCase
+    val numberedPgn = // try to produce numbered PGN "1. e4 e5 2. f4" from a query like "e4 e5 f4"
+      clean.split(' ').toList.map(_.trim).filter(_.nonEmpty).grouped(2).toList.zipWithIndex.map {
+        case (moves, index) => s"${index + 1}. ${moves mkString " "}"
+      } mkString " "
+    Query(clean, numberedPgn, tokenize(clean))
+  }
+  private case class Entry(opening: FullOpening, tokens: Set[Token])
+  private case class Match(opening: FullOpening, score: Score)
+
+  private val index: List[Entry] =
+    openings.view.map { op =>
+      Entry(op, tokenize(op))
+    }.toList
+
+  private def scoreOf(query: Query, entry: Entry): Option[Score] = {
+    def exactMatch(token: Token) =
+      entry.tokens(token) ||
+        entry.tokens(s"${token}s") // King's and Queen's can be matched by king and queen
+    if (
+      entry.opening.pgn.startsWith(query.raw) ||
+      entry.opening.pgn.startsWith(query.numberedPgn) ||
+      entry.opening.uci.startsWith(query.raw)
+    )
+      (query.raw.size * 1000 - entry.opening.nbMoves)
+    else
+      query.tokens
+        .foldLeft((query.tokens, 0)) { case ((remaining, score), token) =>
+          if (exactMatch(token)) (remaining - token, score + token.size * 100)
+          else (remaining, score)
+        } match {
+        case (remaining, score) =>
+          score + remaining.map { t =>
+            entry.tokens.map { e =>
+              if (e startsWith t) t.size * 50
+              else if (e contains t) t.size * 20
+              else 0
+            }.sum
+          }.sum
+      }
+  }.some.filter(0 <).map(_ - entry.opening.key.size)
+
+  private def searchOrdering =
+    Ordering.by[Match, Score] { case Match(_, score) => score }
+
+  def apply(str: String, max: Int): List[FullOpening] = Chronometer.syncMon(_.opening.searchTime) {
+    val query = makeQuery(str)
+    index
+      .flatMap { entry =>
+        scoreOf(query, entry) map {
+          Match(entry.opening, _)
         }
       }
-    }
-
-  private case class Match[R](result: R, exact: Boolean, freq: Int, nameSize: Int)
-
-  private def matchOrdering[R] =
-    Ordering.by[Match[R], (Boolean, Int, Int)] { case Match(_, exactMatch, freq, size) =>
-      (exactMatch, freq, -size)
-    }
-
-  def apply(q: String, max: Int): List[FullOpening] = {
-    val tokens            = tokenize(q)
-    val positions         = tokens.flatMap(index.get)
-    val merged            = positions.flatMap(_.toList)
-    val positionsWithFreq = merged.groupBy(identity).view.mapValues(_.size).toList
-    val matches: List[Match[FullOpening]] = positionsWithFreq.flatMap { case (position, freq) =>
-      openings.lift(position).map(op => Match(op, true, freq, op.name.size))
-    }
-    val sorted = matches.topN(max)(matchOrdering)
-    sorted.map(_.result)
+      .topN(max)(searchOrdering)
+      .map(_.opening)
   }
 }

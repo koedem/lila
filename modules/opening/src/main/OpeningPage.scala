@@ -1,50 +1,54 @@
 package lila.opening
 
+import chess.format.pgn.Pgn
+import chess.format.pgn.San
 import chess.format.{ FEN, Forsyth, Uci }
+import chess.opening.FullOpening
 import chess.opening.FullOpeningDB
 import chess.Speed
 
-import chess.format.pgn.San
-import chess.opening.FullOpening
+import lila.game.Game
 
 case class OpeningPage(
     query: OpeningQuery,
-    explored: OpeningExplored
+    explored: Option[OpeningExplored],
+    wiki: Option[OpeningWiki]
 ) {
   def opening = query.opening
   def name    = query.name
 
-  def nameParts = query.openingAndExtraMoves match {
+  def nameParts: NamePart.NamePartList = query.openingAndExtraMoves match {
     case (op, moves) => (op ?? NamePart.from) ::: NamePart.from(moves)
   }
 }
 
-case class NamePart(name: String, path: Option[String])
-
 case object NamePart {
-  def from(op: FullOpening): List[NamePart] = {
+  type NamePartList = List[Either[Opening.PgnMove, (Opening.NameSection, Option[String])]]
+  def from(op: FullOpening): NamePartList = {
     val sections = Opening.sectionsOf(op.name)
-    sections.zipWithIndex map { case (name, i) =>
-      NamePart(
-        name,
-        Opening.shortestLines.get(FullOpening.nameToKey(sections.take(i + 1).mkString("_"))).map(_.key)
+    sections.toList.zipWithIndex map { case (name, i) =>
+      Right(
+        name ->
+          FullOpeningDB.shortestLines
+            .get(FullOpening.nameToKey(sections.take(i + 1).mkString("_")))
+            .map(_.key)
       )
     }
   }
-  def from(moves: List[String]) = moves.map { m => NamePart(m, none) }
+  def from(moves: List[Opening.PgnMove]): NamePartList = moves.map(Left.apply)
 }
 
 case class ResultCounts(
-    white: Long,
-    draws: Long,
-    black: Long
+    white: Int,
+    draws: Int,
+    black: Int
 ) {
-  lazy val sum: Long = white + draws + black
+  lazy val sum: Int = white + draws + black
 
-  def whitePercent                       = percentOf(white)
-  def drawsPercent                       = percentOf(draws)
-  def blackPercent                       = percentOf(black)
-  private def percentOf(v: Long): Double = (v * 100d / sum)
+  def whitePercent                     = percentOf(white)
+  def drawsPercent                     = percentOf(draws)
+  def blackPercent                     = percentOf(black)
+  private def percentOf(v: Int): Float = (v.toFloat * 100 / sum)
 }
 
 case class OpeningNext(
@@ -60,35 +64,52 @@ case class OpeningNext(
   val key = opening.fold(fen.value.replace(" ", "_"))(_.key)
 }
 
-case class OpeningExplored(result: ResultCounts, next: List[OpeningNext], history: PopularityHistory)
+case class GameWithPgn(game: Game, pgn: Pgn)
+
+case class OpeningExplored(
+    result: ResultCounts,
+    games: List[GameWithPgn],
+    next: List[OpeningNext],
+    history: PopularityHistoryPercent
+)
 
 object OpeningPage {
-  def apply(query: OpeningQuery, exp: OpeningExplorer.Position, history: PopularityHistory): OpeningPage =
+  def apply(
+      query: OpeningQuery,
+      exploredPosition: Option[OpeningExplorer.Position],
+      games: List[GameWithPgn],
+      history: PopularityHistoryPercent,
+      wiki: Option[OpeningWiki]
+  ): OpeningPage =
     OpeningPage(
       query = query,
-      OpeningExplored(
-        result = ResultCounts(exp.white, exp.draws, exp.black),
-        next = exp.moves
-          .flatMap { m =>
-            for {
-              uci  <- Uci.Move(m.uci)
-              move <- query.position.move(uci).toOption
-              result  = ResultCounts(m.white, m.draws, m.black)
-              fen     = Forsyth >> move.situationAfter
-              opening = FullOpeningDB findByFen fen
-            } yield OpeningNext(
-              m.san,
-              uci,
-              fen,
-              query.copy(replay = query.replay addMove Left(move)),
-              result,
-              (result.sum * 100d / exp.movesSum),
-              opening,
-              shortName = Opening.variationName(query.opening, opening)
-            )
-          }
-          .sortBy(-_.result.sum),
-        history = history
-      )
+      exploredPosition map { exp =>
+        OpeningExplored(
+          result = ResultCounts(exp.white, exp.draws, exp.black),
+          games = games,
+          next = exp.moves
+            .flatMap { m =>
+              for {
+                uci  <- Uci.Move(m.uci)
+                move <- query.position.move(uci).toOption
+                result  = ResultCounts(m.white, m.draws, m.black)
+                fen     = Forsyth >> move.situationAfter
+                opening = FullOpeningDB findByFen fen
+              } yield OpeningNext(
+                m.san,
+                uci,
+                fen,
+                query.copy(replay = query.replay addMove Left(move)),
+                result,
+                (result.sum * 100d / exp.movesSum),
+                opening,
+                shortName = Opening.variationName(query.opening, opening)
+              )
+            }
+            .sortBy(-_.result.sum),
+          history = history
+        )
+      },
+      wiki
     )
 }

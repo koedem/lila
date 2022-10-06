@@ -61,7 +61,7 @@ lazy val i18n = smallModule("i18n",
     MessageCompiler(
       sourceDir = new File("translation/source"),
       destDir = new File("translation/dest"),
-      dbs = "site arena emails learn activity coordinates study class contact patron coach broadcast streamer tfa settings preferences team perfStat search tourname faq lag swiss puzzle puzzleTheme challenge storm ublog insight keyboardMove timeago".split(' ').toList,
+      dbs = "site arena emails learn activity coordinates study class contact patron coach broadcast streamer tfa settings preferences team perfStat search tourname faq lag swiss puzzle puzzleTheme challenge storm ublog insight keyboardMove timeago oauthScope".split(' ').toList,
       compileTo = (Compile / sourceManaged).value
     )
   }.taskValue
@@ -256,7 +256,7 @@ lazy val tutor = module("tutor",
 )
 
 lazy val opening = module("opening",
-  Seq(common, memo),
+  Seq(common, memo, game),
   specs2Bundle
 )
 

@@ -98,6 +98,7 @@
   <string name="dtzWithRounding">DTZ50\'\' עם עיגול, בהתבסס על מספר חצאי-המסעים עד ההכאה הבאה או מסע עם חייל</string>
   <string name="noGameFound">אין משחק זמין</string>
   <string name="maybeIncludeMoreGamesFromThePreferencesMenu">להוסיף עוד משחקים מתפריט ההגדרות?</string>
+  <string name="openings">פתיחות</string>
   <string name="openingExplorer">סייר הפתיחות</string>
   <string name="openingEndgameExplorer">סייר פתיחות/סיומים</string>
   <string name="xOpeningExplorer">חוקר פתיחות %s</string>
@@ -318,7 +319,7 @@
     <item quantity="other">%s מדורגים</item>
   </plurals>
   <plurals name="nbWins">
-    <item quantity="one">ניצחון %s</item>
+    <item quantity="one">%s ניצחון</item>
     <item quantity="two">%s ניצחונות</item>
     <item quantity="many">%s ניצחונות</item>
     <item quantity="other">%s ניצחונות</item>

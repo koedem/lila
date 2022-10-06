@@ -6,35 +6,63 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
 import lila.db.dsl._
+import lila.game.{ GameRepo, PgnDump }
 import lila.memo.CacheApi
+import lila.user.User
 
 final class OpeningApi(
+    wikiApi: OpeningWikiApi,
     cacheApi: CacheApi,
+    gameRepo: GameRepo,
+    pgnDump: PgnDump,
     explorer: OpeningExplorer,
     configStore: OpeningConfigStore
 )(implicit ec: ExecutionContext) {
 
-  def index(implicit req: RequestHeader): Fu[Option[OpeningPage]] = lookup("")
+  private val defaultCache = cacheApi.notLoading[String, Option[OpeningPage]](1024, "opening.defaultCache") {
+    _.maximumSize(4096).expireAfterWrite(5 minute).buildAsync()
+  }
 
-  def lookup(q: String)(implicit req: RequestHeader): Fu[Option[OpeningPage]] =
-    OpeningQuery(q, readConfig) ?? lookup
+  def index(implicit req: RequestHeader): Fu[Option[OpeningPage]] = lookup("", withWikiRevisions = false)
 
-  def lookup(query: OpeningQuery): Fu[Option[OpeningPage]] =
-    explorer.stats(query) zip explorer.queryHistory(query) zip allGamesHistory.get(query.config) map {
-      case ((Some(stats), history), allHistory) =>
-        OpeningPage(query, stats, ponderHistory(history, allHistory)).some
-      case _ => none
-    }
+  def lookup(q: String, withWikiRevisions: Boolean)(implicit req: RequestHeader): Fu[Option[OpeningPage]] = {
+    val config = readConfig
+    if (config.isDefault && !withWikiRevisions)
+      defaultCache.getFuture(q, _ => lookup(q, config, withWikiRevisions))
+    else lookup(q, config, withWikiRevisions)
+  }
+
+  private def lookup(q: String, config: OpeningConfig, withWikiRevisions: Boolean): Fu[Option[OpeningPage]] =
+    OpeningQuery(q, config) ?? { compute(_, withWikiRevisions) }
+
+  private def compute(query: OpeningQuery, withWikiRevisions: Boolean): Fu[Option[OpeningPage]] =
+    explorer.stats(query) zip
+      explorer.queryHistory(query) zip
+      allGamesHistory.get(query.config) zip
+      query.openingAndExtraMoves._1.??(op => wikiApi(op, withWikiRevisions) dmap some) flatMap {
+        case (((stats, history), allHistory), wiki) =>
+          for {
+            games <- gameRepo.gamesFromSecondary(stats.??(_.games).map(_.id))
+            withPgn <- games.map { g =>
+              pgnDump(g, None, PgnDump.WithFlags(evals = false)) dmap { GameWithPgn(g, _) }
+            }.sequenceFu
+          } yield OpeningPage(query, stats, withPgn, historyPercent(history, allHistory), wiki).some
+        case _ => fuccess(none)
+      }
 
   def readConfig(implicit req: RequestHeader) = configStore.read
 
-  private def ponderHistory(query: PopularityHistory, config: PopularityHistory): PopularityHistory =
+  private def historyPercent(
+      query: PopularityHistoryAbsolute,
+      config: PopularityHistoryAbsolute
+  ): PopularityHistoryPercent =
     query.zipAll(config, 0, 0) map {
       case (_, 0)     => 0
-      case (cur, all) => ((cur * 10_000L) / all).toInt
+      case (cur, all) => (cur * 100f) / all
     }
 
-  private val allGamesHistory = cacheApi[OpeningConfig, PopularityHistory](32, "opening.allGamesHistory") {
-    _.expireAfterWrite(1 hour).buildAsyncFuture(explorer.configHistory)
-  }
+  private val allGamesHistory =
+    cacheApi[OpeningConfig, PopularityHistoryAbsolute](32, "opening.allGamesHistory") {
+      _.expireAfterWrite(1 hour).buildAsyncFuture(explorer.configHistory)
+    }
 }
