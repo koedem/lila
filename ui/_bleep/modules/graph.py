@@ -23,13 +23,14 @@ module_filter = [
     "chessops",
     "mithril",
 ]
-deps = {}
+modules = {}
+module_build = []
 
 
 def walk(p: Path):
     files = GraphBuilder(p)
-    for name in deps.keys():
-        for dep in deps[name]:
+    for name in modules.keys():
+        for dep in modules[name]["deps"]:
             print(f"{name} -> {dep}")
 
 
@@ -59,9 +60,9 @@ class GraphBuilder:
             ):
                 module_filter.append(file.name)
                 print(file.name)
-        self.build(node)
+        # self.build(node)
 
-    def build(self, file: Path):
+    def build_graph(self, file: Path):
         if file.suffix == ".mjs":
             self.rollup_config(file)
         elif file.name == "package.json":
@@ -72,8 +73,12 @@ class GraphBuilder:
             for f in file.iterdir():
                 self.build(f)
 
+    def build_module(self, module: str):
+        pass
+
     def module_src(self, file: Path):
-        module = file.relative_to(e.src_path).parts[0]
+        relpath = file.relative_to(e.src_path)
+        module = relpath.parts[0]
         print(module)
 
     def package_json(self, file: Path):
@@ -81,10 +86,19 @@ class GraphBuilder:
         # print(dep_json)
         try:
             deps = dep_json["dependencies"]
-            deps[file.parent.name] = filter(
-                lambda dep: dep in module_filter, deps
-            )
-
+            modname = file.parent.name
+            if not hasattr(modules, modname):
+                modules[modname] = {}
+            module = modules[modname]
+            module["deps"] = filter(lambda d: d in module_filter, deps)
+            module["build"] = "yarn run dev"
+            module["cwd"] = file.parent
+            module["triggers"] = []
+            for dep in module["deps"]:
+                if not hasattr(dep, "triggers"):
+                    dep["triggers"] = []
+                dep["triggers"].append(modname)
+                modules[dep]
         except BaseException:
             print(f"{file.as_posix()}")
 

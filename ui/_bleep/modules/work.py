@@ -9,28 +9,41 @@ def init():
     mp.set_start_method("spawn")
 
 
-class work:
-    def __init__(self, id: str, cmd: []):
-        None
+class Cmd:
+    def __init__(self, args: list, cwd: str):
+        self.args = args
+        self.cwd = cwd
+        pass
 
 
-class work_chain:
-    def __init__(self, root: work, deps: list = []):
-        None
+class Work:
+    def __init__(self, id: str, cmd: Cmd):
+        result = subprocess.run(
+            cmd.args,
+            cwd=cmd.cwd,
+            stdout=subprocess.PIPE,
+            # input=password.encode("utf-8"),
+        ).stdout
+        print(f"Got: {result}")
 
 
-class work_queue:
+class WorkChain:
+    def __init__(self, root: Work, deps: list = []):
+        pass
+
+
+class WorkQueue:
     queue = mp.Queue()
     lock = mp.Lock()
 
     def __init__(self):
         None
 
-    def add(self, work_chain):
+    def add(self, work_chain: WorkChain):
         # eventually traverse the chain to consolidate redundancies in the queue
         self
 
-    def next(self) -> work:
+    def next(self) -> Work:
         with lock:
             None
 

@@ -7,6 +7,7 @@ from modules.env import e
 from watchdog.observers import Observer
 from watchdog.events import LoggingEventHandler, PatternMatchingEventHandler
 import modules.graph as graph
+from modules.work import Work, Cmd
 import modules.util as util
 
 
@@ -14,6 +15,13 @@ def main():
     e.set_args(_get_args())
     graph.walk(e.src_path)
     print(e.src_path)
+    Work(
+        "blah",
+        Cmd(
+            ["yarn", "run", "dev"],
+            "/Users/gamblej/ws/lichess/lila-local/ui/chart",
+        ),
+    )
 
 
 """
