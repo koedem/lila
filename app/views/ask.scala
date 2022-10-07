@@ -43,17 +43,21 @@ object ask {
     )
 
   private def header(ask: Ask)(implicit ctx: Context): Frag =
-    legend(cls := "ask__header")(
-      label(ask.question),
-      ctx.me.exists(_ is ask.creator) option button(
-        cls        := "action admin",
-        formaction := s"${routes.Ask.admin(ask.creator)}#${ask._id}",
-        title      := trans.edit.txt()
-      ),
-      hasPick(ask) option button(
-        cls        := "action unset",
-        formaction := s"${routes.Ask.unset(ask._id)}",
-        title      := trans.delete.txt()
+    legend(
+      span(cls := "ask__header")(
+        label(ask.question),
+        button(
+          cls        := s"action unset${hasPick(ask) ?? " visible"}",
+          formmethod := "POST",
+          formaction := s"${routes.Ask.unset(ask._id)}",
+          title      := trans.delete.txt()
+        ),
+        ctx.me.exists(_ is ask.creator) option button(
+          cls        := "action admin",
+          formmethod := "GET",
+          formaction := s"${routes.Ask.admin(ask._id)}",
+          title      := trans.edit.txt()
+        ),
       )
     )
 
@@ -92,11 +96,10 @@ object ask {
     choiceContainer(ask)(
       validRanking(ask).zipWithIndex map { case (choice, index) =>
         val clz = s"ranked-choice${ask.isStretch ?? " stretch"}${hasPick(ask) ?? " badge"}"
-        div(
-          cls       := clz,
-          value     := choice,
-          draggable := "true"
-        )(div(s"${index + 1}"), label(ask.choices(choice)), div)
+        div(cls := clz, value := choice, draggable := true)(
+          div(s"${index + 1}"),
+          label(ask.choices(choice))
+        )
       }
     )
   )

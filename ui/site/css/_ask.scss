@@ -27,6 +27,7 @@ div.ask-container {
 fieldset.ask {
   margin-bottom: 1em;
   padding: 0 (3 * $gap) $gap (2 * $gap);
+  width: 100%;
   font-size: 1em;
   line-height: normal;
   border: solid 1px $c-box-border;
@@ -37,11 +38,17 @@ fieldset.ask {
   }
 }
 
-legend.ask__header {
-  display: block;
-  margin-top: 1em;
+legend {
+  width: 100%;
+}
 
+span.ask__header {
+  display: flex;
+  flex: 1 0 100%;
+  justify-content: space-between;
+  
   label {
+    flex: auto;
     margin: 0 $gap;
     padding-bottom: $gap;
     font-size: 1.4em;
@@ -50,6 +57,8 @@ legend.ask__header {
     @extend %data-icon;
     margin-#{$end-direction}: $gap / 2;
     margin-bottom: $gap;
+    flex: initial;
+    justify-self: flex-end;
     background: none;
     border: none;
     outline: none;
@@ -71,12 +80,16 @@ legend.ask__header {
       }
     }
     &.unset {
+      visibility: hidden;
       color: if($theme-light, #f66, #c33);
       &::before {
         content: '';
       }
       &:hover {
         color: if($theme-light, #c33, #f66);
+      }
+      &.visible {
+        visibility: visible;
       }
     }
   }
@@ -148,7 +161,6 @@ div.ask__choices {
     flex: initial;
     display: inline-block;
     text-align: center;
-    white-space: nowrap;
     user-select: none;
 
     label {
@@ -170,33 +182,27 @@ div.ask__choices {
     &.dragging {
       opacity: 0.3;
     }
-
-    div {
-      margin: 0;
-      visibility: hidden;
+    ::after {
+      content: '';
     }
-    &.badge > div:first-child {
+
+    > div {
       margin-#{$start-direction}: -$gap;
       margin-#{$end-direction}: $gap;
       width: 1.7em;
       height: 1.7em;
       visibility: visible;
       border-radius: 100%;
-      background: $c-secondary; // #464646;
+      background: if($theme-light, #bbb, #666);//$c-secondary;
       border: 1px solid if($theme-light, #aaa, #666);
-      color: if($theme-light, #ddd, #000); //$c-contrast-font;
+      color: if($theme-light, #ddd, #000);
       text-align: center;
       font-size: 0.7em;
       font-weight: bold;
     }
-    &:not(.badge) > label::after {
-      @extend %data-icon;
-      margin-#{$start-direction}: $gap;
-      margin-#{$end-direction}: -$gap;
-      vertical-align: sub;
-      opacity: 1;
-      color: $c-neutral;
-      content: '';
+
+    &.badge > div {
+      background: $c-secondary;
     }
     @if $theme == 'transp' {
       background: hsla(0deg, 0%, 50%, 0.3);
@@ -276,10 +282,6 @@ div.ask__choices {
     &:after {
       transform: translate(-50%, -50%) rotate(20deg);
     }
-  }
-
-  &.stretch {
-    align-items: stretch;
   }
 
   &.vertical {

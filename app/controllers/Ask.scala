@@ -43,7 +43,15 @@ final class Ask(env: Env) extends LilaController(env) {
       case None => NotFound("Not found")
     }}*/
 
-  def admin(uid: String) =
+  def admin(id: String) =
+    AuthBody { implicit ctx => me =>
+      env.ask.api.unset(id, me.id) map {
+        case Some(ask) => Ok(views.html.askAdmin.renderInner(ask))
+        case None      => NotFound(s"Ask $id not found")
+      }
+    }
+
+  def byUser(uid: String) =
     AuthBody { implicit ctx => me =>
       for {
         user <- env.user.lightUser(uid)

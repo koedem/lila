@@ -34,9 +34,9 @@ object askAdmin {
           case None      => "no url"
         }
       ),
-      asks map askToText
+      asks map renderInner
     )
-  def askToText(as: Ask)(implicit ctx: Context) = {
+  def renderInner(as: Ask)(implicit ctx: Context) = {
     val sb = new StringBuilder();
     div(cls  := "ask-admin")(
       a(name := as._id),

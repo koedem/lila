@@ -35,11 +35,17 @@ const rewire = (el: Element | null, frag: string): Ask | undefined => {
   }
 };
 
-const askXhr = (req: { ask: Ask; url: string; body?: FormData; after?: (_: Ask) => void }) =>
-  xhr.textRaw(req.url, { method: 'post', /*redirect: 'error',*/ body: req.body }).then(
+const askXhr = ( req: { 
+  ask: Ask;
+  url: string;
+  method?: string;
+  body?: FormData;
+  after?: (_: Ask) => void
+}) =>
+  xhr.textRaw(req.url, { method: req.method ? req.method : 'post', body: req.body }).then(
     async (rsp: Response) => {
       if (rsp.redirected) {
-        if (!rsp.url.startsWith(window.location.origin)) throw new Error(`Weirdness: ${rsp.url}`);
+        if (!rsp.url.startsWith(window.location.origin)) throw new Error(`Bad redirect: ${rsp.url}`);
         window.location.href = rsp.url;
         return; 
       }
@@ -47,15 +53,15 @@ const askXhr = (req: { ask: Ask; url: string; body?: FormData; after?: (_: Ask) 
       if (req.after) req.after(newAsk!);
     },
     (rsp: Response) => {
-      console.log(`Ask XHR failed with ${rsp.status} ${rsp.statusText}`);
+      console.log(`Ask XHR failed: ${rsp.status} ${rsp.statusText}`);
     }
   );
 
 const wireExclusiveChoices = (ask: Ask): Cash =>
   $('.exclusive-choice', ask.el).on('click', function (e: Event) {
     const target = e.target as Element;
-    const value = target.classList.contains('selected') ? '' : target?.getAttribute('value');
-    askXhr({ ask: ask, url: `/ask/${ask.el.id}?picks=${value}` });
+    const picks = target.classList.contains('selected') ? '' : `?picks=${target.getAttribute('value')}`;
+    askXhr({ ask: ask, url: `/ask/${ask.el.id}${picks}`});
   });
 
 const wireFeedback = (ask: Ask): HTMLInputElement | undefined => {
@@ -95,9 +101,12 @@ const wireSubmit = (ask: Ask): Element | undefined => {
 };
 
 const wireActions = (ask: Ask): Cash =>
-  $('button.action', ask.el).on('click', (e: Event) =>
-    askXhr({ ask: ask, url: (e.target as HTMLButtonElement).formAction })
-  );
+  $('button.action', ask.el).on('click', (e: Event) => {
+    const btn = e.target as HTMLButtonElement;
+    //const method = btn.formMethod ? btn.formMethod : 'POST'
+
+    askXhr({ ask: ask, method: btn.formMethod, url: btn.formAction });
+  });
 
 const wireRankedChoices = (ask: Ask): void => {
   let initialOrder = ask.ranking();
