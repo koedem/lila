@@ -29,7 +29,7 @@
   <string name="cheatDetected">Juks oppdaga</string>
   <string name="kingInTheCenter">Kongen i sentrum</string>
   <string name="threeChecks">Sjakk tre gonger</string>
-  <string name="raceFinished">Målgang</string>
+  <string name="raceFinished">Kappløp er avslutta</string>
   <string name="variantEnding">Variantavslutning</string>
   <string name="newOpponent">Ny motspelar</string>
   <string name="yourOpponentWantsToPlayANewGameWithYou">Motspelaren din ønskjer å spela eit nytt parti med deg</string>
@@ -94,6 +94,7 @@
   <string name="dtzWithRounding">DTZ50\'\' med avrunding, basert på antal halvtrekk fram til neste brikketaking eller bondetrekk</string>
   <string name="noGameFound">Fann ikkje noko parti</string>
   <string name="maybeIncludeMoreGamesFromThePreferencesMenu">Gå til innstillingsmenyen om du vil søkje blant fleire parti.</string>
+  <string name="openings">Opningar</string>
   <string name="openingExplorer">Opningsbok</string>
   <string name="openingEndgameExplorer">Opnings-/sluttspelbok</string>
   <string name="xOpeningExplorer">%s opningsutforskar</string>

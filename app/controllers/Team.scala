@@ -9,12 +9,10 @@ import views._
 
 import lila.api.Context
 import lila.app._
-import lila.common.config.MaxPerSecond
-import lila.common.HTTPRequest
+import lila.common.{ config, HTTPRequest, IpAddress }
 import lila.memo.RateLimit
 import lila.team.{ Requesting, Team => TeamModel }
 import lila.user.{ Holder, User => UserModel }
-import lila.common.config
 
 final class Team(
     env: Env,
@@ -125,7 +123,7 @@ final class Team(
             case true =>
               apiC.jsonStream(
                 env.team
-                  .memberStream(team, MaxPerSecond(20))
+                  .memberStream(team, config.MaxPerSecond(20))
                   .map(env.api.userApi.one(_, withOnline = false))
               )(req)
             case false => Unauthorized
@@ -182,10 +180,31 @@ final class Team(
         ).flashSuccess
       }
     }
+
+  private val ApiKickRateLimitPerIP = lila.memo.RateLimit.composite[IpAddress](
+    key = "team.kick.api.ip",
+    enforce = env.net.rateLimit.value
+  )(
+    ("fast", 10, 2.minutes),
+    ("slow", 50, 1.day)
+  )
+  private val kickLimitReportOnce = lila.memo.OnceEvery(10.minutes)
+
   def kickUser(teamId: String, userId: String) =
-    Scoped(_.Team.Write) { _ => me =>
-      WithOwnedTeamEnabledApi(teamId, me) {
-        api.kick(_, userId, me) inject Api.Done
+    Scoped(_.Team.Lead) { req => me =>
+      WithOwnedTeamEnabledApi(teamId, me) { team =>
+        ApiKickRateLimitPerIP[Fu[Api.ApiResult]](
+          HTTPRequest ipAddress req,
+          cost = if (me.isVerified || me.isApiHog) 0 else 1
+        ) {
+          api.kick(team, userId, me) inject Api.Done
+        } {
+          if (kickLimitReportOnce(userId))
+            lila
+              .log("security")
+              .warn(s"API team.kick limited team:${teamId} user:${me.id} ip:${HTTPRequest ipAddress req}")
+          fuccess(Api.Limited)
+        }
       }
     }
 
@@ -502,7 +521,7 @@ final class Team(
     } yield Ok(html.team.admin.pmAll(team, form, tours, unsubs))
 
   def pmAllSubmit(id: String) =
-    AuthOrScopedBody(_.Team.Write)(
+    AuthOrScopedBody(_.Team.Lead)(
       auth = implicit ctx =>
         me =>
           WithOwnedTeamEnabled(id) { team =>
@@ -595,7 +614,7 @@ final class Team(
     }
 
   def apiRequestProcess(teamId: String, userId: String, decision: String) =
-    Scoped(_.Team.Write) { req => me =>
+    Scoped(_.Team.Lead) { req => me =>
       WithOwnedTeamEnabledApi(teamId, me) { team =>
         api request lila.team.Request.makeId(team.id, UserModel normalize userId) flatMap {
           case None      => fuccess(Api.ClientError("No such team join request"))
@@ -619,7 +638,11 @@ final class Team(
 ---
 You received this because you are subscribed to messages of the team $url."""
               env.msg.api
-                .multiPost(Holder(me), env.team.memberStream.subscribedIds(team, MaxPerSecond(50)), full)
+                .multiPost(
+                  Holder(me),
+                  env.team.memberStream.subscribedIds(team, config.MaxPerSecond(50)),
+                  full
+                )
                 .addEffect { nb =>
                   lila.mon.msg.teamBulk(team.id).record(nb).unit
                 }

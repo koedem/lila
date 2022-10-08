@@ -98,6 +98,7 @@
   <string name="dtzWithRounding">DTZ50 \'\' z zaokroževanjem, odvisno od števila pol-potez do naslednjega zajema ali poteze kmeta</string>
   <string name="noGameFound">Igra ni najdena</string>
   <string name="maybeIncludeMoreGamesFromThePreferencesMenu">Bi vključili več partij v meniju nastavitev?</string>
+  <string name="openings">Otvoritve</string>
   <string name="openingExplorer">Raziskovalec otvoritev</string>
   <string name="openingEndgameExplorer">Raziskovalec otovoritev/končnic</string>
   <string name="xOpeningExplorer">%s raziskovalec otvoritev</string>
@@ -173,6 +174,7 @@
   <string name="viewInFullSize">Pogled v polni velikosti</string>
   <string name="logOut">Odjava</string>
   <string name="signIn">Prijava</string>
+  <string name="rememberMe" comment="rememberMe&#10;&#10;Appears on the sign-in screen.">Zapomni si me</string>
   <string name="youNeedAnAccountToDoThat">Za to dejanje potrebuješ račun</string>
   <string name="signUp">Registracija</string>
   <string name="computersAreNotAllowedToPlay">Računalniška pomoč ni dovoljena. Prosimo da med igro ne uporabljate računalniških programov, baz ali pridobivate pomoč ostalih igralcev. Uporabnik, ki ustvarja več zaporednih uporabniških računov bo onemogočen.</string>

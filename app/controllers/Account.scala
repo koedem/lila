@@ -86,7 +86,7 @@ final class Account(
                   .add("troll" -> me.marks.troll)
                   .add("playban" -> playban)
                   .add("announce" -> AnnounceStore.get.map(_.json))
-              }.withHeaders(CACHE_CONTROL -> s"max-age=15")
+              }.withHeaders(CACHE_CONTROL -> "max-age=15")
             }
         }
       )
@@ -223,6 +223,7 @@ final class Account(
           (prevEmail.exists(_.isNoReply) ?? env.clas.api.student.release(user)) >>
             auth.authenticateUser(
               user,
+              remember = true,
               result =
                 if (prevEmail.exists(_.isNoReply))
                   Some(_ => Redirect(routes.User.show(user.username)).flashSuccess)
@@ -459,7 +460,7 @@ final class Account(
           notFound
         case Some(user) =>
           env.report.api.reopenReports(lila.report.Suspect(user)) >>
-            auth.authenticateUser(user) >>-
+            auth.authenticateUser(user, remember = true) >>-
             lila.mon.user.auth.reopenConfirm("success").increment().unit
       }
     }

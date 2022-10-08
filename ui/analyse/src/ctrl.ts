@@ -169,7 +169,9 @@ export default class AnalyseCtrl {
       if (this.music && set !== 'music') this.music = null;
     });
 
-    lichess.pubsub.on('analysis.change.trigger', this.onChange);
+    lichess.pubsub.on('ply.trigger', () =>
+      lichess.pubsub.emit('ply', this.node.ply, this.tree.lastMainlineNode(this.path).ply === this.node.ply)
+    );
     lichess.pubsub.on('analysis.chart.click', index => {
       this.jumpToIndex(index);
       this.redraw();
@@ -345,7 +347,7 @@ export default class AnalyseCtrl {
   };
 
   private onChange: () => void = throttle(300, () => {
-    lichess.pubsub.emit('analysis.change', this.node.fen, this.path, this.onMainline ? this.node.ply : false);
+    lichess.pubsub.emit('analysis.change', this.node.fen, this.path);
   });
 
   private updateHref: () => void = debounce(() => {
@@ -389,7 +391,7 @@ export default class AnalyseCtrl {
       if (this.study) this.study.onJump();
     }
     if (this.music) this.music.jump(this.node);
-    lichess.pubsub.emit('ply', this.node.ply);
+    lichess.pubsub.emit('ply', this.node.ply, this.tree.lastMainlineNode(this.path).ply === this.node.ply);
     this.showGround();
   }
 
@@ -652,6 +654,11 @@ export default class AnalyseCtrl {
             multiPvDefault: 1,
           }
         : {}),
+      externalEngines:
+        this.data.externalEngines?.map(engine => ({
+          ...engine,
+          endpoint: this.opts.externalEngineEndpoint,
+        })) || [],
     });
   }
 

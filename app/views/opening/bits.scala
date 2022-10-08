@@ -1,5 +1,7 @@
 package views.html.opening
 
+import cats.data.NonEmptyList
+import chess.opening.FullOpening
 import controllers.routes
 import play.api.libs.json.{ JsArray, Json }
 
@@ -7,16 +9,19 @@ import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.String.html.safeJsonValue
-import lila.opening.{ OpeningConfig, OpeningPage, OpeningQuery, ResultCounts }
+import lila.opening.{ Opening, OpeningConfig, OpeningExplored, OpeningPage, OpeningQuery, ResultCounts }
+import lila.opening.OpeningSearchResult
 
 private object bits {
 
-  def whatsNext(page: OpeningPage)(implicit ctx: Context) =
+  def beta = span(cls := "opening__beta")("BETA")
+
+  def whatsNext(explored: OpeningExplored)(implicit ctx: Context) =
     div(cls := "opening__nexts")(
-      page.explored.next.map { next =>
+      explored.next.map { next =>
         a(cls := "opening__next", href := queryUrl(next.query))(
           span(cls := "opening__next__popularity")(
-            span(style := s"width:${percentNumber(next.percent)}%")(
+            span(style := s"width:${percentNumber(next.percent)}%", title := "Popularity")(
               s"${Math.round(next.percent)}%"
             )
           ),
@@ -25,14 +30,8 @@ private object bits {
             span(cls := "opening__next__san")(next.san)
           ),
           span(cls := "opening__next__result-board")(
-            span(cls := "opening__next__result") {
-              import next.result._
-              val (blackV, drawsV, whiteV) = exaggerateResults(next.result)
-              frag(
-                resultSegment("black", blackPercent, blackV),
-                resultSegment("draws", drawsPercent, drawsV),
-                resultSegment("white", whitePercent, whiteV)
-              )
+            span(cls := "opening__next__result result-bar") {
+              resultSegments(next.result)
             },
             span(cls := "opening__next__board")(
               views.html.board.bits.mini(next.fen, lastMove = next.uci.uci)(span)
@@ -42,29 +41,28 @@ private object bits {
       }
     )
 
-  def winRate(page: OpeningPage)(implicit ctx: Context) =
-    div(cls := "opening__win-rate")(
-      h2(
-        strong(page.explored.result.sum.localize),
-        " games",
-        span(cls := "title-stats")(
-          em("White: ", percentFrag(page.explored.result.whitePercent)),
-          em("Black: ", percentFrag(page.explored.result.blackPercent)),
-          em("Draws: ", percentFrag(page.explored.result.drawsPercent))
-        )
-      )
-    )
-
-  def config(page: OpeningPage)(implicit ctx: Context) = {
+  def configForm(config: OpeningConfig, thenTo: String)(implicit ctx: Context) = {
     import OpeningConfig._
-    details(cls := "opening__config")( // , attr("open") := true)(
-      summary(cls := "opening__config__summary")(page.query.config.toString),
+    details(cls := "opening__config")(
+      summary(cls := "opening__config__summary")(
+        div(cls := "opening__config__summary__short")(
+          iconTag('')
+        ),
+        div(cls := "opening__config__summary__large")(
+          "Speed: ",
+          span(cls := "opening__config__summary__speed")(config.showSpeeds),
+          nbsp,
+          nbsp,
+          "Rating: ",
+          span(cls := "opening__config__summary__rating")(config.showRatings)
+        )
+      ),
       postForm(
         cls    := "opening__config__form",
-        action := routes.Opening.config(page.query.key.some.filter(_.nonEmpty) | "index")
+        action := routes.Opening.config(thenTo)
       )(
-        checkboxes(form("speeds"), speedChoices, page.query.config.speeds.map(_.id)),
-        checkboxes(form("ratings"), ratingChoices, page.query.config.ratings),
+        checkboxes(form("speeds"), speedChoices, config.speeds.map(_.id)),
+        checkboxes(form("ratings"), ratingChoices, config.ratings),
         div(cls                           := "opening__config__form__submit")(
           form3.submit(trans.apply())(cls := "button-empty")
         )
@@ -72,14 +70,34 @@ private object bits {
     )
   }
 
-  def moreJs(page: OpeningPage)(implicit ctx: Context) = frag(
+  def moreJs(page: Option[OpeningPage])(implicit ctx: Context) = frag(
     jsModule("opening"),
     embedJsUnsafeLoadThen {
-      s"""LichessOpening.page(${safeJsonValue(
-          Json.obj("history" -> page.explored.history)
-        )})"""
+      page match {
+        case Some(p) =>
+          s"""LichessOpening.page(${safeJsonValue(
+              Json.obj("history" -> p.explored.??(_.history))
+            )})"""
+        case None =>
+          s"""LichessOpening.search()"""
+      }
     }
   )
+
+  def splitName(op: FullOpening) =
+    Opening.sectionsOf(op.name) match {
+      case NonEmptyList(family, variations) =>
+        frag(
+          span(cls := "opening-name__family")(family),
+          variations.nonEmpty option ": ",
+          fragList(
+            variations.map { variation =>
+              span(cls := "opening-name__variation")(variation)
+            },
+            ", "
+          )
+        )
+    }
 
   def queryUrl(q: OpeningQuery) = routes.Opening.query(q.key)
 
@@ -88,12 +106,24 @@ private object bits {
   def percentNumber(v: Double) = f"${v}%1.2f"
   def percentFrag(v: Double)   = frag(strong(percentNumber(v)), "%")
 
-  def resultSegment(key: String, percent: Double, visualPercent: Double) = {
+  def resultSegments(result: ResultCounts) = result.sum > 0 option {
+    import result._
+    val (blackV, drawsV, whiteV) = exaggerateResults(result)
+    frag(
+      resultSegment("black", "Black wins", blackPercent, blackV),
+      resultSegment("draws", "Draws", drawsPercent, drawsV),
+      resultSegment("white", "White wins", whitePercent, whiteV)
+    )
+  }
+
+  def resultSegment(key: String, help: String, percent: Double, visualPercent: Double) = {
     val visible = visualPercent > 7
     val text    = s"${Math.round(percent)}%"
-    span(cls := key, style := s"height:${percentNumber(visualPercent)}%", title := (!visible).option(text))(
-      visible option text
-    )
+    span(
+      cls   := key,
+      style := s"height:${percentNumber(visualPercent)}%",
+      title := s"$text $help"
+    )(visible option text)
   }
 
   private def exaggerateResults(result: ResultCounts) = {

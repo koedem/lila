@@ -1,21 +1,10 @@
-import * as chart from 'chart.js';
 import Lpv from 'lichess-pgn-viewer';
 import { initAll as initMiniBoards } from 'common/mini-board';
 import { OpeningPage } from './interfaces';
-import { addMonths } from 'date-fns';
-import 'chartjs-adapter-date-fns';
-
-chart.Chart.register(
-  chart.LineController,
-  chart.CategoryScale,
-  chart.LinearScale,
-  chart.PointElement,
-  chart.LineElement,
-  chart.Tooltip,
-  chart.Filler,
-  chart.Title,
-  chart.TimeScale
-);
+import { renderHistoryChart } from './chart';
+import { init as searchEngine } from './search';
+import panels from './panels';
+import { Config } from 'chessground/config';
 
 export function page(data: OpeningPage) {
   $('.opening__intro .lpv').each(function (this: HTMLElement) {
@@ -25,74 +14,56 @@ export function page(data: OpeningPage) {
       showMoves: 'bottom',
       showClocks: false,
       showPlayers: false,
+      chessground: cgConfig,
       menu: {
         getPgn: {
           enabled: true,
-          fileName: (this.dataset['title'] || this.dataset['pgn']).replace(' ', '_') + '.pgn',
+          fileName: (this.dataset['title'] || this.dataset['pgn'] || 'opening').replace(' ', '_') + '.pgn',
         },
       },
     });
   });
   initMiniBoards();
   highlightNextPieces();
+  panels($('.opening__panels'), id => {
+    if (id == 'opening-panel-games') loadExampleGames();
+  });
+  searchEngine();
   lichess.requestIdleCallback(() => renderHistoryChart(data));
 }
+
+export const search = searchEngine;
+
+const cgConfig: Config = {
+  coordinates: false,
+};
+
+const loadExampleGames = () =>
+  $('.opening__games .lpv--todo')
+    .removeClass('.lpv--todo')
+    .each(function (this: HTMLElement) {
+      Lpv(this, {
+        pgn: this.dataset['pgn']!,
+        initialPly: parseInt(this.dataset['ply'] || '99'),
+        showMoves: 'bottom',
+        showClocks: false,
+        showPlayers: true,
+        chessground: cgConfig,
+        menu: {
+          getPgn: {
+            enabled: true,
+            fileName: (this.dataset['title'] || 'game').replace(' ', '_') + '.pgn',
+          },
+        },
+      });
+    });
 
 const highlightNextPieces = () => {
   $('.opening__next cg-board').each(function (this: HTMLElement) {
     Array.from($(this).find('.last-move'))
-      .map(el => el.style.transform)
+      .map(el => el!.style.transform)
       .forEach(transform => {
         $(this).find(`piece[style="transform: ${transform};"]`).addClass('highlight');
       });
-  });
-};
-
-const firstDate = new Date('2017-04-01');
-const renderHistoryChart = (data: OpeningPage) => {
-  const canvas = document.querySelector('.opening__popularity__chart') as HTMLCanvasElement;
-  new chart.Chart(canvas, {
-    type: 'line',
-    data: {
-      labels: data.history.map((_, i) => addMonths(firstDate, i)),
-      datasets: [
-        {
-          data: data.history.map(s => s / 100),
-          borderColor: 'hsla(37,74%,43%,1)',
-          backgroundColor: 'hsla(37,74%,43%,0.5)',
-          fill: true,
-        },
-      ],
-    },
-    options: {
-      animation: false,
-      scales: {
-        x: {
-          type: 'time',
-          time: {
-            tooltipFormat: 'MMMM yyyy',
-          },
-          display: false,
-        },
-        y: {
-          title: {
-            display: true,
-            text: 'Popularity over time, in %',
-          },
-        },
-      },
-      // https://www.chartjs.org/docs/latest/configuration/responsive.html
-      // responsive: false, // just doesn't work
-      hover: {
-        mode: 'index',
-        intersect: false,
-      },
-      plugins: {
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-        },
-      },
-    },
   });
 };

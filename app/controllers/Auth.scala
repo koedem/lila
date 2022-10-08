@@ -42,7 +42,7 @@ final class Auth(
 
   private def getReferrer(implicit ctx: Context): String = getReferrerOption | routes.Lobby.home.url
 
-  def authenticateUser(u: UserModel, result: Option[String => Result] = None)(implicit
+  def authenticateUser(u: UserModel, remember: Boolean, result: Option[String => Result] = None)(implicit
       ctx: Context
   ): Fu[Result] =
     api.saveAuthentication(u.id, ctx.mobileApiVersion) flatMap { sessionId =>
@@ -51,7 +51,7 @@ final class Auth(
           result.fold(Redirect(getReferrer))(_(getReferrer))
         },
         api = _ => mobileUserOk(u, sessionId)
-      ) map authenticateCookie(sessionId)
+      ) map authenticateCookie(sessionId, remember)
     } recoverWith authRecovery
 
   private def authenticateAppealUser(u: UserModel, redirect: String => Result)(implicit
@@ -59,14 +59,17 @@ final class Auth(
   ): Fu[Result] =
     api.appeal.saveAuthentication(u.id) flatMap { sessionId =>
       negotiate(
-        html = redirect(appeal.routes.Appeal.landing.url).fuccess map authenticateCookie(sessionId),
+        html = redirect(appeal.routes.Appeal.landing.url).fuccess map
+          authenticateCookie(sessionId, remember = false),
         api = _ => NotFound.fuccess
       )
     } recoverWith authRecovery
 
-  private def authenticateCookie(sessionId: String)(result: Result)(implicit req: RequestHeader) =
+  private def authenticateCookie(sessionId: String, remember: Boolean)(
+      result: Result
+  )(implicit req: RequestHeader) =
     result.withCookies(
-      env.lilaCookie.withSession {
+      env.lilaCookie.withSession(remember = remember) {
         _ + (api.sessionIdKey -> sessionId) - api.AccessUri - lila.security.EmailConfirm.cookie.name
       }
     )
@@ -139,7 +142,8 @@ final class Auth(
                               env.user.repo.email(u.id) foreach {
                                 _ foreach { garbageCollect(u, _) }
                               }
-                              authenticateUser(u, Some(redirectTo))
+                              val remember = api.rememberForm.bindFromRequest().value | true
+                              authenticateUser(u, remember, Some(redirectTo))
                           }
                       )
                   }
@@ -220,7 +224,7 @@ final class Auth(
                   case Signup.Bad(err)           => jsonFormError(err)
                   case Signup.ConfirmEmail(_, _) => Ok(Json.obj("email_confirm" -> true)).fuccess
                   case Signup.AllSet(user, email) =>
-                    welcome(user, email, sendWelcomeEmail = true) >> authenticateUser(user)
+                    welcome(user, email, sendWelcomeEmail = true) >> authenticateUser(user, remember = true)
                 }
           )
         }
@@ -313,7 +317,7 @@ final class Auth(
       negotiate(
         html = Redirect(getReferrerOption | routes.User.show(user.username).url).fuccess,
         api = _ => mobileUserOk(user, sessionId)
-      ) map authenticateCookie(sessionId)
+      ) map authenticateCookie(sessionId, remember = true)
     } recoverWith authRecovery
   }
 
@@ -414,7 +418,7 @@ final class Auth(
                 env.security.store.closeAllSessionsOf(user.id) >>
                 env.push.webSubscriptionApi.unsubscribeByUser(user) >>
                 env.push.unregisterDevices(user) >>
-                authenticateUser(user) >>-
+                authenticateUser(user, remember = true) >>-
                 lila.mon.user.auth.passwordResetConfirm("success").increment().unit
             }(rateLimitedFu)
           }
@@ -483,19 +487,21 @@ final class Auth(
 
   def magicLinkLogin(token: String) =
     Open { implicit ctx =>
-      Firewall {
-        magicLinkLoginRateLimitPerToken(token) {
-          env.security.magicLink confirm token flatMap {
-            case None =>
-              lila.mon.user.auth.magicLinkConfirm("token_fail").increment()
-              notFound
-            case Some(user) =>
-              authLog(user.username, "-", "Magic link")
-              authenticateUser(user) >>-
-                lila.mon.user.auth.magicLinkConfirm("success").increment().unit
-          }
-        }(rateLimitedFu)
-      }
+      if (ctx.isAuth) Redirect(routes.Lobby.home).fuccess
+      else
+        Firewall {
+          magicLinkLoginRateLimitPerToken(token) {
+            env.security.magicLink confirm token flatMap {
+              case None =>
+                lila.mon.user.auth.magicLinkConfirm("token_fail").increment()
+                notFound
+              case Some(user) =>
+                authLog(user.username, "-", "Magic link")
+                authenticateUser(user, remember = true) >>-
+                  lila.mon.user.auth.magicLinkConfirm("success").increment().unit
+            }
+          }(rateLimitedFu)
+        }
     }
 
   private def loginTokenFor(me: UserModel) = JsonOk {
@@ -508,7 +514,14 @@ final class Auth(
   }
 
   def makeLoginToken =
-    AuthOrScoped(_.Web.Login)(_ => loginTokenFor, _ => loginTokenFor)
+    AuthOrScoped(_.Web.Login)(
+      _ => loginTokenFor,
+      req =>
+        user => {
+          lila.log("oauth").info(s"api makeLoginToken ${user.id} ${HTTPRequest printClient req}")
+          loginTokenFor(user)
+        }
+    )
 
   def loginWithToken(token: String) =
     Open { implicit ctx =>
@@ -528,7 +541,7 @@ final class Auth(
       if (ctx.isAuth) Redirect(getReferrer).fuccess
       else
         Firewall {
-          consumingToken(token) { authenticateUser(_) }
+          consumingToken(token) { authenticateUser(_, remember = true) }
         }
     }
 

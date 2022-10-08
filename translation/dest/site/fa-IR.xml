@@ -157,6 +157,7 @@
   <string name="viewInFullSize">نمایش در اندازه کامل</string>
   <string name="logOut">خروج</string>
   <string name="signIn">ورود</string>
+  <string name="rememberMe" comment="rememberMe&#10;&#10;Appears on the sign-in screen.">مرا به خاطر بسپار</string>
   <string name="youNeedAnAccountToDoThat">شما برای انجام این کار به یک حساب کاربری نیاز دارید.</string>
   <string name="signUp">نام نویسی</string>
   <string name="computersAreNotAllowedToPlay">كامپيوتر و بازيكناني كه از كامپيوتر كمك مي گيرند،مجاز به بازی نیستند.لطفا از انجین شطرنج يا دیتابیس شطرنج و يا بازيكنان ديگر كمک نگيريد. همچنین توجه کنید که داشتن چند حساب کاربری به شدت نهی شده است. استفاده فزاینده از چند حساب منجر به مسدود شدن حساب شما خواهد شد.</string>
@@ -197,6 +198,8 @@
   <string name="changeUsername">تغییر نام کاربری</string>
   <string name="changeUsernameNotSame">تنها اندازه حروف میتوانند تغییر کنند. برای مثال \"johndoe\" به \"JohnDoe\".</string>
   <string name="changeUsernameDescription">نام کاربری خود را تغییر دهید. این تنها یک بار انجام پذیر است و شما تنها مجازید اندازه حروف نام کاربری‌تان را تغییر دهید.</string>
+  <string name="signupUsernameHint">مطمئن شوید که یک نام کاربری مناسب انتخاب میکنید. بعداً نمی توانید آن را تغییر دهید و هر حسابی با نام کاربری نامناسب بسته می شود!</string>
+  <string name="signupEmailHint">ما فقط از آن برای تنظیم مجدد رمز عبور استفاده خواهیم کرد.</string>
   <string name="password">رمز عبور</string>
   <string name="changePassword">تغییر کلمه عبور</string>
   <string name="changeEmail">تغییر ایمیل</string>
@@ -483,6 +486,8 @@
   <string name="socialMediaLinks">لینک های رسانه های اجتماعی</string>
   <string name="oneUrlPerLine">یک ادرس اینترنتی در هر خط.</string>
   <string name="inlineNotation">نمایش اطلاعات درون خطها</string>
+  <string name="savingMovesHelp">ما همیشه تغییرات شما را در حافظه پنهان مرورگر شما ذخیره می کنیم.</string>
+  <string name="clearSavedMoves">حرکت های واضح</string>
   <string name="previouslyOnLichessTV">بازی قبلی در لیچس</string>
   <string name="onlinePlayers">بازکنان آنلاین</string>
   <string name="activePlayers">بازیکنان فعال</string>
@@ -757,6 +762,7 @@
   <string name="bestWasX">بهترین حرکت %s بود</string>
   <string name="youBrowsedAway">پوزیشن را به هم زدید!</string>
   <string name="resumePractice">ادامه تمرین</string>
+  <string name="drawByFiftyMoves">بازی با قانون پنجاه حرکت مساوی شده است.</string>
   <string name="theGameIsADraw">بازی مساوی است.</string>
   <string name="computerThinking">کامپیوتر در حال محاسبه است...</string>
   <string name="seeBestMove">مشاهده بهترین حرکت</string>
