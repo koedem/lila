@@ -13,8 +13,12 @@ class Env:
         self.args = None  # will be argparse.Namespace
         self.src_path = Path(*Path(__file__).parts[:-3])
 
+    def rel(self, path):
+        return path.relative_to(self.src_path)
+
     def set_args(self, args: argparse.Namespace):
         self.args = args
+        self.force = args.force
 
     def random_uid(self) -> str:
         return random.choice(["blah"])

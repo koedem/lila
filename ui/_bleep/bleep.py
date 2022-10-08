@@ -6,15 +6,20 @@ import argparse
 from modules.env import e
 from watchdog.observers import Observer
 from watchdog.events import LoggingEventHandler, PatternMatchingEventHandler
-import modules.graph as graph
-from modules.work import Work, Cmd
+import modules.parse as parse
+from modules.work import Work, Cmd, make
 import modules.util as util
 
 
 def main():
     e.set_args(_get_args())
-    graph.walk(e.src_path)
+    parse.walk(e.src_path)
     print(e.src_path)
+    if e.args.module:
+        make(e.args.module)
+
+
+"""
     Work(
         "blah",
         Cmd(
@@ -22,7 +27,7 @@ def main():
             "/Users/gamblej/ws/lichess/lila-local/ui/chart",
         ),
     )
-
+"""
 
 """
     logging.basicConfig(
@@ -66,6 +71,14 @@ def _get_args() -> argparse.Namespace:
         """
     )
     parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="""force full rebuilds with no incremental compilation
+        """,
+    )
+    parser.add_argument("--module", "-m", help="build this module")
+    parser.add_argument(
         "--1",
         "-1",
         help="""
@@ -82,13 +95,6 @@ def _get_args() -> argparse.Namespace:
         """,
         default=0,
         choices=[0, 1, 2],
-    )
-    parser.add_argument(
-        "--bool",
-        "-b",
-        action="store_true",
-        help="""
-        """,
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(

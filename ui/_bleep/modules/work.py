@@ -3,10 +3,33 @@ import os
 import random
 import subprocess
 import multiprocessing as mp
+from modules.parse import modules
 
 
 def init():
     mp.set_start_method("spawn")
+
+
+def make(modname: str) -> None:
+    module = modules[modname]
+    build = module["build"]
+    # lets just run all the scripts for now
+
+    try:
+        for key in build.keys():
+            buildlist = build[key]
+            for cmdlist in buildlist:
+                result = subprocess.run(
+                    cmdlist,
+                    cwd=module["cwd"],
+                    # stderr=subprocess.STDOUT,
+                    # stdout=subprocess.PIPE,
+                    # input=password.encode("utf-8"),
+                )
+                result.check_returncode()
+                print(f"{result.stdout}")
+    except BaseException as err:
+        print(f"{modname} {err}")
 
 
 class Cmd:
