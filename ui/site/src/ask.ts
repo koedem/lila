@@ -16,12 +16,13 @@ class Ask {
     wireExclusiveChoices(this);
     wireRankedChoices(this);
     wireActions(this);
-    this.feedbackEl = wireFeedback(this);
-    this.submitEl = wireSubmit(this);
+    wireFeedback(this);
+    wireSubmit(this);
   }
-  ranking = (): string => Array.from($('.ranked-choice', this.el), e => e?.getAttribute('value')).join('-');
-
-  feedbackState = (state: 'clean' | 'dirty' | 'success') => {
+  ranking(): string {
+    return Array.from($('.ranked-choice', this.el), e => e?.getAttribute('value')).join('-');
+  }
+  feedbackState(state: 'clean' | 'dirty' | 'success') {
     this.submitEl?.classList.remove('dirty', 'success');
     if (state != 'clean') this.submitEl?.classList.add(state);
   };
@@ -42,7 +43,7 @@ const askXhr = ( req: {
   body?: FormData;
   after?: (_: Ask) => void
 }) =>
-  xhr.textRaw(req.url, { method: req.method ? req.method : 'post', body: req.body }).then(
+  xhr.textRaw(req.url, { method: req.method ? req.method : 'POST', body: req.body }).then(
     async (rsp: Response) => {
       if (rsp.redirected) {
         if (!rsp.url.startsWith(window.location.origin)) throw new Error(`Bad redirect: ${rsp.url}`);
@@ -64,8 +65,8 @@ const wireExclusiveChoices = (ask: Ask): Cash =>
     askXhr({ ask: ask, url: `/ask/${ask.el.id}${picks}`});
   });
 
-const wireFeedback = (ask: Ask): HTMLInputElement | undefined => {
-  const feedbackEl = $('.feedback', ask.el)
+const wireFeedback = (ask: Ask): void => {
+  ask.feedbackEl = $('.feedback', ask.el)
     .on('input', () => ask.feedbackState(ask.feedbackEl?.value == initialFeedback ? 'clean' : 'dirty'))
     .on('keypress', (e: KeyboardEvent) => {
       if (
@@ -81,13 +82,13 @@ const wireFeedback = (ask: Ask): HTMLInputElement | undefined => {
       e.preventDefault();
     })
     .get(0) as HTMLInputElement;
-  const initialFeedback = feedbackEl?.value;
-  return feedbackEl;
+  const initialFeedback = ask.feedbackEl?.value;
 };
 
-const wireSubmit = (ask: Ask): Element | undefined => {
-  const submitEl = $('.ask__submit', ask.el).get(0);
-  $('input', submitEl).on('click', () => {
+const wireSubmit = (ask: Ask): void => {
+  ask.submitEl = $('.ask__submit', ask.el).get(0);
+  if (!ask.submitEl) return;
+  $('input', ask.submitEl).on('click', () => {
     const path = `/ask/feedback/${ask.el.id}`;
     const body = ask.feedbackEl?.value ? xhr.form({ text: ask.feedbackEl.value }) : undefined;
     askXhr({
@@ -97,7 +98,6 @@ const wireSubmit = (ask: Ask): Element | undefined => {
       after: ask => ask.feedbackState(ask.feedbackEl?.value ? 'success' : 'clean'),
     });
   });
-  return submitEl;
 };
 
 const wireActions = (ask: Ask): Cash =>
