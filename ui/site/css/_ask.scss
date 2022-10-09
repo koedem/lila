@@ -104,6 +104,7 @@ div.ask__post-footer {
   display: grid;
   grid-template-columns: max-content auto;
   padding: 0 (2*$gap) $gap $gap;
+  user-select: all;
   label {
     grid-column: 1/3;
     font-size: 1.4rem;
