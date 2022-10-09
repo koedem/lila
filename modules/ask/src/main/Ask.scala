@@ -79,7 +79,7 @@ case class Ask(
   def averageRank: Vector[Float] =
     picks match {
       case Some(pmap) if choices.nonEmpty && pmap.nonEmpty =>
-        val results = Array.fill(choices.size)(0)
+        val results = Array.ofDim[Int](choices.size)
         pmap.values foreach { ranking =>
           for (it <- choices.indices)
             results(constrain(ranking(it))) += it
@@ -87,6 +87,22 @@ case class Ask(
         results.map(_ / pmap.size.toFloat).toVector.pp
       case _ =>
         Vector.fill(choices.size)(0f)
+    }
+  // a square matrix M describing the response rankings where each element M[i][j] is the number of
+  // respondents who preferred the choice i at rank j or below (effectively in the top j+1 picks)
+  def rankMatrix: Array[Array[Int]] =
+    picks match {
+      case Some(pmap) if choices.nonEmpty && pmap.nonEmpty =>
+        val n = choices.size
+        val mat = Array.ofDim[Int](n, n)
+        pmap.values foreach { ranking =>
+          for (i <- choices.indices)
+            for (j <- choices.indices)
+              mat(i)(j) += (if (ranking(i) <= j) 1 else 0)
+        }
+        mat
+      case _ =>
+        Array.ofDim[Int](0, 0)
     }
 
   def isPoll: Boolean   = answer isEmpty

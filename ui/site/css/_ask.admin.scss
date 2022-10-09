@@ -2,6 +2,7 @@ $c-contrast-font: $c-font-clear; //if($theme-light, #444, #ddd);
 $c-box-border: if($theme-light, #ddd, #484848);
 
 div.ask-admin {
+  width: 100%;
   font-size: 1.2em;
   div.header {
     font-size: 1.8em;
@@ -47,5 +48,10 @@ div.ask-admin {
     border: solid 1px $c-box-border;
     box-shadow: inset -1px -1px red; //$c-dimmer($c-box-border, 20%);
     background: $c-bg-box;
+    > p {
+      margin: 0 0 0 2em;
+      font-size: 0.8em;
+      text-indent: -2em;
+    }
   }
 }

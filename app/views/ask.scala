@@ -32,14 +32,27 @@ object ask {
   def renderInner(ask: Ask)(implicit ctx: Context): Frag =
     fieldset(cls := "ask", id := ask._id, hasPick(ask) option (value := ""))(
       header(ask),
-      RenderType(ask) match {
-        case POLL    => pollBody(ask)
-        case RANK    => rankBody(ask)
-        case QUIZ    => quizBody(ask)
-        case BAR     => barGraphBody(ask)
+      ask.isConcluded option div(cls := "ask__pre-body", ask.choices.isEmpty option (style := "margin-bottom: 8px"))(
+        if (ask.choices.nonEmpty) s"${ask.picks ?? (_ size)} votes"
+        else s"${ask.feedback ?? (_ size)} responses"
+      ),
+      if (ask.choices.isEmpty) emptyFrag
+      else RenderType(ask) match {
+        case POLL => pollBody(ask)
+        case RANK => rankBody(ask)
+        case QUIZ => quizBody(ask)
+        case BAR => barGraphBody(ask)
         case RANKBAR => rankGraphBody(ask)
       },
-      footer(ask)
+      footer(ask),
+      ask.isConcluded && ask.feedback.exists(_.size > 0) option frag {
+        ask.feedback map { fbmap =>
+          div(cls := "ask__post-footer")(
+            ask.footer map (label(_)),
+            fbmap.toSeq flatMap { case (uid, fb) => Seq(div(s"${ask.isPublic ?? s"$uid:"}"),div(fb))}
+          )
+        }
+      }
     )
 
   private def header(ask: Ask)(implicit ctx: Context): Frag =
@@ -47,46 +60,47 @@ object ask {
       span(cls := "ask__header")(
         label(ask.question),
         button(
-          cls        := s"action unset${hasPick(ask) ?? " visible"}",
+          cls := s"action unset${hasPick(ask) ?? " visible"}",
           formmethod := "POST",
           formaction := s"${routes.Ask.unset(ask._id)}",
-          title      := trans.delete.txt()
+          title := trans.delete.txt()
         ),
         ctx.me.exists(_ is ask.creator) option button(
-          cls        := "action admin",
+          cls := "action admin",
           formmethod := "GET",
           formaction := s"${routes.Ask.admin(ask._id)}",
-          title      := trans.edit.txt()
+          title := trans.edit.txt()
         ),
       )
     )
-
+// TODO jesus christ fix this shit
   private def footer(ask: Ask)(implicit ctx: Context): Frag =
-    ask.isFeedback || (ask.isQuiz && getPick(ask).nonEmpty && ask.footer.nonEmpty) option
+    (ask.isFeedback && !ask.isConcluded) || (ask.isQuiz && getPick(ask).nonEmpty && ask.footer.nonEmpty) option
       div(cls := "ask__footer")(
         ask.footer map (label(_)),
-        ask.isFeedback && !ask.isConcluded option ctx.me.fold(emptyFrag)(u =>
+        ask.isFeedback && !ask.isConcluded option ctx.me.fold(emptyFrag) { u =>
           div(
             input(
-              cls         := "feedback",
-              tpe         := "text",
-              maxlength   := 80,
+              cls := "feedback",
+              tpe := "text",
+              maxlength := 80,
               placeholder := "80 characters max",
-              value       := ask.feedbackFor(u.id)
+              value := ask.feedbackFor(u.id)
             ),
             div(cls := "ask__submit")(input(cls := "button", tpe := "button", value := "Submit"))
           )
-        )
+        }
       )
+
 
   private def pollBody(ask: Ask)(implicit ctx: Context): Frag = frag {
     val pick = getPick(ask)
     choiceContainer(ask)(
-      ask.choices.zipWithIndex map { case (choiceText, i) =>
+      ask.choices.zipWithIndex map { case (choiceText, choice) =>
         div(
-          cls := s"exclusive-choice ${if (pick.contains(i)) "selected" else "enabled"}${ask.isStretch ?? " stretch"}",
-          title := tooltip(ask, choiceText.some),
-          value := i
+          cls := s"exclusive-choice ${if (pick.contains(choice)) "selected" else "enabled"}${ask.isStretch ?? " stretch"}",
+          title := tooltip(ask, choice),
+          value := choice
         )(label(choiceText))
       }
     )
@@ -107,98 +121,104 @@ object ask {
   private def quizBody(ask: Ask)(implicit ctx: Context): Frag = {
     val pick = getPick(ask)
     choiceContainer(ask)(
-      ask.choices.zipWithIndex map { case (choiceText, i) =>
+      ask.choices.zipWithIndex map { case (choiceText, choice) =>
         val classes =
           if (pick isEmpty) "exclusive-choice enabled"
-          else if (ask.answer map (a => ask.choices indexOf a) contains i) "choice correct"
-          else if (pick contains i) "choice wrong"
+          else if (ask.answer map (a => ask.choices indexOf a) contains choice) "choice correct"
+          else if (pick contains choice) "choice wrong"
           else "choice disabled"
         div(
-          title := tooltip(ask, choiceText.some),
-          cls   := s"$classes${ask.isStretch ?? " stretch"}",
-          value := i
+          title := tooltip(ask, choice),
+          cls := s"$classes${ask.isStretch ?? " stretch"}",
+          value := choice
         )(label(choiceText))
       }
     )
   }
 
   def barGraphBody(ask: Ask)(implicit ctx: Context): Frag =
-    div(cls := "ask__bar-graph")(
-      table(
-        tbody(frag {
-          val countMap = ask.choices.indices.map(i => (ask.choices(i), ask.count(i))).toMap
-          val countMax = countMap.values.max
-          countMap.toSeq.sortBy(_._2)(Ordering.Int.reverse).map { case (choiceText, count) =>
-            val pct = if (countMax == 0) 0 else count * 100 / countMax
-            tr(
-              title := tooltip(ask, choiceText.some),
-              td(choiceText),
-              td(pluralize("vote", count)),
-              td(div(cls := "bar", css("width") := s"$pct%")(nbsp))
-            )
-          }
-        })
-      )
-    )
+    div(cls := "ask__graph")(frag {
+      val countMap = ask.choices.indices.map(choice => (choice, ask.count(choice))).toMap
+      val countMax = countMap.values.max
+      countMap.toSeq.sortBy(_._2)(Ordering.Int.reverse).flatMap { case (choice, count) =>
+        val pct = if (countMax == 0) 0 else count * 100 / countMax
+        val hint = tooltip(ask, choice)
+        Seq(
+          div(title := hint)(ask.choices(choice)),
+          div(cls := "votes-text", title := hint)(pluralize("vote", count)),
+          div(cls := "set-width", title := hint, css("width") := s"$pct%")(nbsp)
+        )
+      }
+    })
 
   def rankGraphBody(ask: Ask)(implicit ctx: Context): Frag =
-    div(cls := "ask__bar-graph")(
-      table(
-        tbody(frag {
-          ask.averageRank.zipWithIndex.sortWith((i, j) => i._1 < j._1) map { case (avgIndex, choice) =>
-            val lastIndex  = ask.choices.size - 1
-            val pct        = (lastIndex - avgIndex) / lastIndex * 100
-            val choiceText = ask.choices(choice)
-            tr(
-              title := tooltip(ask, choiceText.some),
-              td(choiceText),
-              td,
-              td(div(cls := "bar", css("width") := s"$pct%")(nbsp))
-            )
-          }
-        })
-      )
-    )
+    div(cls := "ask__rank-graph")(frag {
+      val tooltipVec = rankedTooltips(ask)
+      ask.averageRank.zipWithIndex.sortWith((i, j) => i._1 < j._1) flatMap { case (avgIndex, choice) =>
+        val lastIndex = ask.choices.size - 1
+        val pct = (lastIndex - avgIndex) / lastIndex * 100
+        val hint = tooltipVec(choice)
+        Seq(
+          div(title := hint)(ask.choices(choice)),
+          div(cls := "set-width", title := hint, style := s"width: $pct%")(nbsp),
+        )
+      }
+    })
 
   private def choiceContainer(ask: Ask): scalatags.Text.TypedTag[String] = {
-    val sb = new StringBuilder("ask__choices")
+    val sb = new mutable.StringBuilder("ask__choices")
     if (ask.isVertical) sb ++= " vertical"
     if (ask.isStretch) sb ++= " stretch"
     else if (ask.isCenter) sb ++= " center" // stretch overrides center
     div(cls := sb.toString)
   }
 
-  def tooltip(ask: Ask, choice: Option[String])(implicit ctx: Context): String =
-    choice ?? { choiceText =>
-      val sb        = new mutable.StringBuilder(256);
-      val pick      = getPick(ask)
-      val count     = ask.count(choiceText)
-      val hasChoice = pick.nonEmpty
-      val isAuthor  = ctx.me.exists(_.id == ask.creator)
-      val isShusher = ctx.me ?? Granter(Permission.Shusher)
+  def tooltip(ask: Ask, choice: Int)(implicit ctx: Context): String = {
+    val sb = new mutable.StringBuilder(256)
+    val choiceText = ask.choices(choice)
+    val hasPick = getPick(ask).nonEmpty
 
-      RenderType(ask) match {
-        case BAR =>
+    val count = ask.count(choiceText)
+    val isAuthor = ctx.me.exists(_.id == ask.creator)
+    val isShusher = ctx.me ?? Granter(Permission.Shusher)
+
+    RenderType(ask) match {
+      case BAR =>
+        sb ++= pluralize("vote", count)
+        if (ask.isPublic || isShusher)
+          sb ++= s"\n\n${whoPicked(ask, choice, prefix = true)}"
+      case QUIZ =>
+        if (ask.isTally && hasPick || isAuthor || isShusher)
+          sb ++= pluralize("pick", count)
+        if ((hasPick || isAuthor) && ask.isPublic || isShusher)
+          sb ++= s"\n\n${whoPicked(ask, choice, sb.nonEmpty)}"
+      case POLL =>
+        if (isAuthor || ask.isTally)
           sb ++= pluralize("vote", count)
-          if (ask.isPublic || isShusher)
-            sb ++= whoPicked(ask, choiceText, prefix = true)
-
-        case QUIZ =>
-          if (ask.isTally && hasChoice || isAuthor || isShusher)
-            sb ++= pluralize("pick", count)
-          if ((hasChoice || isAuthor) && ask.isPublic || isShusher)
-            sb ++= whoPicked(ask, choiceText, sb.nonEmpty)
-
-        case POLL =>
-          if (isAuthor || ask.isTally)
-            sb ++= pluralize("vote", count)
-          if (ask.isPublic && ask.isTally || isShusher)
-            sb ++= whoPicked(ask, choiceText, sb.nonEmpty)
-
-        case _ =>
-      }
-      if (sb.isEmpty) choiceText else sb.toString
+        if (ask.isPublic && ask.isTally || isShusher)
+          sb ++= s"\n\n${whoPicked(ask, choice, sb.nonEmpty)}"
+      case _ =>
     }
+    if (sb.isEmpty) choiceText else sb.toString
+  }
+
+  private def rankedTooltips(ask: Ask): IndexedSeq[String] = {
+    val respondents = ask.picks ?? (picks => picks.size)
+    val mat = ask.rankMatrix
+    mat foreach {m => m.mkString(", ")}
+    val notables = List(
+      0 -> "ranked this first",
+      2 -> "chose this in their top three",
+      4 -> "chose this in their top five"
+    )
+    ask.choices.zipWithIndex map { case (choiceText, choice) =>
+      val sb = new mutable.StringBuilder(s"$choiceText:\n\n")
+      notables filter (_._1 < mat.length - 2) map { case (i, text) =>
+        sb ++= s"  ${mat(choice)(i)} $text\n"
+      }
+      sb.toString
+    }
+  }
 
   private def getPick(ask: Ask)(implicit ctx: Context): Option[Int] =
     ctx.me.flatMap(u => ask.picks.flatMap(_ get u.id) flatMap (_ headOption))
@@ -212,9 +232,9 @@ object ask {
   private def pluralize(item: String, n: Int): String =
     if (n == 0) s"No ${item}s" else if (n == 1) s"1 ${item}" else s"$n ${item}s"
 
-  private def whoPicked(ask: Ask, choice: String, prefix: Boolean): String = {
+  private def whoPicked(ask: Ask, choice: Int, prefix: Boolean, max: Int = 40): String = {
     val who = ask.whoPicked(choice)
-    who.take(10).mkString(prefix ?? ": ", " ", (who.length > 10) ?? ", and others...")
+    who.take(max).mkString(prefix ?? ": ", ", ", (who.length > max) ?? ", and others...")
   }
 
   private def validRanking(ask: Ask)(implicit ctx: Context): Vector[Int] = {
