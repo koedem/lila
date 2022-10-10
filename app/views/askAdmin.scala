@@ -58,13 +58,12 @@ object askAdmin {
           case RANK | RANKBAR    => as.choices.nonEmpty ?? rankGraphBody(as)
         }
       ),
-      as.feedback map {
-        case fbmap =>
-          div(cls := "inset-box")(
-            fbmap.toSeq map { case (uid, fb) =>
-              p(s"$uid: $fb")
-            }
-          )
+      as.feedback map { case fbmap =>
+        div(cls := "inset-box")(
+          fbmap.toSeq map { case (uid, fb) =>
+            p(s"$uid: $fb")
+          }
+        )
       },
       div(cls := "actions")(button(tpe := "submit")("Download CSV file")),
       hr,
@@ -81,7 +80,7 @@ object askAdmin {
     as.choices foreach (c =>
       if (c == ~as.answer) sb ++= s" -> * $c\n"
       else sb ++= s"    * $c\n"
-      )
+    )
     if (as.footer.isDefined) sb ++= s"footer:\n    ${~as.footer}\n"
     as.feedback match {
       case Some(fbmap) =>

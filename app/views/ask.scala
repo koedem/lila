@@ -32,27 +32,20 @@ object ask {
   def renderInner(ask: Ask)(implicit ctx: Context): Frag =
     fieldset(cls := "ask", id := ask._id, hasPick(ask) option (value := ""))(
       header(ask),
-      ask.isConcluded option div(cls := "ask__pre-body", ask.choices.isEmpty option (style := "margin-bottom: 8px"))(
+      ask.isConcluded option label(
         if (ask.choices.nonEmpty) s"${ask.picks ?? (_ size)} votes"
         else s"${ask.feedback ?? (_ size)} responses"
       ),
       if (ask.choices.isEmpty) emptyFrag
-      else RenderType(ask) match {
-        case POLL => pollBody(ask)
-        case RANK => rankBody(ask)
-        case QUIZ => quizBody(ask)
-        case BAR => barGraphBody(ask)
-        case RANKBAR => rankGraphBody(ask)
-      },
-      footer(ask),
-      ask.isConcluded && ask.feedback.exists(_.size > 0) option frag {
-        ask.feedback map { fbmap =>
-          div(cls := "ask__post-footer")(
-            ask.footer map (label(_)),
-            fbmap.toSeq flatMap { case (uid, fb) => Seq(div(s"${ask.isPublic ?? s"$uid:"}"),div(fb))}
-          )
-        }
-      }
+      else
+        RenderType(ask) match {
+          case POLL    => pollBody(ask)
+          case RANK    => rankBody(ask)
+          case QUIZ    => quizBody(ask)
+          case BAR     => barGraphBody(ask)
+          case RANKBAR => rankGraphBody(ask)
+        },
+      footer(ask)
     )
 
   private def header(ask: Ask)(implicit ctx: Context): Frag =
@@ -60,38 +53,44 @@ object ask {
       span(cls := "ask__header")(
         label(ask.question),
         button(
-          cls := s"action unset${hasPick(ask) ?? " visible"}",
+          cls        := s"action unset${hasPick(ask) ?? " visible"}",
           formmethod := "POST",
           formaction := s"${routes.Ask.unset(ask._id)}",
-          title := trans.delete.txt()
+          title      := trans.delete.txt()
         ),
         ctx.me.exists(_ is ask.creator) option button(
-          cls := "action admin",
+          cls        := "action admin",
           formmethod := "GET",
           formaction := s"${routes.Ask.admin(ask._id)}",
-          title := trans.edit.txt()
-        ),
+          title      := trans.edit.txt()
+        )
       )
     )
 // TODO jesus christ fix this shit
   private def footer(ask: Ask)(implicit ctx: Context): Frag =
-    (ask.isFeedback && !ask.isConcluded) || (ask.isQuiz && getPick(ask).nonEmpty && ask.footer.nonEmpty) option
-      div(cls := "ask__footer")(
-        ask.footer map (label(_)),
-        ask.isFeedback && !ask.isConcluded option ctx.me.fold(emptyFrag) { u =>
-          div(
-            input(
-              cls := "feedback",
-              tpe := "text",
-              maxlength := 80,
-              placeholder := "80 characters max",
-              value := ask.feedbackFor(u.id)
-            ),
-            div(cls := "ask__submit")(input(cls := "button", tpe := "button", value := "Submit"))
+    div(cls := "ask__footer")(
+      (ask.footer.nonEmpty && (!ask.isQuiz || getPick(ask).nonEmpty)) option ask.footer map (label(_)),
+      ask.isFeedback && !ask.isConcluded option ctx.me.fold(emptyFrag) { u =>
+        Seq(
+          input(
+            cls         := "feedback-text",
+            tpe         := "text",
+            maxlength   := 80,
+            placeholder := "80 characters max",
+            value       := ask.feedbackFor(u.id)
+          ),
+          div(cls := "feedback-submit")(input(cls := "button", tpe := "button", value := "Submit"))
+        )
+      },
+      ask.isConcluded && ask.feedback.exists(_.size > 0) option frag {
+        ask.feedback map { fbmap =>
+          div(cls := "feedback-results")(
+            ask.footer map (label(_)),
+            fbmap.toSeq flatMap { case (uid, fb) => Seq(div(s"${ask.isPublic ?? s"$uid:"}"), div(fb)) }
           )
         }
-      )
-
+      }
+    )
 
   private def pollBody(ask: Ask)(implicit ctx: Context): Frag = frag {
     val pick = getPick(ask)
@@ -129,7 +128,7 @@ object ask {
           else "choice disabled"
         div(
           title := tooltip(ask, choice),
-          cls := s"$classes${ask.isStretch ?? " stretch"}",
+          cls   := s"$classes${ask.isStretch ?? " stretch"}",
           value := choice
         )(label(choiceText))
       }
@@ -141,7 +140,7 @@ object ask {
       val countMap = ask.choices.indices.map(choice => (choice, ask.count(choice))).toMap
       val countMax = countMap.values.max
       countMap.toSeq.sortBy(_._2)(Ordering.Int.reverse).flatMap { case (choice, count) =>
-        val pct = if (countMax == 0) 0 else count * 100 / countMax
+        val pct  = if (countMax == 0) 0 else count * 100 / countMax
         val hint = tooltip(ask, choice)
         Seq(
           div(title := hint)(ask.choices(choice)),
@@ -156,11 +155,11 @@ object ask {
       val tooltipVec = rankedTooltips(ask)
       ask.averageRank.zipWithIndex.sortWith((i, j) => i._1 < j._1) flatMap { case (avgIndex, choice) =>
         val lastIndex = ask.choices.size - 1
-        val pct = (lastIndex - avgIndex) / lastIndex * 100
-        val hint = tooltipVec(choice)
+        val pct       = (lastIndex - avgIndex) / lastIndex * 100
+        val hint      = tooltipVec(choice)
         Seq(
           div(title := hint)(ask.choices(choice)),
-          div(cls := "set-width", title := hint, style := s"width: $pct%")(nbsp),
+          div(cls := "set-width", title := hint, style := s"width: $pct%")(nbsp)
         )
       }
     })
@@ -174,12 +173,12 @@ object ask {
   }
 
   def tooltip(ask: Ask, choice: Int)(implicit ctx: Context): String = {
-    val sb = new mutable.StringBuilder(256)
+    val sb         = new mutable.StringBuilder(256)
     val choiceText = ask.choices(choice)
-    val hasPick = getPick(ask).nonEmpty
+    val hasPick    = getPick(ask).nonEmpty
 
-    val count = ask.count(choiceText)
-    val isAuthor = ctx.me.exists(_.id == ask.creator)
+    val count     = ask.count(choiceText)
+    val isAuthor  = ctx.me.exists(_.id == ask.creator)
     val isShusher = ctx.me ?? Granter(Permission.Shusher)
 
     RenderType(ask) match {
@@ -204,8 +203,8 @@ object ask {
 
   private def rankedTooltips(ask: Ask): IndexedSeq[String] = {
     val respondents = ask.picks ?? (picks => picks.size)
-    val mat = ask.rankMatrix
-    mat foreach {m => m.mkString(", ")}
+    val rankM       = ask.rankMatrix
+    rankM foreach { m => m.mkString(", ") }
     val notables = List(
       0 -> "ranked this first",
       2 -> "chose this in their top three",
@@ -213,8 +212,8 @@ object ask {
     )
     ask.choices.zipWithIndex map { case (choiceText, choice) =>
       val sb = new mutable.StringBuilder(s"$choiceText:\n\n")
-      notables filter (_._1 < mat.length - 2) map { case (i, text) =>
-        sb ++= s"  ${mat(choice)(i)} $text\n"
+      notables filter (_._1 < rankM.length - 2) map { case (i, text) =>
+        sb ++= s"  ${rankM(choice)(i)} $text\n"
       }
       sb.toString
     }

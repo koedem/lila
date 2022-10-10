@@ -25,7 +25,7 @@ class Ask {
   feedbackState(state: 'clean' | 'dirty' | 'success') {
     this.submitEl?.classList.remove('dirty', 'success');
     if (state != 'clean') this.submitEl?.classList.add(state);
-  };
+  }
 }
 
 const rewire = (el: Element | null, frag: string): Ask | undefined => {
@@ -36,19 +36,13 @@ const rewire = (el: Element | null, frag: string): Ask | undefined => {
   }
 };
 
-const askXhr = ( req: { 
-  ask: Ask;
-  url: string;
-  method?: string;
-  body?: FormData;
-  after?: (_: Ask) => void
-}) =>
+const askXhr = (req: { ask: Ask; url: string; method?: string; body?: FormData; after?: (_: Ask) => void }) =>
   xhr.textRaw(req.url, { method: req.method ? req.method : 'POST', body: req.body }).then(
     async (rsp: Response) => {
       if (rsp.redirected) {
         if (!rsp.url.startsWith(window.location.origin)) throw new Error(`Bad redirect: ${rsp.url}`);
         window.location.href = rsp.url;
-        return; 
+        return;
       }
       const newAsk = rewire(req.ask.el, await xhr.ensureOk(rsp).text());
       if (req.after) req.after(newAsk!);
@@ -62,11 +56,11 @@ const wireExclusiveChoices = (ask: Ask): Cash =>
   $('.exclusive-choice', ask.el).on('click', function (e: Event) {
     const target = e.target as Element;
     const picks = target.classList.contains('selected') ? '' : `?picks=${target.getAttribute('value')}`;
-    askXhr({ ask: ask, url: `/ask/${ask.el.id}${picks}`});
+    askXhr({ ask: ask, url: `/ask/${ask.el.id}${picks}` });
   });
 
 const wireFeedback = (ask: Ask): void => {
-  ask.feedbackEl = $('.feedback', ask.el)
+  ask.feedbackEl = $('.feedback-text', ask.el)
     .on('input', () => ask.feedbackState(ask.feedbackEl?.value == initialFeedback ? 'clean' : 'dirty'))
     .on('keypress', (e: KeyboardEvent) => {
       if (
@@ -86,7 +80,7 @@ const wireFeedback = (ask: Ask): void => {
 };
 
 const wireSubmit = (ask: Ask): void => {
-  ask.submitEl = $('.ask__submit', ask.el).get(0);
+  ask.submitEl = $('.feedback-submit', ask.el).get(0);
   if (!ask.submitEl) return;
   $('input', ask.submitEl).on('click', () => {
     const path = `/ask/feedback/${ask.el.id}`;
@@ -206,8 +200,7 @@ const updateHCursor = (d: DragContext, e: MouseEvent): void => {
     const x = r.right - r.width / 2;
     const y = r.bottom + 4; // +4 because there's (currently) 8 device px between rows
     const rowBreak = i > 0 && y != lastY;
-    if (rowBreak && e.y <= lastY)
-      target = { el: d.choices[i], break: 'afterend' };
+    if (rowBreak && e.y <= lastY) target = { el: d.choices[i], break: 'afterend' };
     else if (e.y <= y && (rtl ? e.x >= x : e.x <= x))
       target = { el: d.choices[i], break: rowBreak ? 'beforebegin' : null };
     lastY = y;

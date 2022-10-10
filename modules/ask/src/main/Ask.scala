@@ -93,7 +93,7 @@ case class Ask(
   def rankMatrix: Array[Array[Int]] =
     picks match {
       case Some(pmap) if choices.nonEmpty && pmap.nonEmpty =>
-        val n = choices.size
+        val n   = choices.size
         val mat = Array.ofDim[Int](n, n)
         pmap.values foreach { ranking =>
           for (i <- choices.indices)
