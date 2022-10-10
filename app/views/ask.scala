@@ -66,9 +66,10 @@ object ask {
         )
       )
     )
-// TODO jesus christ fix this shit
+
   private def footer(ask: Ask)(implicit ctx: Context): Frag =
     div(cls := "ask__footer")(
+      // TODO jesus christ fix this boolean nightmare
       (ask.footer.nonEmpty && (!ask.isQuiz || getPick(ask).nonEmpty)) option ask.footer map (label(_)),
       ask.isFeedback && !ask.isConcluded option ctx.me.fold(emptyFrag) { u =>
         Seq(

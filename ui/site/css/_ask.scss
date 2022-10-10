@@ -1,9 +1,8 @@
-// BEM __ is only used for the ask's top level children for searchability.  Please don't use
-// parent selector &__sub-element--modifier conventions in this file. Up to two levels of nesting is
-// tolerated for scoped item element styles that allow brief, readable class names to express intent
-
-$hue-pick: hue($c-primary);
-$hue-correct: hue($c-secondary);
+/*
+  Please don't use BEM in conjunction with parent selector here. Up to two levels of nesting is
+  tolerated.  Nothing depends on this so scoped item element styles with brief class names that
+  express intent is the goal
+*/
 $c-contrast-font: if($theme-light, #444, #ddd);
 $c-neutral: if($theme-light, #ccc, #777);
 $c-box-border: if($theme-light, #ddd, #484848);
@@ -21,7 +20,7 @@ div.ask-container {
   }
 }
 
-// the ask fieldset class has a legend/header, body, footer in block layout
+// main ask class has a legend/header, body, footer in block layout
 fieldset.ask {
   margin-bottom: 2 * $gap;
   padding: 0 (3 * $gap) $gap (2 * $gap);
@@ -34,12 +33,14 @@ fieldset.ask {
     width: 100%;
   }
 
+  // currently just the number of votes/respondents on a concluded ask
   > label {
     margin: $gap;
     flex-basis: 100%;
     font-weight: bold;
   }
 
+  // defaults for header, body, footer
   & > * {
     display: flex;
     align-items: center;
@@ -52,12 +53,15 @@ span.ask__header {
   flex: 1 0 100%;
   justify-content: space-between;
 
+  // the question
   label {
     flex: auto;
     margin: 0 $gap;
     padding-bottom: $gap;
     font-size: 1.3em;
   }
+
+  // icon buttons in the top right
   .action {
     @extend %data-icon;
     margin-#{$end-direction}: $gap / 2;
@@ -75,6 +79,7 @@ span.ask__header {
       font-size: 1.2em;
     }
 
+    // for mods or the poll creator
     &.admin {
       color: $c-link;
       &::before {
@@ -84,6 +89,7 @@ span.ask__header {
         color: $c-link-hover;
       }
     }
+    // the red x will unset a submitted vote,
     &.unset {
       visibility: hidden;
       color: if($theme-light, #f66, #c33);
@@ -145,6 +151,7 @@ div.ask__footer {
       visibility: visible;
     }
   }
+
   // optional feedback results
   .feedback-results {
     grid-column: 1/3;
@@ -162,7 +169,7 @@ div.ask__footer {
   }
 }
 
-// the main body flex layout of Ask.choices
+// the main body - a flex layout of Ask.choices
 div.ask__choices {
   margin: $gap 0 $gap 0;
   display: flex;
@@ -185,11 +192,13 @@ div.ask__choices {
       pointer-events: none;
     }
 
+    // modifier corresponds to 'stretch' tag in ask markup
     &.stretch {
       flex: auto;
     }
   }
 
+  // a draggable choice button
   .ranked-choice {
     @extend %lighten-hover;
     display: flex;
