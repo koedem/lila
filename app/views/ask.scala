@@ -53,7 +53,7 @@ object ask {
       span(cls := "ask__header")(
         label(ask.question),
         button(
-          cls        := s"action unset${hasPick(ask) ?? " visible"}",
+          cls := s"action unset${(hasPick(ask) && !ask.isConcluded) ?? " visible"}",
           formmethod := "POST",
           formaction := s"${routes.Ask.unset(ask._id)}",
           title      := trans.delete.txt()
@@ -185,17 +185,17 @@ object ask {
       case BAR =>
         sb ++= pluralize("vote", count)
         if (ask.isPublic || isShusher)
-          sb ++= s"\n\n${whoPicked(ask, choice, prefix = true)}"
+          sb ++= s"\n\n${whoPicked(ask, choice)}"
       case QUIZ =>
         if (ask.isTally && hasPick || isAuthor || isShusher)
           sb ++= pluralize("pick", count)
         if ((hasPick || isAuthor) && ask.isPublic || isShusher)
-          sb ++= s"\n\n${whoPicked(ask, choice, sb.nonEmpty)}"
+          sb ++= s"\n\n${whoPicked(ask, choice)}"
       case POLL =>
         if (isAuthor || ask.isTally)
           sb ++= pluralize("vote", count)
         if (ask.isPublic && ask.isTally || isShusher)
-          sb ++= s"\n\n${whoPicked(ask, choice, sb.nonEmpty)}"
+          sb ++= s"\n\n${whoPicked(ask, choice)}"
       case _ =>
     }
     if (sb.isEmpty) choiceText else sb.toString
@@ -231,9 +231,9 @@ object ask {
   private def pluralize(item: String, n: Int): String =
     if (n == 0) s"No ${item}s" else if (n == 1) s"1 ${item}" else s"$n ${item}s"
 
-  private def whoPicked(ask: Ask, choice: Int, prefix: Boolean, max: Int = 40): String = {
+  private def whoPicked(ask: Ask, choice: Int, max: Int = 40): String = {
     val who = ask.whoPicked(choice)
-    who.take(max).mkString(prefix ?? ": ", ", ", (who.length > max) ?? ", and others...")
+    who.take(max).mkString("", ", ", (who.length > max) ?? ", and others...")
   }
 
   private def validRanking(ask: Ask)(implicit ctx: Context): Vector[Int] = {
