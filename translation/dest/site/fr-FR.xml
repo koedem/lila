@@ -94,6 +94,7 @@
   <string name="dtzWithRounding">DTZ50\'\' arrondi, basé sur le nombre de demi-coups jusqu\'à la prochaine capture ou le prochain coup de pion</string>
   <string name="noGameFound">Aucune partie trouvée</string>
   <string name="maybeIncludeMoreGamesFromThePreferencesMenu">Peut-être inclure plus de parties depuis le menu préférences ?</string>
+  <string name="openings">Ouvertures</string>
   <string name="openingExplorer">Explorateur d\'ouvertures</string>
   <string name="openingEndgameExplorer">Explorateur d\'ouvertures/de finales</string>
   <string name="xOpeningExplorer">%s explorateur d\'ouvertures</string>
@@ -157,6 +158,7 @@
   <string name="viewInFullSize">Agrandir</string>
   <string name="logOut">Déconnexion</string>
   <string name="signIn">Connexion</string>
+  <string name="rememberMe">Se souvenir de moi</string>
   <string name="youNeedAnAccountToDoThat">Compte d\'utilisateur requis</string>
   <string name="signUp">S\'inscrire</string>
   <string name="computersAreNotAllowedToPlay">Les ordinateurs et les joueurs assistés par ordinateur ne sont pas autorisés à jouer. Veuillez ne pas vous aider de moteurs d\'analyse, de bases de données ou d\'autres joueurs pendant la partie. Notez également qu\'il est fortement déconseillé de créer plusieurs comptes. Le multi-compte excessif mènera à l\'exclusion.</string>
@@ -215,7 +217,7 @@
   <string name="refreshInboxAfterFiveMinutes">Attendez 5 minutes et rafraîchissez votre boîte de réception.</string>
   <string name="checkSpamFolder">Vérifiez aussi votre dossier de pourriel, il pourrait s\'y trouver. Si c\'est le cas, marquez-le comme non-pourriel.</string>
   <string name="emailForSignupHelp">Si rien ne marche, envoyez-nous ce courriel :</string>
-  <string name="copyTextToEmail">Copiez et collez le texte ci-dessus et envoyez-le à %s</string>
+  <string name="copyTextToEmail" comment="copyTextToEmail&#10;%s is the Lichess support email address, contact@lichess.org">Copiez et collez le texte ci-dessus et envoyez-le à %s</string>
   <string name="waitForSignupHelp">Nous vous contacterons sous peu pour vous aider à compléter votre inscription.</string>
   <string name="accountConfirmed">L\'inscription de l\'utilisateur %s a été confirmée avec succès.</string>
   <string name="accountCanLogin">Vous pouvez désormais vous connecter en tant que %s.</string>

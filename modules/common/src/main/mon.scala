@@ -35,7 +35,7 @@ object mon {
     val fingerPrint          = timer("http.fingerPrint.time").withoutTags()
     def jsmon(event: String) = counter("http.jsmon").withTag("event", event)
     val requestHandler       = timer("http.requestHandler").withoutTags()
-    val router               = timer("http.router").withoutTags()
+    def router(path: String) = timer("http.router").withTag("path", path)
   }
   object syncache {
     def miss(name: String)    = counter("syncache.miss").withTag("name", name)
@@ -356,6 +356,9 @@ object mon {
       def form(client: String, result: String) =
         counter("hcaptcha.form").withTags(Map("client" -> client, "result" -> result))
     }
+  }
+  object shutup {
+    def analyzer = timer("shutup.analyzer.time").withoutTags()
   }
   object tv {
     object streamer {

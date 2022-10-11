@@ -94,6 +94,7 @@
   <string name="dtzWithRounding">DTZ50\'\' con redondeo, baseado no número de movementos intermedios ata a próxima captura ou movemento de peón</string>
   <string name="noGameFound">Non se atoparon partidas</string>
   <string name="maybeIncludeMoreGamesFromThePreferencesMenu">E se probas a incluír máis partidas dende o menú de preferencias?</string>
+  <string name="openings">Aperturas</string>
   <string name="openingExplorer">Abrir o explorador</string>
   <string name="openingEndgameExplorer">Explorador de aperturas/finais</string>
   <string name="xOpeningExplorer">Explorador de aperturas %s</string>
@@ -157,6 +158,7 @@
   <string name="viewInFullSize">Ver a tamaño completo</string>
   <string name="logOut">Pechar sesión</string>
   <string name="signIn">Iniciar sesión</string>
+  <string name="rememberMe">Lembrarme</string>
   <string name="youNeedAnAccountToDoThat">Precisas dunha conta de usuario para facer iso</string>
   <string name="signUp">Rexistrarse</string>
   <string name="computersAreNotAllowedToPlay">Non están permitidos os ordenadores ou os xogadores asistidos por eles. Por favor non te axudes de módulos de xadrez, bases de datos ou otros xogadores durante a partida. Lembra tamén que o uso de múltiples contas está altamente desaconsellado e que o uso abusivo deste tipo de contas pode conducir á suspensión</string>
@@ -215,7 +217,7 @@
   <string name="refreshInboxAfterFiveMinutes">Agarda 5 minutos e refresca a túa caixa de correo.</string>
   <string name="checkSpamFolder">Comproba tamén o teu buzón de spam, puido rematar aí. Se así foi, quítalle a marca de correo non desexado.</string>
   <string name="emailForSignupHelp">Se todo falla, entón envíanos un correo:</string>
-  <string name="copyTextToEmail">Copia e pega o seguinte texto e envíao a %s</string>
+  <string name="copyTextToEmail" comment="copyTextToEmail&#10;%s is the Lichess support email address, contact@lichess.org">Copia e pega o seguinte texto e envíao a %s</string>
   <string name="waitForSignupHelp">Volveremos dentro de pouco para axudarche a completar o teu rexistro.</string>
   <string name="accountConfirmed">O usuario %s foi confirmado correctamente.</string>
   <string name="accountCanLogin">Agora podes loguearte como %s.</string>
