@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig_module.base.json",
+  "include": ["src/*.ts"],
+  "exclude": [],
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "outDir": "./dist",
+    "noImplicitThis": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "strict": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "declaration": false,
+    "types": ["node"]
+  }
+}
