@@ -1,7 +1,7 @@
-import { Work } from './types';
+import { Work, Redraw } from './types';
 import { Protocol } from './protocol';
 import { Cache } from './cache';
-import { readStream, CancellableStream } from 'common/stream';
+import { readNdJson } from 'common/ndjson';
 
 export enum CevalState {
   Initial,
@@ -28,7 +28,7 @@ export class WebWorker implements CevalWorker {
   private protocol = new Protocol();
   private worker: Worker | undefined;
 
-  constructor(private opts: WebWorkerOpts) {}
+  constructor(private opts: WebWorkerOpts, private redraw: Redraw) {}
 
   getState() {
     return !this.worker
@@ -53,6 +53,7 @@ export class WebWorker implements CevalWorker {
         err => {
           console.error(err);
           this.failed = true;
+          this.redraw();
         },
         true
       );
@@ -107,7 +108,7 @@ export class ThreadedWasmWorker implements CevalWorker {
   private static protocols = { Stockfish: new Protocol(), StockfishMv: new Protocol() };
   private static sf: { Stockfish?: Promise<void>; StockfishMv?: Promise<void> } = {};
 
-  constructor(private opts: ThreadedWasmWorkerOpts) {}
+  constructor(private opts: ThreadedWasmWorkerOpts, private redraw: Redraw) {}
 
   getState() {
     return !ThreadedWasmWorker.sf[this.opts.module]
@@ -184,6 +185,7 @@ export class ThreadedWasmWorker implements CevalWorker {
         err => {
           console.error(err);
           ThreadedWasmWorker.failed[this.opts.module] = true;
+          this.redraw();
         }
       );
     }
@@ -211,17 +213,31 @@ export interface ExternalEngine {
   variants: VariantKey[];
   maxThreads: number;
   maxHash: number;
+  shallowDepth: number;
+  deepDepth: number;
   clientSecret: string;
   officialStockfish?: boolean;
   endpoint: string;
 }
 
+interface ExternalEngineOutput {
+  time: number;
+  depth: number;
+  nodes: number;
+  pvs: {
+    depth: number;
+    cp?: number;
+    mate?: number;
+    moves: Uci[];
+  }[];
+}
+
 export class ExternalWorker implements CevalWorker {
   private state = CevalState.Initial;
   private session = Math.random().toString(36).slice(2, 12);
-  private stream: CancellableStream | undefined;
+  private req: AbortController | undefined;
 
-  constructor(private opts: ExternalEngine) {}
+  constructor(private opts: ExternalEngine, private redraw: Redraw) {}
 
   getState() {
     return this.state;
@@ -231,45 +247,66 @@ export class ExternalWorker implements CevalWorker {
     stop();
     this.state = CevalState.Loading;
 
-    const url = new URL(`${this.opts.endpoint}/api/external-engine/${this.opts.id}/analyse`);
-    fetch(url.href, {
-      method: 'post',
-      cache: 'default',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'omit',
-      body: JSON.stringify({
-        clientSecret: this.opts.clientSecret,
-        work: {
-          sessionId: this.session,
-          threads: work.threads,
-          hash: work.hashSize || 16,
-          deep: work.maxDepth >= 99,
-          multiPv: work.multiPv,
-          variant: work.variant,
-          initialFen: work.initialFen,
-          moves: work.moves,
+    this.req = new AbortController();
+    this.analyse(work, this.req.signal);
+  }
+
+  private async analyse(work: Work, signal: AbortSignal): Promise<void> {
+    try {
+      const url = new URL(`${this.opts.endpoint}/api/external-engine/${this.opts.id}/analyse`);
+      const deep = work.maxDepth >= 99;
+      const res = await fetch(url.href, {
+        signal,
+        method: 'post',
+        cache: 'default',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      }),
-    }).then(
-      res => {
-        this.stream = readStream((line: string) => {
-          this.state = CevalState.Computing;
-          console.log(line);
-        })(res);
-        this.stream.end.promise.then(() => (this.state = CevalState.Initial));
-      },
-      err => {
-        console.error(err);
+        credentials: 'omit',
+        body: JSON.stringify({
+          clientSecret: this.opts.clientSecret,
+          work: {
+            sessionId: this.session,
+            threads: work.threads,
+            hash: work.hashSize || 16,
+            deep,
+            multiPv: work.multiPv,
+            variant: work.variant,
+            initialFen: work.initialFen,
+            moves: work.moves,
+          },
+        }),
+      });
+
+      await readNdJson<ExternalEngineOutput>(res, line => {
+        this.state = CevalState.Computing;
+        work.emit({
+          fen: work.currentFen,
+          maxDepth: deep ? this.opts.deepDepth : this.opts.shallowDepth,
+          depth: line.pvs[0]?.depth || 0,
+          knps: line.nodes / Math.max(line.time, 1),
+          nodes: line.nodes,
+          cp: line.pvs[0]?.cp,
+          mate: line.pvs[0]?.mate,
+          millis: line.time,
+          pvs: line.pvs,
+        });
+      });
+
+      this.state = CevalState.Initial;
+    } catch (err: unknown) {
+      if ((err as Error).name !== 'AbortError') {
         this.state = CevalState.Failed;
+      } else {
+        this.state = CevalState.Initial;
       }
-    );
+    }
+
+    this.redraw();
   }
 
   stop() {
-    this.stream?.cancel();
-    this.state = CevalState.Initial;
+    this.req?.abort('ceval stopped');
   }
 
   engineName() {
