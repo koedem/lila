@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Module } from './bleep';
 
-export default parseModules; 
+import { LilaModule, LilaRollup } from './bleep';
+export { parseModules }; 
 
 const walkModules = async function*(dirpath: string): AsyncGenerator<string> {
   const walkFilter = 
@@ -20,26 +20,25 @@ const walkModules = async function*(dirpath: string): AsyncGenerator<string> {
 
 const rollupRe = /rollupProject\((\{.+})\);/s
 
-const parseModule = async (moduleDir:string): Promise<Module> => {
+const parseModule = async (moduleDir:string): Promise<LilaModule> => {
   const pkg = parseObject(
     await fs.promises.readFile(path.resolve(moduleDir,'package.json'), 'utf8')
   );
 
-  const mod: Module = {
+  const mod: LilaModule = {
     pkg: pkg,
     name: path.basename(moduleDir),
     root: moduleDir
   }
   parseScriptArgs(mod, 'scripts' in pkg ? pkg.scripts : {})
 
-
-          mod.rollup = [];
+  const hasTsConfig = fs.existsSync(path.join(mod.root,'tsconfig.json'));
 
   const rollupConfigPath = path.join(mod.root,'rollup.config.mjs');
   if (!fs.existsSync(rollupConfigPath)) {
-    mod.rollup.push({mod: mod.name, name: mod.name, input: 'src/*'});
-    return mod; // let rollup do tsc, otherwise we're done
+    return mod;    
   }
+
   const rollup = stripProperty( 
     matchGroupOne(rollupRe, await fs.promises.readFile(rollupConfigPath,'utf8')), 
     'plugins'
@@ -49,16 +48,18 @@ const parseModule = async (moduleDir:string): Promise<Module> => {
   }
   const obj = parseObject(rollup?.objMinusProp);
 
-  //mod.rollup = [];
+  mod.rollup = [];
 
   for (const key in obj) {
     const cfg = obj[key];
-    if (key == 'main' && cfg.output != mod.name) mod.rollupAlias = cfg.output
+    if (key == 'main' && cfg.output != mod.name) mod.rollupAlias = cfg.output;
     mod.rollup.push({
-      mod: mod.name, 
-      name: cfg.name ? cfg.name : cfg.output, 
+      dirName: mod.name, 
+      modName: cfg.name ? cfg.name : cfg.output, 
       input: cfg.input, 
-      output: cfg.output
+      output: cfg.output,
+      customTsc: !!mod.tscOptions,
+      hasTsConfig: hasTsConfig
     });
   }
   return mod;
@@ -78,7 +79,7 @@ const tokenizeArgs = (argstr:string): string[] => {
 }
 
 // go through package json scripts and get what we need from 'compile' and 'dev'
-const parseScriptArgs = (module: Module, pkgScripts:any) => {
+const parseScriptArgs = (module: LilaModule, pkgScripts:any) => {
   // if some other script is necessary, add it to buildScriptKeys
   const buildScriptKeys = ['compile', 'dev']; 
   const buildList: string[][] = []
@@ -134,8 +135,8 @@ export const parseObject = (o: string|null): any => Function(
   + "return " + o
 )();
 
-async function parseModules(uidir: string): Promise<Module[]> {
-  const modules: Module[] = [];
+async function parseModules(uidir: string): Promise<LilaModule[]> {
+  const modules: LilaModule[] = [];
 
   for await (const moduleDir of walkModules(uidir)) 
     if (moduleDir != uidir) 

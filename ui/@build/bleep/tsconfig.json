@@ -5,6 +5,7 @@
   "compilerOptions": {
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "allowUnreachableCode": true,
     "outDir": "./dist",
     "noImplicitThis": true,
     "inlineSourceMap": true,
