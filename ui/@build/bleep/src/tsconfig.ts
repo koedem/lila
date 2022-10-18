@@ -1,77 +1,64 @@
-import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
-import typescript from '@rollup/plugin-typescript';
-import * as rollup from 'rollup';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as ps from 'process';
-import { modules, launchDeps, LilaModule, tsconfigDir, uidir } from './bleep';
+import { modules, bleepLog, moduleDeps, LichessModule, tsconfigDir, uiDir } from './build';
 
-export const makeBleepConfig = () => {//cfgPaths: string[]) => {
+export const makeBleepConfig = async () => {//cfgPaths: string[]) => {
   const tsc: string[] = [];
 
   modules.forEach(mod => { // do this first
-    launchDeps.get(mod.name)?.forEach(dep => {
+    moduleDeps.get(mod.name)?.forEach(dep => {
       const depMod = modules.get(dep);
       if (depMod?.tscOptions && !depMod.tscOptions?.includes('composite'))
         depMod.tscOptions!.push('composite');
     });
   });
 
-  modules.forEach(mod => {
-    if (mod.tscOptions) tsc.push(makeTsConfig(mod,true))
-    else makeTsConfig(mod,false);
-  });
+  for (const mod of modules.values()) {
+    if (mod.tscOptions) tsc.push(await makeTsConfig(mod,true))
+    else await makeTsConfig(mod,false);
+  }
   const cfg:any = {};
   cfg.files = [];
-  cfg.compilerOptions = {
-    //rootDirs: Array.from(tsc.map(t => path.resolve(uidir,t.substring(0, t.indexOf('.')))))
-  }
-  cfg.references = Array.from(tsc.map(p => { return { path: p } }));
-  fs.writeFileSync(path.resolve(tsconfigDir, 'bleep.tsconfig.json'), JSON.stringify(cfg));
-  console.log(cfg);
+  cfg.compilerOptions = {}
+  cfg.references = tsc.map(p => ({ path: p }));
+  await fs.promises.writeFile(
+    path.resolve(tsconfigDir, 'bleep.tsconfig.json'), 
+    JSON.stringify(cfg)
+  );
 }
 
-// still need to do site BS
-const makeTsConfig = (mod: LilaModule, doDeps = false): string => {
+const makeTsConfig = async (mod: LichessModule, doDeps = false): Promise<string> => {
   const fixMe = ["include","exclude","outDir","src","baseUrl","extends", "path"]
   const resolvePaths = (o:any, forceAll = false): any => {
-    for (const prop in o) {
-      const val = o[prop];
-      if (forceAll || fixMe.includes(prop)) {
-        if (typeof val == 'string') o[prop] = path.resolve(mod.root, val);
-        else if (Array.isArray(val)) o[prop] = o[prop].map((p:string) => path.resolve(mod.root, p)); 
-      }
-      else if (typeof val === 'object' && !Array.isArray(val)) {
-        o[prop] = resolvePaths(val, prop == 'paths'); // resolve all values in 'paths' element
-      }
-    }
+    for (const key in o)
+      if (forceAll || fixMe.includes(key))
+        if (typeof o[key] == 'string') 
+          o[key] = path.resolve(mod.root, o[key]);
+        else if (Array.isArray(o[key])) o[key] = 
+          o[key].map((el: any) => resolvePaths(el));
+
+      else if (typeof o[key] === 'object' && !Array.isArray(o[key]))
+        o[key] = resolvePaths(o[key], key == 'paths'); // resolve all values in 'paths' element
+
     return o;
   };
-  let src: any;
-  try { src = JSON.parse(fs.readFileSync(path.resolve(mod.root, 'tsconfig.json'),'utf8')); }
-  catch (e) {
-    return '';
-  }
-  src = resolvePaths(src);
+  const config = resolvePaths(JSON.parse(
+    await fs.promises.readFile(path.resolve(mod.root, 'tsconfig.json'), 'utf8')
+  ));
+  if (!('include' in config)) config.include = [path.resolve(uiDir,mod.name,'src')];
+  if (!('compilerOptions' in config)) config.compilerOptions = {};
+  config.compilerOptions.rootDir = path.resolve(uiDir,mod.name,'src');
+  mod.tscOptions?.forEach(option => config.compilerOptions[option] = true);
 
-  if (!('compilerOptions' in src)) src.compilerOptions = {}
-  
-  mod.tscOptions?.forEach(option => src.compilerOptions[option] = true);
-  // force add incremental here?
-    src.compilerOptions.rootDir =  path.resolve(uidir,mod.name,'src');
+  const deps = moduleDeps.get(mod.name) ;
+  if (doDeps && deps)
+    config['references'] = deps.map(dep => ({ path: `${dep}.tsconfig.json` }));
 
-  const deps = launchDeps.get(mod.name) ;
+  const configName = `${mod.name}.tsconfig.json`;
 
-  if (deps && doDeps) {
-    src['references'] = Array.from(deps.map(dep => {
-      return { path: `${dep}.tsconfig.json` }
-    }));
-  }
-  const cfgName = `${mod.name}.tsconfig.json`;
-  fs.writeFileSync(
-    path.resolve(tsconfigDir, cfgName), 
-    JSON.stringify(src)
+  await fs.promises.writeFile(
+    path.resolve(tsconfigDir, configName), 
+    JSON.stringify(config)
   );
-  return cfgName;
+  return configName;
 }

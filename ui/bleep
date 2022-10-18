@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+BASEDIR=$(dirname "$0")
+echo $BASEDIR
+node --max-old-space-size=8000 "$BASEDIR/@build/bleep/dist/bleep.js"

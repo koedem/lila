@@ -36,6 +36,7 @@ ui/puz/**/*.js
 ui/puz/**/*.d.ts
 ui/*/npm-debug.log
 ui/*/tsconfig.tsbuildinfo
+ui/**/.tsconfig
 hs_*.log
 yarn-error.log
 

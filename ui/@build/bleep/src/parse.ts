@@ -1,12 +1,23 @@
 import * as fs from 'fs';
+import * as cps from 'child_process';
 import * as path from 'path';
+import pluginCopy from 'rollup-plugin-copy';
+import pluginReplace from '@rollup/plugin-replace';
+import { LichessModule, nodeDir } from './build';
+//export { parseModules }; 
 
-import { LilaModule, LilaRollup } from './bleep';
-export { parseModules }; 
+export async function parseModules(uidir: string): Promise<LichessModule[]> {
+  const modules: LichessModule[] = [];
+
+  for await (const moduleDir of walkModules(uidir)) 
+    if (moduleDir != uidir) 
+      modules.push(await parseModule(moduleDir))
+
+  return modules;
+}
 
 const walkModules = async function*(dirpath: string): AsyncGenerator<string> {
-  const walkFilter = 
-    [/*"build", "css", "src", "dist", "types",*/ "@build", "@types", "node_modules"];
+  const walkFilter = ["@build", "@types", "node_modules"];
 
   const fsNodes = await fs.promises.readdir(dirpath, { withFileTypes: true });
   for (const fsNode of fsNodes) {
@@ -18,54 +29,72 @@ const walkModules = async function*(dirpath: string): AsyncGenerator<string> {
   }
 }
 
-const rollupRe = /rollupProject\((\{.+})\);/s
-
-const parseModule = async (moduleDir:string): Promise<LilaModule> => {
+const parseModule = async (moduleDir:string): Promise<LichessModule> => {
   const pkg = parseObject(
     await fs.promises.readFile(path.resolve(moduleDir,'package.json'), 'utf8')
   );
 
-  const mod: LilaModule = {
+  const mod: LichessModule = {
     pkg: pkg,
     name: path.basename(moduleDir),
-    root: moduleDir
+    root: moduleDir,
+    build: {pre:[], post:[]},
+    hasTsconfig: fs.existsSync(path.join(moduleDir,'tsconfig.json'))
   }
-  parseScriptArgs(mod, 'scripts' in pkg ? pkg.scripts : {})
-
-  const hasTsConfig = fs.existsSync(path.join(mod.root,'tsconfig.json'));
-
+  parseScripts(mod, 'scripts' in pkg ? pkg.scripts : {})
   const rollupConfigPath = path.join(mod.root,'rollup.config.mjs');
-  if (!fs.existsSync(rollupConfigPath)) {
-    return mod;    
-  }
-
-  const rollup = stripProperty( 
-    matchGroupOne(rollupRe, await fs.promises.readFile(rollupConfigPath,'utf8')), 
-    'plugins'
-  );
-  if (rollup.prop) { 
-    /* do some shit for site here */ 
-  }
-  const obj = parseObject(rollup?.objMinusProp);
-
+  
+  if (!fs.existsSync(rollupConfigPath)) return mod; // we're done
+  
   mod.rollup = [];
+  const rollupConfigStr = await fs.promises.readFile(rollupConfigPath,'utf8');
+  const rollupMatch = /rollupProject\((\{.+})\);/s.exec(rollupConfigStr);
 
-  for (const key in obj) {
-    const cfg = obj[key];
-    if (key == 'main' && cfg.output != mod.name) mod.rollupAlias = cfg.output;
+  const rollupObj = parseObject(rollupMatch?.length == 2 ? rollupMatch[1]: null);
+
+  for (const key in rollupObj) {
+    const cfg = rollupObj[key];
+    if (key == 'main' && cfg.output != mod.name) 
+      mod.moduleAlias = cfg.output; // analyse == analysisBoard
+     
     mod.rollup.push({
-      dirName: mod.name, 
-      modName: cfg.name ? cfg.name : cfg.output, 
+      hostMod: mod, 
       input: cfg.input, 
       output: cfg.output,
-      customTsc: !!mod.tscOptions,
-      hasTsConfig: hasTsConfig
+      importName: cfg.name ? cfg.name : cfg.output, 
+      plugins: cfg.plugins,
+      onWarn: cfg.onwarn,
+      isMain: key == 'main' || cfg.output == mod.name// run more commands from package.json?
     });
   }
   return mod;
 }
 
-// filenames with spaces in a package.json prop must be single quoted
+const replaceValues = { // from site/rollup.config.js
+  __info__: JSON.stringify({
+    date: new Date(new Date().toUTCString()).toISOString().split('.')[0] + '+00:00',
+    commit: cps.execSync('git rev-parse -q HEAD', { encoding: 'utf-8' }).trim(),
+    message: cps.execSync('git log -1 --pretty=%s', { encoding: 'utf-8' }).trim(),
+  }),
+}
+
+const suppressThisIsUndefined = 
+  (warning: any, warn: any) => warning.code !== "THIS_IS_UNDEFINED" && warn(warning);
+
+const parseObject = (o: string|null) => {
+  const copy = pluginCopy;
+  const replace = (_:any) => pluginReplace({
+    values: replaceValues,
+    preventAssignment: true,
+  });
+  const dirname = path.dirname;
+  const execSync = (_:any,__:any) => ''; // ignore, can't execSync in an eval
+  const require = { resolve: (mod: string) => path.resolve(nodeDir, mod) };
+  copy, replace, dirname, require, suppressThisIsUndefined, execSync; // suppress unused
+  return eval(`(${o})`) || {};
+}
+
+// filenames containing spaces in a package.json script must be single quoted otherwise fail
 const tokenizeArgs = (argstr:string): string[] => {
   const args: string[] = [];
   const reducer = (a:any[], ch:string) => {
@@ -78,70 +107,27 @@ const tokenizeArgs = (argstr:string): string[] => {
   return lastOne ? [...args, lastOne] : args;
 }
 
-// go through package json scripts and get what we need from 'compile' and 'dev'
-const parseScriptArgs = (module: LilaModule, pkgScripts:any) => {
-  // if some other script is necessary, add it to buildScriptKeys
-  const buildScriptKeys = ['compile', 'dev']; 
-  const buildList: string[][] = []
+// go through package json scripts and get what we need from 'compile', 'dev', and deps
+// if some other script is necessary, add it to buildScriptKeys
+
+const parseScripts = (module: LichessModule, pkgScripts:any) => {
+  const buildScriptKeys = ['deps', 'compile', 'dev']; 
+  
+  let buildList: string[][] = module.build.pre;
   for (const script in pkgScripts) {
     if (!buildScriptKeys.includes(script)) continue;
-    pkgScripts[script].split('&&').forEach((cmd: string) => {
-      const args = tokenizeArgs(cmd.trim()).filter((x) => x != '$npm_execpath');
-      if (args[0] == 'tsc') { // we handle this, but store off the options
+    pkgScripts[script].split(/&&/).forEach((cmd: string) => {
+      // no need to support || in a script property yet
+      const args = tokenizeArgs(cmd.trim());
+      if (args[0] == 'tsc')
         module.tscOptions = args
-          .flatMap((arg: string) => arg.startsWith('--') ? [arg.substring(2)] : [])
-      }
-      else if (args[0] != 'rollup') { // we handle this too, no need
-        buildList.push(args)
-      }
+          .flatMap(
+            (arg: string) => arg.startsWith('--') ? [arg.substring(2)] : []
+          ) // only support flag arguments
+      else if (args[0] == 'rollup')
+        buildList = module.build.post;
+      else if (!['$npm_execpath','yarn','npm'].includes(args[0]))
+        buildList.push(args);
     });
   }
-  if (buildList.length) module.build = buildList;
 }
-
-const matchGroupOne = (re: RegExp, str: string):string|null => {
-  const match = re.exec(str);
-  return match?.length == 2 ? match[1] : null;
-}
-
-// this will fail if an object property contains mismatched {}[] characters
-// escaped or wrapped in quotes.
-
-const stripProperty = (obj: string|null, propName: string)
-: {objMinusProp: string, prop: string} => {
-  obj = obj || '';
-  const res = {objMinusProp: obj, prop: ''};
-  const re = new RegExp(`[{[,]\\s*${propName}\\s*:\\s*`, 'g');
-  const match = re.exec(obj);
-  if (!match) return res;
-
-  const stripFrom = match.index + match[0].indexOf(propName);
-  let cursor = re.lastIndex, nesting = 0;
-
-  while (cursor < obj.length) {
-    const ch = obj[cursor++];
-    if (ch == '{' || ch == '[') nesting++;
-    else if ((ch == '}' || ch == ']') && --nesting < 0) break;
-    else if (ch == ',' && nesting == 0) break;
-    res.prop += ch;
-  }
-  res.objMinusProp = obj.substring(0, stripFrom) + obj.substring(cursor + nesting);
-  return res;
-}
-
-export const parseObject = (o: string|null): any => Function(
-  "'use strict';"
-  + "const suppressThisIsUndefined = undefined;" // classic 
-  + "return " + o
-)();
-
-async function parseModules(uidir: string): Promise<LilaModule[]> {
-  const modules: LilaModule[] = [];
-
-  for await (const moduleDir of walkModules(uidir)) 
-    if (moduleDir != uidir) 
-      modules.push(await parseModule(moduleDir))
-
-  return modules;
-}
-
