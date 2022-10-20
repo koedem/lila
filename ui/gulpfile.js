@@ -42,7 +42,7 @@ const build = () =>
     .pipe(renameAs('dev'))
     .pipe(destination());
 
-const startWatching = () => {
+const startWatching = async () => {
   global.isWatching = true;
   gulp.watch(sourcesGlob, { ignoreInitial: false }, build);
 };

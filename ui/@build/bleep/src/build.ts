@@ -1,222 +1,161 @@
 import * as rup from 'rollup';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as ps from 'process';
-import * as cps from 'child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as ps from 'node:process';
+import * as cps from 'node:child_process';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import { parseModules } from './parse';
 import { makeBleepConfig } from './tsconfig';
+import { LichessModule, LichessRollup, env, colorFuncs as c } from './env';
 
-export const rootDir = '/Users/gamblej/ws/lichess/lila-local';
-export const nodeDir = path.resolve(rootDir, 'node_modules');
-export const outDir = path.resolve(rootDir, 'public/compiled');
-export const uiDir = path.resolve(rootDir, 'ui');
-export const bleepDir = path.resolve(uiDir, '@build/bleep');
-export const tsconfigDir = path.resolve(bleepDir, '.tsconfig');
 export const moduleDeps = new Map<string, string[]>();
 export let modules: Map<string, LichessModule>;
-
-const cfg = {
-  color: true,
-}
-let gulp: cps.ChildProcess;
-let tsc: cps.ChildProcess;
 let watcher: rup.RollupWatcher;
-let deferred: () => void;
+let startupTime: number | undefined = Date.now();
 
-const filterMods = ['tutor'];
+export async function build(moduleNames: string[]) {
+  modules = new Map((await parseModules()).map(mod => [mod.name, mod]));
 
-// rename LichessModule - lila is the server
-export type LichessModule = {
-  name: string, // dirname relative to lila/ui, usually the module name
-  root: string, // absolute path to package.json parentdir (module root)
-  moduleAlias?: string, // analysisBoard, good times
-  pkg: any, // the entire package.json object
-  build: {pre: string[][], post: string[][]}, // additional build steps from package.json
-  hasTsconfig?: boolean,
-  tscOptions?: string[],
-  rollup?: LichessRollup[],
+  for (const moduleName of moduleNames)
+    if (!known(moduleName)) {
+      env.log(c.red('Argument error: ') + `unknown module '${c.magenta(moduleName)}'`);
+      return;
+    }
+
+  buildDependencyList();
+  const buildModules =
+    moduleNames && moduleNames.length > 0 ? new Set(depsMany(moduleNames)) : new Set(modules.values());
+
+  const exclude = env.opts.exclude?.flatMap(depsReverse) || [];
+  for (const mod of exclude)
+    if (moduleNames.includes(mod.name)) {
+      env.log(c.red('Config error: ') + `'${c.magenta(mod.name)}' depends on excluded module`);
+      return;
+    }
+  exclude.forEach(rm => buildModules.delete(rm));
+
+  if (env.opts.gulp !== false) gulpWatch();
+  await makeBleepConfig([...buildModules]);
+  typescriptWatch(() => rollupWatch([...buildModules]));
 }
 
-export type LichessRollup = {
-  hostMod: LichessModule,
-  input: string,
-  output: string,
-  importName?: string,
-  plugins?: any[], // basically just to copy stuff in site bundle
-  onWarn?: (w: any, wf: any) => any, // mostly to suppress 'this is undefined'
-  isMain: boolean, // false for plugin bundles
-};
-
-const colorStr = (code: number, text: string) => cfg.color ? `\x1b[${code}m${text}\x1b[0m` : text;
-export const red = (text: string): string => colorStr(31, text);
-export const green = (text: string): string => colorStr(32, text);
-export const yellow = (text: string): string => colorStr(33, text);
-export const blue = (text: string): string => colorStr(34, text);
-export const magenta = (text: string): string =>colorStr(35, text);
-export const cyan = (text: string): string => colorStr(36, text);
-export const grey = (text: string): string => colorStr(37, text);
-
-export const bleepLog = (ctx: string, buf: Buffer|string, withTime = true) => {
-  const text = typeof buf == 'string' ? buf : buf.toString('utf8');
-  const now = new Date();
-  const pad = (n: number) => n < 10 ? `0${n}` : `${n}`;
-  const time = `[${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}] `;
-
-  text.split(/[\n\r\f]/).filter(nonEmpty => nonEmpty).forEach(
-    (line) => console.log(`[${ctx}] ${withTime?time:''}${line}`));
-}
-
-export const build = async () => {
-
-  await fs.promises.rm(tsconfigDir, {recursive: true, force: true});
-  await fs.promises.mkdir(tsconfigDir);
-
-  modules = new Map((await parseModules(uiDir)).map(mod => [mod.name, mod]));
-  
-  filterMods.forEach(x => modules.delete(x));
-
-  modules.forEach(mod => {
-    const deplist: string[] = [];
-    for (const dep in mod.pkg.dependencies)
-      if (modules.has(dep)) deplist.push(dep);
-  
-    moduleDeps.set(mod.name, deplist); // todo, convert deplist to LichessModule[]  ?
-    mod.rollup?.forEach(r => {
-      if (r.output && ![mod.name, mod.moduleAlias].includes(r.output))
-        moduleDeps.set(r.output, [mod.name,...deplist])
+function postModBuild(mod: LichessModule | undefined) {
+  mod?.build.post?.forEach((args: string[]) => {
+    env.log(c.cyan(args.join(' ')), { ctx: mod.name });
+    cps.exec(`${args.join(' ')}`, { cwd: mod.root }, (err, stdout, stderr) => {
+      if (stdout) env.log(stdout, { ctx: mod.name });
+      if (stderr) env.log(stderr, { ctx: mod.name });
+      if (err) env.log(err, { ctx: mod.name, error: true });
     });
   });
-  await makeBleepConfig();
-  //gulpWatch();
-  typescriptWatch();
-  deferred = rollupWatch.bind(this, [...modules.values()]);
-  //deferred = rollupWatch.bind(this, depsFor('site'))
 }
 
-const postModBuild = (mod: LichessModule|undefined) => {
-  mod?.build.post?.forEach((args:string[]) => {
-    bleepLog(mod.name, args.join(' '));
-    cps.exec(`${args.join(' ')}`, {cwd: mod.root}, (err, stdout, stderr) => {
-      if (stdout) bleepLog(mod.name, stdout);
-      if (stderr) bleepLog(mod.name, stderr);
-      if (err) bleepLog(mod.name, `script error: ${err}`);
-    });
-  })
-}
-
-const preModBuild = (mod: LichessModule|undefined) => {
-  mod?.build.pre?.forEach((args:string[]) => {
-    bleepLog(mod.name, args.join(' '));
-    const stdout = cps.execSync(`${args.join(' ')}`, {cwd:mod.root});
-    // we need this to block, otherwise the rollup that may depend on this command
+function preModBuild(mod: LichessModule | undefined) {
+  mod?.build.pre?.forEach((args: string[]) => {
+    env.log(c.cyan(args.join(' ')), { ctx: mod.name });
+    // this must block, otherwise the rollup that may depend on this command
     // will begin executing
-    if (stdout) bleepLog(mod.name, stdout);
+    const stdout = cps.execSync(`${args.join(' ')}`, { cwd: mod.root });
+    if (stdout) env.log(stdout, { ctx: mod.name });
   });
 }
 
-const typescriptWatch = () => {
-  tsc = cps.spawn(
-    'tsc', [
-      '-b', 
-      path.resolve(tsconfigDir,'bleep.tsconfig.json'),
-      '--incremental',
-      '-w',
-      '--preserveWatchOutput'
-    ]
+function typescriptWatch(success: () => void) {
+  const tsc = cps.spawn(
+    'tsc',
+    ['-b', path.resolve(env.tsconfigDir, 'bleep.tsconfig.json'), '--incremental', '-w', '--preserveWatchOutput'],
+    { cwd: env.tsconfigDir }
   );
   tsc.stdout?.on('data', (txt: Buffer) => {
-    if (!watcher && txt.toString().search("Found 0 errors.") >= 0) {
-      // our rollup startup trigger depends on exact tsc output.
-      // this is brittle but easily fixed if tsc output changes
-      deferred(); 
+    // no way to magically get build events...
+    // maybe look at transpiling in this process because keying off stdout feels dirty.
+    if (!watcher && txt.toString().search('Found 0 errors.') >= 0) {
+      env.log('tsc build success. Begin watching...', { ctx: 'tsc' });
+      success();
+      return;
     }
-    else {
-      bleepLog('tsc', txt);
+    env.log(txt, { ctx: 'tsc' });
+  });
+  tsc.stderr?.on('data', txt => env.log(txt, { ctx: 'tsc' }));
+}
+
+function gulpWatch(numTries = 0) {
+  const gulp = cps.spawn('yarn', ['gulp', 'css'], { cwd: env.uiDir });
+  gulp.stdout?.on('data', txt => env.log(txt, { ctx: 'gulp' }));
+  gulp.stderr?.on('data', txt => env.log(txt, { ctx: 'gulp' }));
+  gulp.on('close', (code: number) => {
+    if (code == 1) {
+      // gulp fails to watch on macos with exit code 1 pretty randomly
+      if (numTries < 3) {
+        env.log(c.red('Retrying gulp watch...'), { ctx: 'gulp' });
+        gulpWatch(numTries + 1);
+      } else throw 'gulp fail';
     }
   });
-  tsc.stderr?.on('data', txt => bleepLog('tsc', txt));
 }
 
-const gulpWatch = () => {
-  gulp = cps.spawn('yarn', ['gulp', 'css'], {cwd: uiDir});
-  gulp.stdout?.on('data', (txt: Buffer) => {
-    bleepLog('gulp', txt, false);
-  })
-  gulp.stderr?.on('data', (txt: Buffer) => {
-    bleepLog('gulp', txt, false);
-  })
+function buildDependencyList() {
+  modules.forEach(mod => {
+    const deplist: string[] = [];
+    for (const dep in mod.pkg.dependencies) if (modules.has(dep)) deplist.push(dep);
+
+    moduleDeps.set(mod.name, deplist);
+    mod.rollup?.forEach(r => {
+      if (r.output && ![mod.name, mod.moduleAlias].includes(r.output)) moduleDeps.set(r.output, [mod.name, ...deplist]);
+    });
+  });
 }
 
-// we don't have to worry about order here, but we do need depended mods
-const depClosure = (modName: string): LichessModule[] => {
-  const depSet = new Set<LichessModule>();
-  const collect = (modName: string, depSet: Set<LichessModule>, depth: number) => {
-    if (depth > 8)
-      throw `dependency sanity check failed - ${[...depSet.values()].map(m => m.name)}`;
-
-    moduleDeps.get(modName)?.forEach(dep => collect( dep, depSet, depth + 1));
-    depSet.add(modules.get(modName)!);
-  }
-  collect(modName,depSet,0);
-  return [...depSet];
-}
-
-const rollupWatch = (todo: LichessModule[]) => {
-  ps.chdir(uiDir);
+function rollupWatch(todo: LichessModule[]): void {
+  ps.chdir(env.uiDir);
 
   const outputToHostMod = new Map<string, LichessModule>();
   const triggerScriptCmds = new Set<string>();
   const rollups: rup.RollupOptions[] = [];
-  
+
   todo.forEach(mod => {
     mod.rollup?.forEach(r => {
       const options = rollupOptions(r);
-      const output = path.resolve(outDir, `${r.output}.js`);
+      const output = path.resolve(env.outDir, `${r.output}.js`);
       outputToHostMod.set(output, mod);
       if (r.isMain) triggerScriptCmds.add(output);
       rollups.push(options);
     });
   });
   watcher = rup.watch(rollups).on('event', (e: rup.RollupWatcherEvent) => {
-    if (e.code == 'END') bleepLog('bleep','idle...');
-  
-    else if (e.code == 'BUNDLE_START') {
-        const output = e.output.length > 0 ? e.output[0] : '';
-        if (triggerScriptCmds.has(output))
-          preModBuild(outputToHostMod.get(output));
+    if (e.code == 'END') {
+      const elapsed = startupTime ? `in ${c.green((Date.now() - startupTime) / 1000 + '')}s ` : '';
+      env.log(`Build done ${elapsed}- watching...`);
+      startupTime = undefined;
+    } else if (e.code == 'BUNDLE_START') {
+      if (!startupTime) startupTime = Date.now();
+      const output = e.output.length > 0 ? e.output[0] : '';
+      if (triggerScriptCmds.has(output)) preModBuild(outputToHostMod.get(output));
     } else if (e.code == 'BUNDLE_END') {
-        const output = e.output.length > 0 ? e.output[0] : '';
-        const hostMod = outputToHostMod.get(output);
-        if (triggerScriptCmds.has(output))
-          postModBuild(hostMod);
-        const modName = fs.existsSync(output) ? path.basename(output) : '<unknown>';
-        const rss = `${Math.round(ps.memoryUsage.rss() / (1000 * 1000))} MB`;
+      const output = e.output.length > 0 ? e.output[0] : '';
+      const hostMod = outputToHostMod.get(output);
+      if (triggerScriptCmds.has(output)) postModBuild(hostMod);
+      const modName = fs.existsSync(output) ? path.basename(output) : '<unknown>';
 
-        bleepLog('rollup', `bundled '${cyan(modName)}' - ` + grey(`${e.duration}ms [rss ${rss}]`));
-        
-        e.result?.close();
+      env.log(`bundled '${c.cyan(modName)}' - ` + c.grey(`${e.duration}ms`), { ctx: 'rollup' });
+
+      e.result?.close();
     } else if (e.code == 'ERROR') {
-        bleepLog('rollup',red(`${e}`));
+      env.log(e, { ctx: 'rollup', error: true });
     }
   });
-    //watcher.on('restart', () => { console.log('restart') })
+  //watcher.on('restart', () => { console.log('restart') })
 }
 
-const bundleDone = (output: string, result: rup.RollupBuild, dur: number) => {
-
-}
-
-const rollupOptions = (o: LichessRollup): rup.RollupWatchOptions => {
+function rollupOptions(o: LichessRollup): rup.RollupWatchOptions {
   const modDir = o.hostMod.root;
-  const plugins = (o.plugins || [])
-    .concat(o.hostMod.hasTsconfig ? [
-      typescript({tsconfig: path.resolve(modDir, 'tsconfig.json')}),
-      resolve(),
-      commonjs({extensions: ['.js']}),      
-    ] : []);
+  const plugins = (o.plugins || []).concat(
+    o.hostMod.hasTsconfig
+      ? [typescript({ tsconfig: path.resolve(modDir, 'tsconfig.json') }), resolve(), commonjs({ extensions: ['.js'] })]
+      : []
+  );
   return {
     input: path.resolve(modDir, o.input),
     plugins: plugins,
@@ -224,8 +163,44 @@ const rollupOptions = (o: LichessRollup): rup.RollupWatchOptions => {
     output: {
       format: 'iife',
       name: o.importName,
-      file: path.resolve(outDir, `${o.output}.js`),
+      file: path.resolve(env.outDir, `${o.output}.js`),
       generatedCode: { preset: 'es2015', constBindings: false },
     },
-  }
+  };
 }
+
+// don't worry about cycles because yarn install would fail
+function depsOne(modName: string): LichessModule[] {
+  const deps: LichessModule[] = [];
+  const collect = (modName: string) => {
+    moduleDeps.get(modName)?.forEach(dep => collect(dep));
+    deps.push(modules.get(modName)!);
+  };
+  collect(modName);
+  return deps;
+}
+
+const depsMany = (modNames: string[]): LichessModule[] => {
+  const deps: LichessModule[] = [];
+  modNames.filter(known).forEach(name => deps.push(...depsOne(name)));
+  return unique(deps);
+};
+
+function depsReverse(modName: string): LichessModule[] {
+  if (!known(modName)) return [];
+  const depsReverse: LichessModule[] = [modules.get(modName)!];
+  const collect = (modName: string) => {
+    moduleDeps.forEach((deps, name) => {
+      if (deps.includes(modName)) {
+        depsReverse.push(modules.get(name)!);
+        collect(name);
+      }
+    });
+  };
+  collect(modName);
+  return unique(depsReverse);
+}
+
+const unique = (mods: LichessModule[]): LichessModule[] => [...new Set(mods)].filter(x => x);
+//const knownUnique = (mods: string[]): string[] => [...new Set(mods)].filter(known);
+const known = (name: string): boolean => modules.has(name);

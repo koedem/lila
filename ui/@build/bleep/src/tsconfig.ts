@@ -1,64 +1,57 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { modules, bleepLog, moduleDeps, LichessModule, tsconfigDir, uiDir } from './build';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { modules, moduleDeps } from './build';
+import { LichessModule, env } from './env';
 
-export const makeBleepConfig = async () => {//cfgPaths: string[]) => {
+export async function makeBleepConfig(buildModules: LichessModule[]): Promise<void> {
   const tsc: string[] = [];
+  await fs.promises.rm(env.tsconfigDir, { recursive: true, force: true });
+  await fs.promises.mkdir(env.tsconfigDir);
 
-  modules.forEach(mod => { // do this first
+  buildModules.forEach(mod => {
+    // do this first
     moduleDeps.get(mod.name)?.forEach(dep => {
       const depMod = modules.get(dep);
-      if (depMod?.tscOptions && !depMod.tscOptions?.includes('composite'))
-        depMod.tscOptions!.push('composite');
+      if (depMod?.tscOptions && !depMod.tscOptions?.includes('composite')) depMod.tscOptions!.push('composite');
     });
   });
 
-  for (const mod of modules.values()) {
-    if (mod.tscOptions) tsc.push(await makeTsConfig(mod,true))
-    else await makeTsConfig(mod,false);
+  for (const mod of buildModules) {
+    if (mod.tscOptions) tsc.push(await makeTsConfig(mod, true));
+    else await makeTsConfig(mod, false);
   }
-  const cfg:any = {};
+  const cfg: any = {};
   cfg.files = [];
-  cfg.compilerOptions = {}
   cfg.references = tsc.map(p => ({ path: p }));
-  await fs.promises.writeFile(
-    path.resolve(tsconfigDir, 'bleep.tsconfig.json'), 
-    JSON.stringify(cfg)
-  );
+  await fs.promises.writeFile(path.resolve(env.tsconfigDir, 'bleep.tsconfig.json'), JSON.stringify(cfg));
 }
 
-const makeTsConfig = async (mod: LichessModule, doDeps = false): Promise<string> => {
-  const fixMe = ["include","exclude","outDir","src","baseUrl","extends", "path"]
-  const resolvePaths = (o:any, forceAll = false): any => {
-    for (const key in o)
-      if (forceAll || fixMe.includes(key))
-        if (typeof o[key] == 'string') 
-          o[key] = path.resolve(mod.root, o[key]);
-        else if (Array.isArray(o[key])) o[key] = 
-          o[key].map((el: any) => resolvePaths(el));
+async function makeTsConfig(mod: LichessModule, withRefs: boolean): Promise<string> {
+  const resolveThese = ['include', 'exclude', 'outDir', 'src', 'baseUrl', 'extends', 'path'];
 
-      else if (typeof o[key] === 'object' && !Array.isArray(o[key]))
-        o[key] = resolvePaths(o[key], key == 'paths'); // resolve all values in 'paths' element
-
+  const absolutePaths = (o: any, forceAll = false): any => {
+    for (const key in o) {
+      if (forceAll || resolveThese.includes(key)) {
+        if (typeof o[key] == 'string') o[key] = path.resolve(mod.root, o[key]);
+        else if (Array.isArray(o[key])) o[key] = o[key].map((p: string) => path.resolve(mod.root, p));
+      } else if (typeof o[key] === 'object' && !Array.isArray(o[key])) {
+        o[key] = absolutePaths(o[key], key == 'paths'); // resolve all values in 'paths' element
+      }
+    }
     return o;
   };
-  const config = resolvePaths(JSON.parse(
-    await fs.promises.readFile(path.resolve(mod.root, 'tsconfig.json'), 'utf8')
-  ));
-  if (!('include' in config)) config.include = [path.resolve(uiDir,mod.name,'src')];
-  if (!('compilerOptions' in config)) config.compilerOptions = {};
-  config.compilerOptions.rootDir = path.resolve(uiDir,mod.name,'src');
-  mod.tscOptions?.forEach(option => config.compilerOptions[option] = true);
+  const config = absolutePaths(JSON.parse(await fs.promises.readFile(path.resolve(mod.root, 'tsconfig.json'), 'utf8')));
 
-  const deps = moduleDeps.get(mod.name) ;
-  if (doDeps && deps)
-    config['references'] = deps.map(dep => ({ path: `${dep}.tsconfig.json` }));
+  if (!('include' in config)) config.include = [path.resolve(env.uiDir, mod.name, 'src')];
+  if (!('compilerOptions' in config)) config.compilerOptions = {};
+
+  config.compilerOptions.rootDir = path.resolve(env.uiDir, mod.name, 'src');
+  mod.tscOptions?.forEach(option => (config.compilerOptions[option] = true));
+
+  const deps = moduleDeps.get(mod.name);
+  if (withRefs && deps) config['references'] = deps.map(dep => ({ path: `${dep}.tsconfig.json` }));
 
   const configName = `${mod.name}.tsconfig.json`;
-
-  await fs.promises.writeFile(
-    path.resolve(tsconfigDir, configName), 
-    JSON.stringify(config)
-  );
+  await fs.promises.writeFile(path.resolve(env.tsconfigDir, configName), JSON.stringify(config));
   return configName;
 }
