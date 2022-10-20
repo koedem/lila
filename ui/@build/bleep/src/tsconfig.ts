@@ -46,6 +46,7 @@ async function makeTsConfig(mod: LichessModule, withRefs: boolean): Promise<stri
   if (!('compilerOptions' in config)) config.compilerOptions = {};
 
   config.compilerOptions.rootDir = path.resolve(env.uiDir, mod.name, 'src');
+  config.compilerOptions.baseUrl = path.resolve(env.uiDir, mod.name );
   mod.tscOptions?.forEach(option => (config.compilerOptions[option] = true));
 
   const deps = moduleDeps.get(mod.name);
