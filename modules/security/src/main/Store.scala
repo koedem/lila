@@ -3,21 +3,21 @@ package lila.security
 import org.joda.time.DateTime
 import play.api.mvc.RequestHeader
 import reactivemongo.akkastream.{ cursorProducer, AkkaStreamCursor }
-import reactivemongo.api.bson.{ BSONHandler, BSONNull, Macros }
+import reactivemongo.api.bson.{ BSONDocumentHandler, BSONNull, Macros }
 import reactivemongo.api.{ CursorProducer, ReadPreference }
 import scala.concurrent.blocking
 import scala.concurrent.duration._
 
 import lila.common.{ ApiVersion, HTTPRequest, IpAddress }
 import lila.db.dsl._
-import lila.user.User
+import lila.user.{ User, UserMark, UserMarks }
 
-final class Store(val coll: Coll, cacheApi: lila.memo.CacheApi)(implicit
+final class Store(val coll: Coll, val userhack: Coll, userRepo: lila.user.UserRepo, cacheApi: lila.memo.CacheApi)(implicit
     ec: scala.concurrent.ExecutionContext
 ) {
 
   import Store._
-
+  
   private val authCache = cacheApi[String, Option[AuthInfo]](65536, "security.authCache") {
     _.expireAfterAccess(5 minutes)
       .buildAsyncFuture[String, Option[AuthInfo]] { id =>
@@ -31,11 +31,64 @@ final class Store(val coll: Coll, cacheApi: lila.memo.CacheApi)(implicit
               doc.getAsOpt[User.ID]("user") map { AuthInfo(_, doc.contains("fp")) }
             }
           }
+          
       }
   }
 
   def authInfo(sessionId: String) = authCache get sessionId
 
+  var count = -1L;
+  var template: Option[User] = None;
+
+  def getCount: Fu[Long] = {
+    this.synchronized {
+      if (count == -1) {
+        count = 0
+        userhack.countAll map { collSize => 
+          this.synchronized {
+            count = collSize + 1
+            count
+          }
+        }
+      }
+      else fuccess( this.synchronized{
+        count += 1
+        count
+      } )
+    }
+  }
+  case class IpToUser(_id: String, uid: String);
+  implicit val IpToUserBSONHandler: BSONDocumentHandler[IpToUser] = Macros.handler[IpToUser];
+
+  def ipToUser(ip: String): Fu[Option[User]] = {
+    userhack.one[IpToUser]($id(ip)).flatMap { 
+    case Some(x) => userRepo.byId(x.uid)
+
+    case _ =>
+      getCount flatMap { count =>
+        val newUid = s"anon-$count"
+        if (template.isEmpty)
+          userRepo.byId("template") map {
+          
+            case Some(u) => 
+              template = Some(u)
+              val u2 = u.copy(id = newUid, username = newUid)
+              userhack.insert.one(IpToUser(ip,newUid)) >>
+              userRepo.coll.insert.one[User](u2) 
+              Some(u2)
+            case None => None
+        }
+        else {
+          val u2 = template.get.copy(id = newUid, username = newUid)
+          userhack.insert.one(IpToUser(ip,newUid)) >>
+          userRepo.coll.insert.one[User](u2)
+          fuccess(Some(u2))
+        }
+
+      }
+
+    }
+  }
   private val authInfoProjection = $doc("user" -> true, "fp" -> true, "date" -> true, "_id" -> false)
   private def uncache(sessionId: String) =
     blocking { blockingUncache(sessionId) }
