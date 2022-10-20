@@ -34,10 +34,7 @@ object mon {
     val userGamesCost   = counter("http.userGames.cost").withoutTags()
     def csrfError(tpe: String, action: String, client: String) =
       counter("http.csrf.error").withTags(tags("type" -> tpe, "action" -> action, "client" -> client))
-    val fingerPrint          = timer("http.fingerPrint.time").withoutTags()
-    def jsmon(event: String) = counter("http.jsmon").withTag("event", event)
-    val requestHandler       = timer("http.requestHandler").withoutTags()
-    def router(path: String) = timer("http.router").withTag("path", path)
+    val fingerPrint = timer("http.fingerPrint.time").withoutTags()
   }
   object syncache {
     def miss(name: String)    = counter("syncache.miss").withTag("name", name)
@@ -310,7 +307,8 @@ object mon {
     def gameStream(event: String) = counter("bot.gameStream").withTag("event", event)
   }
   object cheat {
-    val cssBot                       = counter("cheat.cssBot").withoutTags()
+    def selfReport(name: String, auth: Boolean) =
+      counter("cheat.selfReport").withTags(tags("name" -> name, "auth" -> auth))
     val holdAlert                    = counter("cheat.holdAlert").withoutTags()
     def autoAnalysis(reason: String) = counter("cheat.autoAnalysis").withTag("reason", reason)
     val autoMark                     = counter("cheat.autoMark.count").withoutTags()

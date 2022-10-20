@@ -114,6 +114,13 @@ final class PlayApi(
           as(id, me) { pov =>
             env.bot.player.claimVictory(pov) pipe toResult
           }
+        case Array("game", id, "berserk") =>
+          as(id, me) { pov =>
+            fuccess {
+              if (env.bot.player.berserk(pov.game, me)) jsonOkResult
+              else JsonBadRequest(jsonError("Cannot berserk"))
+            }
+          }
         case _ => notFoundJson("No such command")
       }
   }
@@ -190,7 +197,7 @@ final class PlayApi(
           .botsByIdsCursor(env.bot.onlineApiUsers.get)
           .documentSource(getInt("nb", req) | Int.MaxValue)
           .throttle(50, 1 second)
-          .map { env.user.jsonView.full(_, withOnline = false, withRating = true) }
+          .map { env.user.jsonView.full(_, withOnline = false, withRating = true, withProfile = true) }
       }
     }
 }
