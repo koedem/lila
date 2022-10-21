@@ -9,5 +9,5 @@ if [ ! -f "$UI_DIR/../node_modules/@build/bleep/dist/main.js" ]; then
   tsc
 fi
 
-cd $UI_DIR
-node --max-old-space-size=6000 "$UI_DIR/@build/bleep/dist/main.js" "$@"
+cd "$UI_DIR/@build/bleep"
+yarn --silent run go "$@"

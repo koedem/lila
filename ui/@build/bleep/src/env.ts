@@ -10,7 +10,9 @@ export interface BleepOpts {
     time?: boolean; // show time in log statements, default = true
     ctx?: boolean; // show context (tsc, rollup, etc), default = true
     // omit color object to strip all color escapes
-    color?: any; // default { bleep: 'cyan', rollup: 'blue', tsc: 'yellow', gulp: 'magenta' }
+    color?: any; // set false to disable colors, leave undefined for default, or assign
+    // an object that maps contexts -> colors.
+    // undefined = { bleep: 'green', rollup: 'cyan', tsc: 'yellow', gulp: 'magenta' }
   };
 }
 
@@ -37,42 +39,34 @@ export interface LichessRollup {
 
 export function init(root: string, opts?: BleepOpts) {
   env.rootDir = root;
-  const laxOpts = opts as any;
-  if (!laxOpts?.log?.color && laxOpts?.log?.colors)
-    // fix common plural mistake
-    laxOpts.log.color = laxOpts.log.colors;
-  env.opts = laxOpts ? laxOpts : defaultOpts;
+  env.opts = opts ? opts : { log: {} };
+  if (env.opts.log && env.opts.log.color === undefined) {
+    env.opts.log.color = {
+      bleep: 'green',
+      gulp: 'magenta',
+      tsc: 'yellow',
+      rollup: 'cyan',
+    };
+  }
+  if (!env.opts.exclude) env.opts.exclude = [];
 }
 
+const lines = (s: string): string[] => s.split(/[\n\r\f]+/).filter(x => x);
+
+const colorLines = (text: string, code: string) =>
+  lines(text)
+    .map(t => escape(t, code))
+    .join('\n');
+
 export const colorFuncs = {
-  red: (text: string): string =>
-    lines(text)
-      .map(t => escape(t, codes.red))
-      .join('\n'),
-  green: (text: string): string =>
-    lines(text)
-      .map(t => escape(t, codes.green))
-      .join('\n'),
-  yellow: (text: string): string =>
-    lines(text)
-      .map(t => escape(t, codes.yellow))
-      .join('\n'),
-  blue: (text: string): string =>
-    lines(text)
-      .map(t => escape(t, codes.blue))
-      .join('\n'),
-  magenta: (text: string): string =>
-    lines(text)
-      .map(t => escape(t, codes.magenta))
-      .join('\n'),
-  cyan: (text: string): string =>
-    lines(text)
-      .map(t => escape(t, codes.cyan))
-      .join('\n'),
-  grey: (text: string): string =>
-    lines(text)
-      .map(t => escape(t, codes.grey))
-      .join('\n'),
+  red: (text: string): string => colorLines(text, codes.red),
+  green: (text: string): string => colorLines(text, codes.green),
+  yellow: (text: string): string => colorLines(text, codes.yellow),
+  blue: (text: string): string => colorLines(text, codes.blue),
+  magenta: (text: string): string => colorLines(text, codes.magenta),
+  cyan: (text: string): string => colorLines(text, codes.cyan),
+  grey: (text: string): string => colorLines(text, codes.grey),
+  black: (text: string): string => colorLines(text, codes.black),
 };
 
 class Env {
@@ -120,9 +114,9 @@ class Env {
     else if (ctx == 'tsc') text = text.replace(/\d?\d:\d\d:\d\d (PM|AM) /, '').replace('- ', '');
 
     const prefix = (
-      (show?.time ? esc(prettyTime(), codes.grey) : '') +
-      (show?.ctx && ctx ? `[${esc(ctx, colorForCtx(ctx, show?.color))}] ` : '') +
-      (show?.heap ? `${esc(rss + '', rss > 5000 ? codes.red : codes.grey)} MB ` : '')
+      (show?.time === false ? '' : prettyTime()) +
+      (!ctx || show?.ctx === false ? '' : `[${esc(ctx, colorForCtx(ctx, show?.color))}] `) +
+      (show?.heap === true ? `${esc(rss + ' MB', rss > 5000 ? codes.red : codes.grey)} ` : '')
     ).trim();
 
     lines(text).forEach(line => console.log(`${prefix ? prefix + ' - ' : ''}${error ? esc(line, '31') : line}`));
@@ -142,28 +136,10 @@ export const codes: any = {
   grey: '90',
 };
 
-const defaultOpts: BleepOpts = {
-  log: {
-    heap: false,
-    time: true,
-    ctx: true,
-    color: {
-      bleep: codes.cyan,
-      gulp: codes.magenta,
-      tsc: codes.yellow,
-      rollup: codes.blue,
-    },
-  },
-  gulp: true,
-  exclude: [],
-};
-
 const colorForCtx = (ctx: string, color: any): string =>
   color && ctx in color && color[ctx] in codes ? codes[color[ctx]] : codes.grey;
 
 const escape = (text: string, code: string): string => `\x1b[${code}m${stripColorEscapes(text)}\x1b[0m`;
-
-const lines = (s: string): string[] => s.split(/[\n\r\f]+/).filter(x => x);
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 

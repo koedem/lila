@@ -9,7 +9,6 @@ export async function makeBleepConfig(buildModules: LichessModule[]): Promise<vo
   await fs.promises.mkdir(env.tsconfigDir);
 
   buildModules.forEach(mod => {
-    // do this first
     moduleDeps.get(mod.name)?.forEach(dep => {
       const depMod = modules.get(dep);
       if (depMod?.tscOptions && !depMod.tscOptions?.includes('composite')) depMod.tscOptions!.push('composite');
@@ -40,13 +39,16 @@ async function makeTsConfig(mod: LichessModule, withRefs: boolean): Promise<stri
     }
     return o;
   };
-  const config = absolutePaths(JSON.parse(await fs.promises.readFile(path.resolve(mod.root, 'tsconfig.json'), 'utf8')));
+  const srcConfig = path.resolve(mod.root, 'tsconfig.json');
+  const config = fs.existsSync(srcConfig)
+    ? absolutePaths(JSON.parse(await fs.promises.readFile(srcConfig, 'utf8')))
+    : {}; // i love you tutor
 
   if (!('include' in config)) config.include = [path.resolve(env.uiDir, mod.name, 'src')];
   if (!('compilerOptions' in config)) config.compilerOptions = {};
 
   config.compilerOptions.rootDir = path.resolve(env.uiDir, mod.name, 'src');
-  config.compilerOptions.baseUrl = path.resolve(env.uiDir, mod.name );
+  //config.compilerOptions.baseUrl = path.resolve(env.uiDir, mod.name );
   mod.tscOptions?.forEach(option => (config.compilerOptions[option] = true));
 
   const deps = moduleDeps.get(mod.name);
