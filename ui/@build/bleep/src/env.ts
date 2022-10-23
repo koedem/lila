@@ -102,8 +102,10 @@ class Env {
     const esc = show?.color ? escape : (text: string, _: any) => text;
     const rss = Math.round(ps.memoryUsage.rss() / (1000 * 1000));
 
-    if (!show?.color) text = stripColorEscapes(text);
-
+    if (!show?.color) {
+      text = stripColorEscapes(text);
+      ctx = stripColorEscapes(ctx)
+    }
     // strip the time displays from these contexts for consistent formatting
     if (ctx == 'gulp') text = text.replace(/\[\d\d:\d\d:\d\d] /, '');
     else if (ctx == 'tsc') text = text.replace(/\d?\d:\d\d:\d\d (PM|AM) /, '').replace('- ', '');
