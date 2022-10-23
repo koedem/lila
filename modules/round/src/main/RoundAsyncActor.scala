@@ -199,7 +199,7 @@ final private[round] class RoundAsyncActor(
             makeMessage(
               "analysisProgress",
               Json.obj(
-                "analysis" -> lila.analyse.JsonView.bothPlayers(a.game, a.analysis),
+                "analysis" -> lila.analyse.JsonView.bothPlayers(a.game.startedAt, a.analysis),
                 "tree" -> lila.tree.Node.minimalNodeJsonWriter.writes {
                   TreeBuilder(
                     a.game,
@@ -246,9 +246,9 @@ final private[round] class RoundAsyncActor(
       p.promise.foreach(_ completeWith res)
       res
 
-    case FishnetPlay(uci, ply) =>
+    case FishnetPlay(uci, hash) =>
       handle { game =>
-        player.fishnet(game, ply, uci)
+        player.fishnet(game, hash, uci)
       }.mon(_.round.move.time)
 
     case Abort(playerId) =>

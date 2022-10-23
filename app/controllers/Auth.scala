@@ -28,7 +28,11 @@ final class Auth(
   private def mobileUserOk(u: UserModel, sessionId: String)(implicit ctx: Context): Fu[Result] =
     env.round.proxyRepo urgentGames u map { povs =>
       Ok {
-        env.user.jsonView.full(u, withOnline = true, withRating = ctx.pref.showRatings) ++ Json.obj(
+        env.user.jsonView.full(
+          u,
+          withRating = ctx.pref.showRatings,
+          withProfile = true
+        ) ++ Json.obj(
           "nowPlaying" -> JsArray(povs take 20 map env.api.lobbyApi.nowPlaying),
           "sessionId"  -> sessionId
         )

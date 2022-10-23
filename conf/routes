@@ -93,6 +93,7 @@ GET   /player/myself                   controllers.User.myself
 GET   /player/opponents                controllers.User.opponents
 GET   /player                          controllers.User.list
 GET   /player/top/:nb/:perfKey         controllers.User.topNb(nb: Int, perfKey)
+GET   /api/player/top/:nb/:perfKey     controllers.User.topNbApi(nb: Int, perfKey)
 GET   /player/top/week                 controllers.User.topWeek
 GET   /player/online                   controllers.User.online
 GET   /player/autocomplete             controllers.User.autocomplete
@@ -111,17 +112,20 @@ GET   /blog.atom                       controllers.Blog.atom
 GET   /blog.txt                        controllers.Blog.sitemapTxt
 GET   /blog/friends                    controllers.Ublog.friends(page: Int ?= 1)
 GET   /blog/liked                      controllers.Ublog.liked(page: Int ?= 1)
-GET   /blog/community                  controllers.Ublog.community(lang = "all", page: Int ?= 1)
+GET   /blog/community                  controllers.Ublog.communityAll(page: Int ?= 1)
+GET   /$lang<\w\w>/blog/community      controllers.Ublog.communityLang(lang, page: Int ?= 1)
 GET   /blog/community.atom             controllers.Ublog.communityAtom(lang = "all")
 GET   /blog/community/$lang<[\w-]{2,6}>.atom controllers.Ublog.communityAtom(lang)
-GET   /blog/community/:lang            controllers.Ublog.community(lang, page: Int ?= 1)
+GET   /blog/community/$lang<[\w-]{2,6}> controllers.Ublog.communityLangBC(lang)
 GET   /blog/:id/:slug                  controllers.Blog.show(id, slug, ref: Option[String] ?= None)
+GET   /blog/prismic-preview            controllers.Blog.preview(token)
 
 GET   /opening                         controllers.Opening.index(q: Option[String] ?= None)
-POST  /opening/config/:q               controllers.Opening.config(q)
-POST  /opening/wiki/:key               controllers.Opening.wikiWrite(key)
+POST  /opening/config/:key             controllers.Opening.config(key)
+POST  /opening/wiki/:key/:moves        controllers.Opening.wikiWrite(key, moves)
 GET   /opening/tree                    controllers.Opening.tree
-GET   /opening/:q                      controllers.Opening.query(q)
+GET   /opening/:key                    controllers.Opening.byKeyAndMoves(key, moves = "")
+GET   /opening/:key/:moves             controllers.Opening.byKeyAndMoves(key, moves)
 
 # Training - Coordinate
 GET   /training/coordinate             controllers.Coordinate.home
@@ -538,6 +542,7 @@ POST  /mod/:username/refreshUserAssess controllers.Mod.refreshUserAssess(usernam
 POST  /mod/:username/email             controllers.Mod.setEmail(username)
 POST  /mod/inquiry-to-zulip            controllers.Mod.inquiryToZulip
 POST  /mod/:username/create-name-close-vote controllers.Mod.createNameCloseVote(username)
+POST  /mod/:username/ask-usertable-check controllers.Mod.askUsertableCheck(username)
 GET   /mod/leaderboard                 controllers.Mod.gamify
 GET   /mod/leaderboard/:period         controllers.Mod.gamifyPeriod(period)
 GET   /mod/activity                    controllers.Mod.activity
@@ -588,7 +593,6 @@ POST  /forum/:categSlug/new            controllers.ForumTopic.create(categSlug)
 GET   /forum/participants/:topicId     controllers.ForumTopic.participants(topicId)
 GET   /forum/:categSlug/:slug          controllers.ForumTopic.show(categSlug, slug, page: Int ?= 1)
 POST  /forum/:categSlug/:slug/close    controllers.ForumTopic.close(categSlug, slug)
-POST  /forum/:categSlug/:slug/hide     controllers.ForumTopic.hide(categSlug, slug)
 POST  /forum/:categSlug/:slug/sticky   controllers.ForumTopic.sticky(categSlug, slug)
 POST  /forum/:categSlug/:slug/new      controllers.ForumPost.create(categSlug, slug, page: Int ?= 1)
 POST  /forum/:categSlug/delete/:id     controllers.ForumPost.delete(categSlug, id)
@@ -846,9 +850,7 @@ POST  /dgt/config/token                controllers.DgtCtrl.generateToken
 # Accessibility
 POST  /toggle-blind-mode               controllers.Main.toggleBlindMode
 
-GET   /prismic-preview                 controllers.Blog.preview(token)
 POST  /jslog/$id<\w{12}>               controllers.Main.jslog(id)
-POST  /jsmon/:event                    controllers.Main.jsmon(event)
 
 GET   /assets/_$v<\w{6}>/*file         controllers.Main.devAsset(v, path="public", file)
 GET   /assets/*file                    controllers.ExternalAssets.at(path="public", file)
@@ -857,7 +859,3 @@ GET   /manifest.json                   controllers.Main.manifest
 GET   /robots.txt                      controllers.Main.robots
 
 GET   /$username<[\w-]{2,30}>          controllers.User.redirect(username)
-
-# Should be handled by nginx mostly
-OPTIONS /                              controllers.Options.root
-OPTIONS /*url                          controllers.Options.all(url)

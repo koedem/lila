@@ -234,7 +234,7 @@ final class GameApiV2(
       .sortedCursor(Query imported user.id, Query.importedSort, batchSize = 20)
       .documentSource()
       .throttle(20, 1 second)
-      .mapConcat(_.pgnImport.map(_.pgn).toList)
+      .mapConcat(_.pgnImport.map(_.pgn + "\n\n\n").toList)
 
   private val upgradeOngoingGame =
     Flow[Game].mapAsync(4)(gameProxy.upgradeIfPresent)
@@ -311,7 +311,11 @@ final class GameApiV2(
             .add("name", p.name)
             .add("provisional" -> p.provisional)
             .add("aiLevel" -> p.aiLevel)
-            .add("analysis" -> analysisOption.flatMap(analysisJson.player(g pov p.color sideAndStart)))
+            .add(
+              "analysis" -> analysisOption.flatMap(
+                analysisJson.player(g pov p.color sideAndStart)(_, accuracy = none)
+              )
+            )
             .add("team" -> teams.map(_(p.color)))
         // .add("moveCentis" -> withFlags.moveTimes ?? g.moveTimes(p.color).map(_.map(_.centis)))
         })

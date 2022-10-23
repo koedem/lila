@@ -17,9 +17,11 @@ import lila.user.User
 
 case class OpeningWiki(
     markup: Option[String],
-    firstParagraph: Option[String],
     revisions: List[OpeningWiki.Revision]
-)
+) {
+  def markupForMove(move: String): Option[String] =
+    markup map OpeningWiki.filterMarkupForMove(move)
+}
 
 final class OpeningWikiApi(coll: Coll @@ WikiColl, explorer: OpeningExplorer, cacheApi: CacheApi)(implicit
     ec: ExecutionContext
@@ -31,14 +33,11 @@ final class OpeningWikiApi(coll: Coll @@ WikiColl, explorer: OpeningExplorer, ca
   implicit val wikiHandler     = Macros.handler[OpeningWiki]
 
   def apply(op: FullOpening, withRevisions: Boolean): Fu[OpeningWiki] = for {
-    wiki <- cache.get(op.key)
+    wiki <- cache get op.key
     revisions <- withRevisions ?? {
       coll.primitiveOne[List[Revision]]($id(op.key), "revisions")
     }
   } yield wiki.copy(revisions = (~revisions) take 25)
-
-  def firstParagraph(op: FullOpening): Fu[Option[String]] =
-    apply(op, false).dmap(_.firstParagraph)
 
   def write(op: FullOpening, text: String, by: User): Funit =
     coll.update
@@ -110,7 +109,6 @@ final class OpeningWikiApi(coll: Coll @@ WikiColl, explorer: OpeningExplorer, ca
     text    = lastRev.map(_.text)
   } yield OpeningWiki(
     text map markdown.render(key),
-    text.flatMap(_.value.split("\n").headOption).map(Markdown) map markdown.render(key),
     Nil
   )
 
@@ -138,4 +136,11 @@ object OpeningWiki {
   case class Revision(text: Markdown, by: User.ID, at: DateTime)
 
   val form = Form(single("text" -> nonEmptyText(minLength = 10, maxLength = 10_000)))
+
+  private val MoveLiRegex = """(?i)^<li>(\w{2,5}\+?):(.+)</li>""".r
+  private def filterMarkupForMove(move: String)(markup: String) =
+    markup.linesIterator collect {
+      case MoveLiRegex(m, content) => if (m.toLowerCase == move.toLowerCase) s"<p>${content.trim}</p>" else ""
+      case html                    => html
+    } mkString "\n"
 }

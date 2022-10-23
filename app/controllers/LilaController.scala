@@ -5,7 +5,7 @@ import play.api.data.Form
 import play.api.data.FormBinding
 import play.api.http._
 import play.api.i18n.Lang
-import play.api.libs.json.{ JsArray, JsObject, JsString, JsValue, Json, Writes }
+import play.api.libs.json.{ JsArray, JsNumber, JsObject, JsString, JsValue, Json, Writes }
 import play.api.mvc._
 import scala.annotation.nowarn
 import scalatags.Text.Frag
@@ -330,7 +330,7 @@ abstract private[controllers] class LilaController(val env: Env)
 
   protected def NoLameOrBot[A <: Result](me: UserModel)(a: => Fu[A]): Fu[Result] =
     if (me.isBot) notForBotAccounts.fuccess
-    else if (me.lame) Results.Forbidden.fuccess
+    else if (me.lame) Forbidden.fuccess
     else a
 
   protected def NoShadowban[A <: Result](a: => Fu[A])(implicit ctx: Context): Fu[Result] =
@@ -341,17 +341,22 @@ abstract private[controllers] class LilaController(val env: Env)
       _.fold(a) { ban =>
         negotiate(
           html = keyPages.home(Results.Forbidden),
-          api = _ =>
-            fuccess {
-              Forbidden(
-                jsonError(
-                  s"Banned from playing for ${ban.remainingMinutes} minutes. Reason: Too many aborts, unplayed games, or rage quits."
-                )
-              ) as JSON
-            }
+          api = _ => playbanJsonError(ban)
         )
       }
     }
+  protected def NoPlayban(userId: Option[UserModel.ID])(a: => Fu[Result]): Fu[Result] =
+    userId.??(env.playban.api.currentBan) flatMap {
+      _.fold(a)(playbanJsonError)
+    }
+
+  private def playbanJsonError(ban: lila.playban.TempBan) = fuccess {
+    Forbidden(
+      jsonError(
+        s"Banned from playing for ${ban.remainingMinutes} minutes. Reason: Too many aborts, unplayed games, or rage quits."
+      ) + ("minutes" -> JsNumber(ban.remainingMinutes))
+    ) as JSON
+  }
 
   protected def NoCurrentGame(a: => Fu[Result])(implicit ctx: Context): Fu[Result] =
     ctx.me.??(env.preloader.currentGameMyTurn) flatMap {

@@ -360,7 +360,8 @@ case class Game(
   def abortable       = status == Status.Started && playedTurns < 2 && nonMandatory
   def abortableByUser = abortable && !metadata.hasRule(_.NoAbort)
 
-  def berserkable = clock.??(_.config.berserkable) && status == Status.Started && playedTurns < 2
+  def berserkable =
+    isTournament && clock.??(_.config.berserkable) && status == Status.Started && playedTurns < 2
 
   def goBerserk(color: Color): Option[Progress] =
     clock.ifTrue(berserkable && !player(color).berserk).map { c =>
@@ -624,6 +625,8 @@ case class Game(
     else None
   }
 
+  def startedAt = Game.StartedAt(startColor, chess.startedAtTurn)
+
   override def toString = s"""Game($id)"""
 }
 
@@ -643,6 +646,9 @@ object Game {
   case class WithInitialFen(game: Game, fen: Option[FEN])
 
   case class SideAndStart(color: Color, startColor: Color, startedAtTurn: Int)
+  case class StartedAt(startColor: Color, startedAtTurn: Int) {
+    def pov(color: Color) = SideAndStart(color, startColor, startedAtTurn)
+  }
 
   val syntheticId = "synthetic"
 

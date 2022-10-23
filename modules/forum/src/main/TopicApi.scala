@@ -78,15 +78,13 @@ final private[forum] class TopicApi(
         slug = slug,
         name = noShouting(data.name),
         userId = me.id,
-        troll = me.marks.troll,
-        hidden = categ.quiet || data.looksLikeVenting
+        troll = me.marks.troll
       )
       val post = Post.make(
         topicId = topic.id,
         author = none,
         userId = me.id.some,
         troll = me.marks.troll,
-        hidden = topic.hidden,
         text = frozen.text,
         lang = lang map (_.language),
         number = 1,
@@ -134,7 +132,6 @@ final private[forum] class TopicApi(
           name = name,
           troll = false,
           userId = authorId,
-          hidden = false,
           ublogId = ublogId.some
         )
         val post = Post.make(
@@ -142,7 +139,6 @@ final private[forum] class TopicApi(
           author = none,
           userId = authorId.some,
           troll = false,
-          hidden = false,
           text = s"Comments on $url",
           lang = none,
           number = 1,
@@ -158,15 +154,13 @@ final private[forum] class TopicApi(
       slug = slug,
       name = name,
       troll = false,
-      userId = User.lichessId,
-      hidden = false
+      userId = User.lichessId
     )
     val post = Post.make(
       topicId = topic.id,
       author = none,
       userId = User.lichessId.some,
       troll = false,
-      hidden = false,
       text = s"Comments on $url",
       lang = none,
       number = 1,
@@ -197,14 +191,6 @@ final private[forum] class TopicApi(
     topicRepo.close(topic.id, topic.open) >> {
       (MasterGranter.is(_.ModerateForum)(mod) || topic.isAuthor(mod.user)) ?? {
         modLog.toggleCloseTopic(mod.id, categ.id, topic.slug, topic.open)
-      }
-    }
-
-  def toggleHide(categ: Categ, topic: Topic, mod: Holder): Funit =
-    topicRepo.hide(topic.id, topic.visibleOnHome) >> {
-      MasterGranter.is(_.ModerateForum)(mod) ?? {
-        postRepo.hideByTopic(topic.id, topic.visibleOnHome) >>
-          modLog.toggleHideTopic(mod.id, categ.id, topic.slug, topic.visibleOnHome)
       }
     }
 

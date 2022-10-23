@@ -51,7 +51,6 @@ final class PostApi(
         number = topic.nbPosts + 1,
         lang = lang.map(_.language),
         troll = me.marks.troll,
-        hidden = topic.hidden,
         categId = categ.id,
         modIcon = modIcon option true
       )
@@ -59,9 +58,7 @@ final class PostApi(
         case Some(dup) if !post.modIcon.getOrElse(false) => fuccess(dup)
         case _ =>
           postRepo.coll.insert.one(post) >>
-            topicRepo.coll.update.one($id(topic.id), topic withPost post) >> {
-              shouldHideOnPost(topic) ?? topicRepo.hide(topic.id, value = true)
-            } >>
+            topicRepo.coll.update.one($id(topic.id), topic withPost post) >>
             categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>
             askApi.commit(frozen, s"/forum/redirect/post/${post._id}".some) >>- {
               !categ.quiet ?? (indexer ! InsertPost(post))
@@ -98,16 +95,6 @@ final class PostApi(
               } >>- promotion.save(user, newPost.text)
             } inject newPost
           }
-      }
-    }
-
-  private val quickHideCategs = Set("lichess-feedback", "off-topic-discussion")
-
-  private def shouldHideOnPost(topic: Topic) =
-    topic.visibleOnHome && {
-      (quickHideCategs(topic.categId) && topic.nbPosts == 1) || {
-        topic.nbPosts == config.postMaxPerPage.value ||
-        (!topic.looksLikeTeamForum && topic.createdAt.isBefore(DateTime.now minusDays 5))
       }
     }
 
