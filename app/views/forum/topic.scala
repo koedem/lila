@@ -1,14 +1,14 @@
 package views.html
 package forum
 
+import controllers.report.routes.{ Report => reportRoutes }
+import controllers.routes
 import play.api.data.Form
 
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.paginator.Paginator
-
-import controllers.routes
 
 object topic {
 
@@ -35,7 +35,7 @@ object topic {
           ),
           p(
             trans.toReportSomeoneForCheatingOrBadBehavior(
-              strong(a(href := routes.Report.form)(trans.useTheReportForm()))
+              strong(a(href := reportRoutes.form)(trans.useTheReportForm()))
             )
           ),
           p(
@@ -153,12 +153,6 @@ object topic {
                 )
               )
             },
-            isGranted(_.ModerateForum) option
-              postForm(action := routes.ForumTopic.hide(categ.slug, topic.slug))(
-                button(cls := "button button-empty button-green")(
-                  if (topic.hidden) "Feature" else "Un-feature"
-                )
-              ),
             canModCateg || (topic.isUblog && ctx.me.exists(topic.isAuthor)) option
               postForm(action := routes.ForumTopic.close(categ.slug, topic.slug))(
                 button(cls := "button button-empty button-red")(

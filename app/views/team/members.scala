@@ -20,7 +20,7 @@ object members {
         .OpenGraph(
           title = s"${t.name} • ${trans.team.teamRecentMembers.txt()}",
           url = s"$netBaseUrl${routes.Team.show(t.id).url}",
-          description = shorten(t.description.value, 152)
+          description = t.intro ?? { shorten(_, 152) }
         )
         .some
     ) {

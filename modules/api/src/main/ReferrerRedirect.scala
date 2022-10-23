@@ -7,11 +7,13 @@ import lila.common.config.BaseUrl
 
 final class ReferrerRedirect(baseUrl: BaseUrl) {
 
-  val sillyLoginReferrers = Set("/login", "/signup", "/mobile")
+  private val sillyLoginReferrersSet   = Set("/login", "/signup", "/mobile")
+  private val loginPattern             = """/\w\w/(login|signup|mobile)""".r.pattern
+  def sillyLoginReferrers(ref: String) = sillyLoginReferrersSet(ref) || loginPattern.matcher(ref).matches
 
   private lazy val parsedBaseUrl = URL.parse(baseUrl.value)
 
-  private val validCharsRegex = """^[\w-\.:/\?&=@#%\[\]\+]+$""".r
+  private val validCharsRegex = """^[\w-\.:/\?&=@#%\[\]\+~]+$""".r
 
   // allow relative and absolute redirects only to the same domain or
   // subdomains, excluding /mobile (which is shown after logout)

@@ -1,7 +1,8 @@
 package lila.setup
 
 import akka.stream.scaladsl._
-import chess.variant.Variant
+import chess.variant.{ FromPosition, Variant }
+import chess.format.FEN
 import chess.{ Clock, Mode }
 import org.joda.time.DateTime
 import play.api.data._
@@ -9,8 +10,9 @@ import play.api.data.Forms._
 import play.api.libs.json.Json
 import scala.concurrent.duration._
 
-import lila.common.{ Bearer, Template }
-import lila.game.{ Game, IdGenerator }
+import lila.common.Json._
+import lila.common.{ Bearer, Days, Template }
+import lila.game.{ Game, GameRule, IdGenerator }
 import lila.oauth.{ AccessToken, OAuthScope, OAuthServer }
 import lila.user.User
 
@@ -21,12 +23,25 @@ object SetupBulk {
   case class BulkFormData(
       tokens: String,
       variant: Variant,
-      clock: Clock.Config,
+      clock: Option[Clock.Config],
+      days: Option[Days],
       rated: Boolean,
       pairAt: Option[DateTime],
       startClocksAt: Option[DateTime],
-      message: Option[Template]
-  )
+      message: Option[Template],
+      rules: Set[GameRule],
+      fen: Option[FEN] = None
+  ) {
+    def clockOrDays = clock.toLeft(days | Days(3))
+
+    def allowMultiplePairingsPerUser = clock.isEmpty
+
+    def validFen = ApiConfig.validFen(variant, fen)
+
+    def autoVariant =
+      if (variant.standard && fen.exists(!_.initial)) copy(variant = FromPosition)
+      else this
+  }
 
   private def timestampInNearFuture = longNumber(
     min = 0,
@@ -37,40 +52,55 @@ object SetupBulk {
     mapping(
       "players" -> nonEmptyText
         .verifying("Not enough tokens", t => extractTokenPairs(t).nonEmpty)
-        .verifying(s"Too many tokens (max: ${maxGames * 2})", t => extractTokenPairs(t).sizeIs < maxGames)
-        .verifying(
-          "Tokens must be unique",
-          t => {
-            val tokens = extractTokenPairs(t).view.flatMap { case (w, b) => Vector(w, b) }.toVector
-            tokens.size == tokens.distinct.size
-          }
-        ),
+        .verifying(s"Too many tokens (max: ${maxGames * 2})", t => extractTokenPairs(t).sizeIs < maxGames),
       SetupForm.api.variant,
-      "clock"         -> SetupForm.api.clockMapping,
+      SetupForm.api.clock,
+      SetupForm.api.optionalDays,
+      "fen"           -> Mappings.fenField,
       "rated"         -> boolean,
       "pairAt"        -> optional(timestampInNearFuture),
       "startClocksAt" -> optional(timestampInNearFuture),
-      "message"       -> SetupForm.api.message
+      "message"       -> SetupForm.api.message,
+      "rules"         -> optional(Mappings.gameRules)
     ) {
       (
           tokens: String,
           variant: Option[String],
-          clock: Clock.Config,
+          clock: Option[Clock.Config],
+          days: Option[Days],
+          fen: Option[FEN],
           rated: Boolean,
           pairTs: Option[Long],
           clockTs: Option[Long],
-          message: Option[String]
+          message: Option[String],
+          rules: Option[Set[GameRule]]
       ) =>
         BulkFormData(
           tokens,
           Variant orDefault ~variant,
           clock,
+          days,
           rated,
           pairTs.map { new DateTime(_) },
           clockTs.map { new DateTime(_) },
-          message map Template
-        )
+          message map Template,
+          ~rules,
+          fen
+        ).autoVariant
     }(_ => None)
+      .verifying(
+        "clock or correspondence days required",
+        c => c.clock.isDefined || c.days.isDefined
+      )
+      .verifying("invalidFen", _.validFen)
+      .verifying(
+        "Tokens must be unique for real-time games (not correspondence)",
+        data =>
+          data.allowMultiplePairingsPerUser || {
+            val tokens = extractTokenPairs(data.tokens).view.flatMap { case (w, b) => Vector(w, b) }.toVector
+            tokens.size == tokens.distinct.size
+          }
+      )
   )
 
   private[setup] def extractTokenPairs(str: String): List[(Bearer, Bearer)] =
@@ -95,18 +125,21 @@ object SetupBulk {
       by: User.ID,
       games: List[ScheduledGame],
       variant: Variant,
-      clock: Clock.Config,
+      clock: Either[Clock.Config, Days],
       mode: Mode,
       pairAt: DateTime,
       startClocksAt: Option[DateTime],
       scheduledAt: DateTime,
       message: Option[Template],
-      pairedAt: Option[DateTime] = None
+      rules: Set[GameRule] = Set.empty,
+      pairedAt: Option[DateTime] = None,
+      fen: Option[FEN] = None
   ) {
     def userSet = Set(games.flatMap(g => List(g.white, g.black)))
     def collidesWith(other: ScheduledBulk) = {
       pairAt == other.pairAt || startClocksAt == other.startClocksAt
     } && userSet.exists(other.userSet.contains)
+    def nonEmptyRules = rules.nonEmpty option rules
   }
 
   sealed trait ScheduleError
@@ -117,6 +150,7 @@ object SetupBulk {
   def toJson(bulk: ScheduledBulk) = {
     import bulk._
     import lila.common.Json.jodaWrites
+    import lila.game.JsonView.ruleWriter
     Json
       .obj(
         "id" -> _id,
@@ -127,18 +161,25 @@ object SetupBulk {
             "black" -> g.black
           )
         },
-        "variant" -> variant.key,
-        "clock" -> Json.obj(
-          "limit"     -> clock.limitSeconds,
-          "increment" -> clock.incrementSeconds
-        ),
+        "variant"       -> variant.key,
         "rated"         -> mode.rated,
         "pairAt"        -> pairAt,
         "startClocksAt" -> startClocksAt,
         "scheduledAt"   -> scheduledAt,
         "pairedAt"      -> pairedAt
       )
+      .add("clock" -> bulk.clock.left.toOption.map { c =>
+        Json.obj(
+          "limit"     -> c.limitSeconds,
+          "increment" -> c.incrementSeconds
+        )
+      })
+      .add("correspondence" -> bulk.clock.toOption.map { days =>
+        Json.obj("daysPerTurn" -> days)
+      })
       .add("message" -> message.map(_.value))
+      .add("rules" -> nonEmptyRules)
+      .add("fen" -> fen)
   }
 
 }
@@ -177,7 +218,7 @@ final class SetupBulkApi(oauthServer: OAuthServer, idGenerator: IdGenerator)(imp
       .flatMap {
         case Left(errors) => fuccess(Left(BadTokens(errors.reverse)))
         case Right(allPlayers) =>
-          val dups = allPlayers
+          lazy val dups = allPlayers
             .groupBy(identity)
             .view
             .mapValues(_.size)
@@ -185,7 +226,7 @@ final class SetupBulkApi(oauthServer: OAuthServer, idGenerator: IdGenerator)(imp
               case (u, nb) if nb > 1 => u
             }
             .toList
-          if (dups.nonEmpty) fuccess(Left(DuplicateUsers(dups)))
+          if (!data.allowMultiplePairingsPerUser && dups.nonEmpty) fuccess(Left(DuplicateUsers(dups)))
           else {
             val pairs = allPlayers.reverse
               .grouped(2)
@@ -211,12 +252,14 @@ final class SetupBulkApi(oauthServer: OAuthServer, idGenerator: IdGenerator)(imp
                     by = me.id,
                     _,
                     data.variant,
-                    data.clock,
+                    data.clockOrDays,
                     Mode(data.rated),
                     pairAt = data.pairAt | DateTime.now,
                     startClocksAt = data.startClocksAt,
                     message = data.message,
-                    scheduledAt = DateTime.now
+                    rules = data.rules,
+                    scheduledAt = DateTime.now,
+                    fen = data.fen
                   )
                 }
                 .dmap(Right.apply)

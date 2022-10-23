@@ -1,10 +1,10 @@
 package lila.forum
 
+import Filter._
 import org.joda.time.DateTime
-import reactivemongo.akkastream.cursorProducer
+import reactivemongo.akkastream.{ cursorProducer, AkkaStreamCursor }
 import reactivemongo.api.ReadPreference
 
-import Filter._
 import lila.db.dsl._
 import lila.user.User
 
@@ -62,6 +62,11 @@ final class PostRepo(val coll: Coll, filter: Filter = Safe)(implicit
       .cursor[Post]()
       .list(nb)
 
+  def allByUserCursor(user: User): AkkaStreamCursor[Post] =
+    coll
+      .find($doc("userId" -> user.id))
+      .cursor[Post](ReadPreference.secondaryPreferred)
+
   def countByCateg(categ: Categ): Fu[Int] =
     coll.countSel(selectCateg(categ.id))
 
@@ -70,15 +75,6 @@ final class PostRepo(val coll: Coll, filter: Filter = Safe)(implicit
 
   def removeByTopic(topicId: String): Funit =
     coll.delete.one(selectTopic(topicId)).void
-
-  def hideByTopic(topicId: String, value: Boolean): Funit =
-    coll.update
-      .one(
-        selectTopic(topicId),
-        $set("hidden" -> value),
-        multi = true
-      )
-      .void
 
   def selectTopic(topicId: String) = $doc("topicId" -> topicId) ++ trollFilter
 

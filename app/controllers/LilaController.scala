@@ -5,7 +5,7 @@ import play.api.data.Form
 import play.api.data.FormBinding
 import play.api.http._
 import play.api.i18n.Lang
-import play.api.libs.json.{ JsArray, JsObject, JsString, JsValue, Json, Writes }
+import play.api.libs.json.{ JsArray, JsNumber, JsObject, JsString, JsValue, Json, Writes }
 import play.api.mvc._
 import scala.annotation.nowarn
 import scalatags.Text.Frag
@@ -70,8 +70,10 @@ abstract private[controllers] class LilaController(val env: Env)
   protected def EnableSharedArrayBuffer(res: Result)(implicit req: RequestHeader): Result =
     res.withHeaders(
       "Cross-Origin-Opener-Policy" -> "same-origin",
-      "Cross-Origin-Embedder-Policy" -> (if (HTTPRequest isChrome96OrMore req) "credentialless"
-                                         else "require-corp")
+      "Cross-Origin-Embedder-Policy" -> (if (HTTPRequest isChrome96Plus req)
+                                           "credentialless"
+                                         else
+                                           "require-corp")
     )
 
   protected def NoCache(res: Result): Result =
@@ -328,7 +330,7 @@ abstract private[controllers] class LilaController(val env: Env)
 
   protected def NoLameOrBot[A <: Result](me: UserModel)(a: => Fu[A]): Fu[Result] =
     if (me.isBot) notForBotAccounts.fuccess
-    else if (me.lame) Results.Forbidden.fuccess
+    else if (me.lame) Forbidden.fuccess
     else a
 
   protected def NoShadowban[A <: Result](a: => Fu[A])(implicit ctx: Context): Fu[Result] =
@@ -339,17 +341,22 @@ abstract private[controllers] class LilaController(val env: Env)
       _.fold(a) { ban =>
         negotiate(
           html = keyPages.home(Results.Forbidden),
-          api = _ =>
-            fuccess {
-              Forbidden(
-                jsonError(
-                  s"Banned from playing for ${ban.remainingMinutes} minutes. Reason: Too many aborts, unplayed games, or rage quits."
-                )
-              ) as JSON
-            }
+          api = _ => playbanJsonError(ban)
         )
       }
     }
+  protected def NoPlayban(userId: Option[UserModel.ID])(a: => Fu[Result]): Fu[Result] =
+    userId.??(env.playban.api.currentBan) flatMap {
+      _.fold(a)(playbanJsonError)
+    }
+
+  private def playbanJsonError(ban: lila.playban.TempBan) = fuccess {
+    Forbidden(
+      jsonError(
+        s"Banned from playing for ${ban.remainingMinutes} minutes. Reason: Too many aborts, unplayed games, or rage quits."
+      ) + ("minutes" -> JsNumber(ban.remainingMinutes))
+    ) as JSON
+  }
 
   protected def NoCurrentGame(a: => Fu[Result])(implicit ctx: Context): Fu[Result] =
     ctx.me.??(env.preloader.currentGameMyTurn) flatMap {
@@ -456,10 +463,7 @@ abstract private[controllers] class LilaController(val env: Env)
 
   def notFoundJson(msg: String = "Not found"): Fu[Result] = fuccess(notFoundJsonSync(msg))
 
-  def notForBotAccounts =
-    BadRequest(
-      jsonError("This API endpoint is not for Bot accounts.")
-    )
+  def notForBotAccounts = JsonBadRequest(jsonError("This API endpoint is not for Bot accounts."))
 
   def ridiculousBackwardCompatibleJsonError(err: JsObject): JsObject =
     err ++ Json.obj("error" -> err)
@@ -481,8 +485,7 @@ abstract private[controllers] class LilaController(val env: Env)
       html = fuccess {
         Redirect(
           if (HTTPRequest.isClosedLoginPath(ctx.req)) routes.Auth.login else routes.Auth.signup
-        ) withCookies env.lilaCookie
-          .session(env.security.api.AccessUri, ctx.req.uri)
+        ) withCookies env.lilaCookie.session(env.security.api.AccessUri, ctx.req.uri)
       },
       api = _ =>
         env.lilaCookie
@@ -622,7 +625,7 @@ abstract private[controllers] class LilaController(val env: Env)
   protected def NotForKids(f: => Fu[Result])(implicit ctx: Context) =
     if (ctx.kid) notFound else f
 
-  protected def OnlyHumans(result: => Fu[Result])(implicit ctx: lila.api.Context) =
+  protected def OnlyHumans(result: => Fu[Result])(implicit ctx: Context) =
     if (HTTPRequest isCrawler ctx.req) notFound else result
 
   protected def NotManaged(result: => Fu[Result])(implicit ctx: Context) =
@@ -673,7 +676,7 @@ abstract private[controllers] class LilaController(val env: Env)
   protected def pageHit(req: RequestHeader): Unit =
     if (HTTPRequest isHuman req) lila.mon.http.path(req.path).increment().unit
 
-  protected def pageHit(implicit ctx: lila.api.Context): Unit = pageHit(ctx.req)
+  protected def pageHit(implicit ctx: Context): Unit = pageHit(ctx.req)
 
   protected val noProxyBufferHeader = "X-Accel-Buffering" -> "no"
   protected val noProxyBuffer       = (res: Result) => res.withHeaders(noProxyBufferHeader)
@@ -684,4 +687,40 @@ abstract private[controllers] class LilaController(val env: Env)
   protected val pgnContentType    = "application/x-chess-pgn"
   protected val ndJsonContentType = "application/x-ndjson"
   protected val csvContentType    = "text/csv"
+
+  protected def LangPage(call: Call)(f: Context => Fu[Result])(langCode: String): Action[Unit] =
+    LangPage(call.url)(f)(langCode)
+  protected def LangPage(path: String)(f: Context => Fu[Result])(langCode: String): Action[Unit] =
+    Open { ctx =>
+      if (ctx.isAuth) redirectWithQueryString(path)(ctx.req).fuccess
+      else
+        I18nLangPicker.byHref(langCode, ctx.req) match {
+          case I18nLangPicker.NotFound => notFound(ctx)
+          case I18nLangPicker.Redir(code) =>
+            redirectWithQueryString(s"/$code${~path.some.filter("/" !=)}")(ctx.req).fuccess
+          case I18nLangPicker.Refused(_) => redirectWithQueryString(path)(ctx.req).fuccess
+          case I18nLangPicker.Found(lang) =>
+            val langCtx = ctx withLang lang
+            pageHit(langCtx)
+            f(langCtx)
+        }
+    }
+
+  protected def redirectWithQueryString(path: String)(implicit req: RequestHeader) =
+    Redirect {
+      if (req.target.uriString contains "?") s"$path?${req.target.queryString}" else path
+    }
+
+  protected val movedMap: Map[String, String] = Map(
+    "swag" -> "https://shop.spreadshirt.com/lichess-org",
+    "yt"   -> "https://www.youtube.com/c/LichessDotOrg",
+    "dmca" -> "https://docs.google.com/forms/d/e/1FAIpQLSdRVaJ6Wk2KHcrLcY0BxM7lTwYSQHDsY2DsGwbYoLUBo3ngfQ/viewform",
+    "fishnet" -> "https://github.com/lichess-org/fishnet",
+    "qa"      -> "/faq",
+    "help"    -> "/contact",
+    "support" -> "/contact",
+    "donate"  -> "/patron"
+  )
+  protected def staticRedirect(key: String): Option[Fu[Result]] =
+    movedMap get key map { MovedPermanently(_).fuccess }
 }

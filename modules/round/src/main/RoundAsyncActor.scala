@@ -1,9 +1,9 @@
 package lila.round
 
 import actorApi._, round._
+import alleycats.Zero
 import chess.{ Black, Centis, Color, White }
 import org.joda.time.DateTime
-import alleycats.Zero
 import play.api.libs.json._
 import scala.concurrent.duration._
 import scala.concurrent.Promise
@@ -199,7 +199,7 @@ final private[round] class RoundAsyncActor(
             makeMessage(
               "analysisProgress",
               Json.obj(
-                "analysis" -> lila.analyse.JsonView.bothPlayers(a.game, a.analysis),
+                "analysis" -> lila.analyse.JsonView.bothPlayers(a.game.startedAt, a.analysis),
                 "tree" -> lila.tree.Node.minimalNodeJsonWriter.writes {
                   TreeBuilder(
                     a.game,
@@ -246,9 +246,9 @@ final private[round] class RoundAsyncActor(
       p.promise.foreach(_ completeWith res)
       res
 
-    case FishnetPlay(uci, ply) =>
+    case FishnetPlay(uci, hash) =>
       handle { game =>
-        player.fishnet(game, ply, uci)
+        player.fishnet(game, hash, uci)
       }.mon(_.round.move.time)
 
     case Abort(playerId) =>
@@ -290,7 +290,7 @@ final private[round] class RoundAsyncActor(
 
     case DrawForce(playerId) =>
       handle(playerId) { pov =>
-        (pov.game.drawable && !pov.game.hasAi && pov.game.hasClock && pov.game.bothPlayersHaveMoved) ?? {
+        (pov.game.forceDrawable && !pov.game.hasAi && pov.game.hasClock) ?? {
           getPlayer(!pov.color).isLongGone flatMap {
             case true => finisher.rageQuit(pov.game, None)
             case _    => fuccess(List(Event.Reload))
@@ -472,6 +472,7 @@ final private[round] class RoundAsyncActor(
     proxy.withPov(color) { pov =>
       fuccess {
         socketSend(Protocol.Out.gone(FullId(pov.fullId), gone))
+        publishBoardBotGone(pov, gone option 0L)
       }
     }
 
@@ -479,8 +480,16 @@ final private[round] class RoundAsyncActor(
     proxy.withPov(color) { pov =>
       fuccess {
         socketSend(Protocol.Out.goneIn(FullId(pov.fullId), millis))
+        publishBoardBotGone(pov, millis.some)
       }
     }
+
+  private def publishBoardBotGone(pov: Pov, millis: Option[Long]) =
+    if (lila.game.Game.isBoardOrBotCompatible(pov.game))
+      lila.common.Bus.publish(
+        lila.game.actorApi.BoardGone(pov, millis.map(m => (m.atLeast(0) / 1000).toInt)),
+        lila.game.actorApi.BoardGone makeChan gameId
+      )
 
   private def handle(op: Game => Fu[Events]): Funit =
     proxy.withGame { g =>

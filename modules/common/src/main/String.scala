@@ -63,7 +63,8 @@ object String {
       // phonetic extensions https://www.compart.com/en/unicode/block/U+1D00
       (c >= '\u1d00' && c <= '\u1d7f') ||
       // IPA extensions https://www.compart.com/en/unicode/block/U+0250
-      (c >= '\u0250' && c <= '\u02af')
+      // but allow https://www.compart.com/en/unicode/U+0259
+      (c >= '\u0250' && c < '\u0259') || (c > '\u0259' && c <= '\u02af')
 
   private def isInvisibleChar(c: Int) =
     // invisible chars https://www.compart.com/en/unicode/block/U+2000
@@ -206,4 +207,6 @@ object String {
     """(?i)(prize|\$|€|£|¥|₽|元|₹|₱|₿|rupee|rupiah|ringgit|(\b|\d)usd|dollar|paypal|cash|award|\bfees?\b|\beuros?\b|price|(\b|\d)btc|bitcoin)""".r.unanchored
 
   def looksLikePrize(txt: String) = prizeRegex matches txt
+
+  def underscoreFen(fen: chess.format.FEN) = fen.value.replace(" ", "_")
 }

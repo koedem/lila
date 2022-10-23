@@ -35,14 +35,18 @@ object bits {
           br,
           span(cls := "clock")(
             c.daysPerTurn map { days =>
-              if (days == 1) trans.oneDay()
-              else trans.nbDays.pluralSame(days)
+              if (days.value == 1) trans.oneDay()
+              else trans.nbDays.pluralSame(days.value)
             } getOrElse shortClockName(c.clock.map(_.config))
           )
         )
       ),
       div(cls := "mode")(
-        s"${c.colorChoice.toString()} • ${modeName(c.mode)}"
+        c.open.map {
+          _.colorFor(ctx.me).fold("Restricted")(_.toString)
+        } | c.colorChoice.toString,
+        " • ",
+        modeName(c.mode)
       )
     )
 }

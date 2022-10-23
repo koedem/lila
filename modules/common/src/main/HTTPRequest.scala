@@ -44,12 +44,9 @@ object HTTPRequest {
 
   def userAgent(req: RequestHeader): Option[String] = req.headers get HeaderNames.USER_AGENT
 
-  val isAndroid = UaMatcher("""(?i)android.+mobile""")
-  val isMobile  = UaMatcher("""(?i)iphone|ipad|ipod|android.+mobile""")
+  val isChrome96Plus = UaMatcher("""Chrome/(?:\d{3,}|9[6-9])""")
 
-  private def uaContains(req: RequestHeader, str: String) = userAgent(req).exists(_ contains str)
-  def isChrome(req: RequestHeader)                        = uaContains(req, "Chrome/")
-  val isChrome96OrMore                                    = UaMatcher("""Chrome/(?:\d{3,}|9[6-9])""")
+  val isMobile = UaMatcher("""(?i)iphone|ipad|ipod|android.+mobile""")
 
   def origin(req: RequestHeader): Option[String] = req.headers get HeaderNames.ORIGIN
 
@@ -57,7 +54,8 @@ object HTTPRequest {
 
   def ipAddress(req: RequestHeader) =
     IpAddress.unchecked {
-      req.remoteAddress.split(", ").lastOption | req.remoteAddress // trusted
+      // chain of trusted proxies, strip scope id
+      req.remoteAddress.split(", ").last.split("%").head
     }
 
   def sid(req: RequestHeader): Option[String] = req.session get LilaCookie.sessionId
@@ -132,4 +130,12 @@ object HTTPRequest {
     }
     else if (isCrawler(req)) "crawler"
     else "browser"
+
+  def queryStringGet(req: RequestHeader, name: String): Option[String] =
+    req.queryString get name flatMap (_.headOption) filter (_.nonEmpty)
+
+  def looksLikeLichessBot(req: RequestHeader) =
+    userAgent(req) exists { ua =>
+      ua.startsWith("lichess-bot/") || ua.startsWith("maia-bot/")
+    }
 }

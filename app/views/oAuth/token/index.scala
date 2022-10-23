@@ -46,14 +46,14 @@ object index {
           "."
         ),
         tokens.headOption.filter(_.isBrandNew).map { token =>
-          div(cls            := "box__pad brand")(
-            iconTag("")(cls := "is-green"),
+          div(cls := "box__pad brand")(
+            if (token.isDangerous) iconTag("")(cls := "is-red")
+            else iconTag("")(cls                   := "is-green"),
             div(
-              p(
-                "Make sure to copy your new personal access token now.",
-                br,
-                "You won’t be able to see it again!"
-              ),
+              if (token.isDangerous)
+                p(strong(trans.oauthScope.doNotShareIt()))
+              else
+                p(trans.oauthScope.copyTokenNow()),
               code(token.plain.secret)
             )
           )
@@ -64,7 +64,7 @@ object index {
               td(
                 strong(t.description | "Unnamed"),
                 br,
-                em(t.scopes.map(_.name).mkString(", "))
+                em(t.scopes.map(_.name.txt()).mkString(", "))
               ),
               td(cls := "date")(
                 t.createdAt.map { created =>

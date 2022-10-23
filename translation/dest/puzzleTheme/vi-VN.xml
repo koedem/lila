@@ -9,7 +9,7 @@
   <string name="arabianMate">Chiếu hết kiểu Ả Rập</string>
   <string name="arabianMateDescription">Một Mã và một Xe hợp sức để bẫy vua đối phương trên một góc của bàn cờ.</string>
   <string name="attackingF2F7">Tấn công ô f2 hoặc f7</string>
-  <string name="attackingF2F7Description">Một đòn tấn công nhằm vào quân tốt f2 hay f7, ví dụ như trong khai cuộc lá gan rán.</string>
+  <string name="attackingF2F7Description">Một đòn tấn công nhằm vào quân tốt f2 hay f7, ví dụ như khai cuộc Fried Liver Attack.</string>
   <string name="attraction">Kéo quân</string>
   <string name="attractionDescription">Việc đổi quân hoặc thí quân thu hút hoặc ép buộc một quân đối phương đến một ô nhằm tạo một đòn chiến thuật.</string>
   <string name="backRankMate">Chiếu hết hàng cuối</string>
@@ -47,7 +47,7 @@
   <string name="enPassantDescription">Một đòn chiến thuật bao gồm luật bắt tốt qua đường, khi một con tốt có thể ăn một con tốt đối phương đi qua mặt nó khi đi 2 ô từ vị trí ban đầu của nó.</string>
   <string name="exposedKing">Vua sơ hở</string>
   <string name="exposedKingDescription">Một đòn chiến thuật bao gồm một quân vua với ít sự bảo vệ quanh nó, thường dẫn tới hết cờ.</string>
-  <string name="fork">Một đánh hai</string>
+  <string name="fork">Bắt đôi</string>
   <string name="forkDescription">Một nước đi mà một quân cờ tấn công hai quân cờ của đối phương cùng lúc.</string>
   <string name="hangingPiece">Quân cờ không được bảo vệ</string>
   <string name="hangingPieceDescription">Một chiến thuật liên quan đến quân cờ của đối phương không được phòng thủ hoặc phòng thủ không đủ dẫn tới việc có thể ăn quân cờ đấy.</string>

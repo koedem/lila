@@ -1,24 +1,25 @@
 package views.html.swiss
 
+import controllers.routes
 import play.api.i18n.Lang
+
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.swiss.{ FeaturedSwisses, Swiss }
 
-import controllers.routes
-
 object home {
 
   def apply(featured: FeaturedSwisses)(implicit ctx: Context) =
     views.html.base.layout(
-      title = "Swiss tournaments",
-      moreCss = cssTag("swiss.home")
+      title = trans.swiss.swissTournaments.txt(),
+      moreCss = cssTag("swiss.home"),
+      withHrefLangs = lila.common.LangPath(routes.Swiss.home).some
     ) {
       main(cls := "page-small box box-pad page swiss-home")(
         h1("Swiss tournaments"),
-        renderList("Now playing")(featured.started),
-        renderList("Starting soon")(featured.created),
+        renderList(trans.swiss.nowPlaying.txt())(featured.started),
+        renderList(trans.swiss.startingSoon.txt())(featured.created),
         div(cls := "swiss-home__infos")(
           div(cls := "wiki")(
             iconTag(""),
@@ -57,9 +58,11 @@ object home {
             ),
             td(cls := "infos")(
               span(cls := "rounds")(
-                s.isStarted option frag(s.round.value, " / "),
-                s.settings.nbRounds,
-                " rounds Swiss"
+                if (s.isStarted)
+                  trans.swiss.xOutOfYRoundsSwiss
+                    .plural(s.settings.nbRounds, s.round.value, s.settings.nbRounds)
+                else
+                  trans.swiss.xRoundsSwiss.pluralSame(s.settings.nbRounds)
               ),
               span(cls := "setup")(
                 s.clock.show,

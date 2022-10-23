@@ -76,7 +76,7 @@ trait AssetHelper { self: I18nHelper with SecurityHelper =>
     }
 
   def basicCsp(implicit req: RequestHeader): ContentSecurityPolicy = {
-    val assets = assetDomain.value
+    val assets  = assetDomain.value
     val sockets = socketDomains map { x => s"wss://$x${!req.secure ?? s" ws://$x"}" }
     // include both ws and wss when insecure because requests may come through a secure proxy
     val localDev = !req.secure ?? List("http://127.0.0.1:3000")
@@ -98,6 +98,9 @@ trait AssetHelper { self: I18nHelper with SecurityHelper =>
     val csp = basicCsp(ctx.req)
     ctx.nonce.fold(csp)(csp.withNonce(_))
   }
+
+  def analysisCsp(implicit ctx: Context): ContentSecurityPolicy =
+    defaultCsp.withWebAssembly.withExternalEngine(env.externalEngineEndpoint)
 
   def embedJsUnsafe(js: String)(implicit ctx: Context): Frag =
     raw {

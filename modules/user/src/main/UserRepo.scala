@@ -7,7 +7,7 @@ import reactivemongo.api._
 import reactivemongo.api.bson._
 
 import lila.common.{ ApiVersion, EmailAddress, NormalizedEmailAddress, ThreadLocalRandom }
-import lila.db.BSON.BSONJodaDateTimeHandler
+import lila.db.BSON.jodaDateTimeHandler
 import lila.db.dsl._
 import lila.rating.Glicko
 import lila.rating.{ Perf, PerfType }
@@ -459,7 +459,7 @@ final class UserRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionCont
         }
       )
       .void
-  }
+  } >>- lila.common.Bus.publish(lila.hub.actorApi.user.ChangeEmail(id, email), "email")
 
   private def anyEmail(doc: Bdoc): Option[EmailAddress] =
     doc.getAsOpt[EmailAddress](F.verbatimEmail) orElse doc.getAsOpt[EmailAddress](F.email)
@@ -711,7 +711,7 @@ final class UserRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionCont
   ) = {
 
     implicit def countHandler = Count.countBSONHandler
-    import lila.db.BSON.BSONJodaDateTimeHandler
+    import lila.db.BSON.jodaDateTimeHandler
 
     val normalizedEmail = email.normalize
     $doc(

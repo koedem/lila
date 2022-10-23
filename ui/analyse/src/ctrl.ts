@@ -4,6 +4,7 @@ import * as game from 'game';
 import * as keyboard from './keyboard';
 import * as speech from './speech';
 import * as util from './util';
+import { plural } from './view/util';
 import debounce from 'common/debounce';
 import GamebookPlayCtrl from './study/gamebook/gamebookPlayCtrl';
 import type makeStudyCtrl from './study/studyCtrl';
@@ -14,10 +15,9 @@ import { Autoplay, AutoplayDelay } from './autoplay';
 import { build as makeTree, path as treePath, ops as treeOps, TreeWrapper } from 'tree';
 import { compute as computeAutoShapes } from './autoShape';
 import { Config as ChessgroundConfig } from 'chessground/config';
-import { ActionMenuCtrl } from './actionMenu';
-import { ctrl as cevalCtrl, isEvalBetter, sanIrreversible, CevalCtrl, EvalMeta } from 'ceval';
+import { CevalCtrl, isEvalBetter, sanIrreversible, EvalMeta } from 'ceval';
 import { ctrl as treeViewCtrl, TreeView } from './treeView/treeView';
-import { defined, prop, Prop } from 'common';
+import { defined, prop, Prop, toggle, Toggle } from 'common';
 import { DrawShape } from 'chessground/draw';
 import { ForecastCtrl } from './forecast/interfaces';
 import { lichessRules } from 'chessops/compat';
@@ -55,6 +55,7 @@ export default class AnalyseCtrl {
   ceval: CevalCtrl;
   evalCache: EvalCache;
   persistence?: Persistence;
+  actionMenu: Toggle = toggle(false);
 
   // current tree state, cursor, and denormalized node lists
   path: Tree.Path;
@@ -63,7 +64,6 @@ export default class AnalyseCtrl {
   mainline: Tree.Node[];
 
   // sub controllers
-  actionMenu: ActionMenuCtrl;
   autoplay: Autoplay;
   explorer: ExplorerCtrl;
   forecast?: ForecastCtrl;
@@ -169,11 +169,14 @@ export default class AnalyseCtrl {
       if (this.music && set !== 'music') this.music = null;
     });
 
-    lichess.pubsub.on('analysis.change.trigger', this.onChange);
+    lichess.pubsub.on('ply.trigger', () =>
+      lichess.pubsub.emit('ply', this.node.ply, this.tree.lastMainlineNode(this.path).ply === this.node.ply)
+    );
     lichess.pubsub.on('analysis.chart.click', index => {
       this.jumpToIndex(index);
       this.redraw();
     });
+    lichess.pubsub.on('theme.change', redraw);
     speech.setup();
     this.persistence?.merge();
   }
@@ -187,12 +190,11 @@ export default class AnalyseCtrl {
     this.tree = makeTree(util.treeReconstruct(this.data.treeParts));
     if (prevTree) this.tree.merge(prevTree);
 
-    this.actionMenu = new ActionMenuCtrl();
     this.autoplay = new Autoplay(this);
     if (this.socket) this.socket.clearCache();
     else this.socket = makeSocket(this.opts.socketSend, this);
     if (this.explorer) this.explorer.destroy();
-    this.explorer = new ExplorerCtrl(this, this.opts.explorer, this.explorer ? this.explorer.allowed() : !this.embed);
+    this.explorer = new ExplorerCtrl(this, this.opts.explorer, this.explorer);
     this.gamePath =
       this.synthetic || this.ongoing ? undefined : treePath.fromNodeList(treeOps.mainlineNodeList(this.tree.root));
     this.fork = makeFork(this);
@@ -273,7 +275,7 @@ export default class AnalyseCtrl {
 
   togglePlay(delay: AutoplayDelay): void {
     this.autoplay.toggle(delay);
-    this.actionMenu.open = false;
+    this.actionMenu(false);
   }
 
   private showGround(): void {
@@ -345,7 +347,7 @@ export default class AnalyseCtrl {
   };
 
   private onChange: () => void = throttle(300, () => {
-    lichess.pubsub.emit('analysis.change', this.node.fen, this.path, this.onMainline ? this.node.ply : false);
+    lichess.pubsub.emit('analysis.change', this.node.fen, this.path);
   });
 
   private updateHref: () => void = debounce(() => {
@@ -389,7 +391,7 @@ export default class AnalyseCtrl {
       if (this.study) this.study.onJump();
     }
     if (this.music) this.music.jump(this.node);
-    lichess.pubsub.emit('ply', this.node.ply);
+    lichess.pubsub.emit('ply', this.node.ply, this.tree.lastMainlineNode(this.path).ply === this.node.ply);
     this.showGround();
   }
 
@@ -560,8 +562,8 @@ export default class AnalyseCtrl {
       (count.nodes >= 10 || count.comments > 0) &&
       !confirm(
         'Delete ' +
-          util.plural('move', count.nodes) +
-          (count.comments ? ' and ' + util.plural('comment', count.comments) : '') +
+          plural('move', count.nodes) +
+          (count.comments ? ' and ' + plural('comment', count.comments) : '') +
           '?'
       )
     )
@@ -637,7 +639,7 @@ export default class AnalyseCtrl {
 
   private instanciateCeval(): void {
     if (this.ceval) this.ceval.destroy();
-    this.ceval = cevalCtrl({
+    this.ceval = new CevalCtrl({
       variant: this.data.game.variant,
       initialFen: this.data.game.initialFen,
       possible: !this.embed && (this.synthetic || !game.playable(this.data)),
@@ -652,12 +654,15 @@ export default class AnalyseCtrl {
             multiPvDefault: 1,
           }
         : {}),
+      externalEngines:
+        this.data.externalEngines?.map(engine => ({
+          ...engine,
+          endpoint: this.opts.externalEngineEndpoint,
+        })) || [],
     });
   }
 
-  getCeval() {
-    return this.ceval;
-  }
+  getCeval = () => this.ceval;
 
   outcome(node?: Tree.Node): Outcome | undefined {
     return this.position(node || this.node).unwrap(

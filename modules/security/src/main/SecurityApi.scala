@@ -12,7 +12,6 @@ import scala.annotation.nowarn
 import scala.concurrent.duration._
 
 import lila.common.{ ApiVersion, Bearer, EmailAddress, HTTPRequest, IpAddress, SecureRandom }
-import lila.db.BSON.BSONJodaDateTimeHandler
 import lila.db.dsl._
 import lila.oauth.{ AccessToken, OAuthScope, OAuthServer }
 import lila.user.User.LoginCandidate
@@ -36,23 +35,27 @@ final class SecurityApi(
 
   val AccessUri = "access_uri"
 
+  private val usernameOrEmailMapping =
+    lila.common.Form.cleanText(minLength = 2, maxLength = EmailAddress.maxLength)
+
   lazy val usernameOrEmailForm = Form(
     single(
-      "username" -> nonEmptyText
+      "username" -> usernameOrEmailMapping
     )
   )
 
   lazy val loginForm = Form(
     tuple(
-      "username" -> nonEmptyText, // can also be an email
+      "username" -> usernameOrEmailMapping, // can also be an email
       "password" -> nonEmptyText
     )
   )
+  lazy val rememberForm = Form(single("remember" -> boolean))
 
   private def loadedLoginForm(candidate: Option[LoginCandidate]) =
     Form(
       mapping(
-        "username" -> nonEmptyText, // can also be an email
+        "username" -> usernameOrEmailMapping, // can also be an email
         "password" -> nonEmptyText,
         "token"    -> optional(nonEmptyText)
       )(authenticateCandidate(candidate)) {

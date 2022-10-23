@@ -17,7 +17,7 @@ object replay {
 
   private[analyse] def titleOf(pov: Pov)(implicit lang: Lang) =
     s"${playerText(pov.game.whitePlayer)} vs ${playerText(pov.game.blackPlayer)}: ${pov.game.opening
-        .fold(trans.analysis.txt())(_.opening.ecoName)}"
+        .fold(trans.analysis.txt())(_.opening.name)}"
 
   def apply(
       pov: Pov,
@@ -51,7 +51,9 @@ object replay {
         dataIcon := "",
         cls      := "text game-gif",
         targetBlank,
-        href := cdnUrl(routes.Export.gif(pov.gameId, pov.color.name).url)
+        href := cdnUrl(
+          routes.Export.gif(pov.gameId, pov.color.name, ctx.pref.theme.some, ctx.pref.pieceSet.some).url
+        )
       )(trans.gameAsGIF()),
       a(
         dataIcon := "",
@@ -60,10 +62,12 @@ object replay {
         href := cdnUrl(
           routes.Export
             .fenThumbnail(
-              Forsyth.>>(pov.game.situation).value.replace(" ", "_"),
+              Forsyth.>>(pov.game.situation).value,
               pov.color.name,
               None,
-              pov.game.variant.key.some
+              pov.game.variant.key.some,
+              ctx.pref.theme.some,
+              ctx.pref.pieceSet.some
             )
             .url
         )
@@ -125,13 +129,13 @@ object replay {
         embedJsUnsafeLoadThen(s"""LichessAnalyse.boot(${safeJsonValue(
             Json
               .obj(
-                "data"     -> data,
-                "i18n"     -> jsI18n(),
-                "userId"   -> ctx.userId,
-                "chat"     -> chatJson,
-                "explorer" -> views.html.board.bits.explorerConfig
+                "data"   -> data,
+                "i18n"   -> jsI18n(),
+                "userId" -> ctx.userId,
+                "chat"   -> chatJson
               )
-              .add("hunter" -> isGranted(_.ViewBlurs))
+              .add("hunter" -> isGranted(_.ViewBlurs)) ++
+              views.html.board.bits.explorerAndCevalConfig
           )})""")
       ),
       openGraph = povOpenGraph(pov).some

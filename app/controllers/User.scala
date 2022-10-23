@@ -77,9 +77,10 @@ final class User(
   private def renderShow(u: UserModel, status: Results.Status = Results.Ok)(implicit ctx: Context) =
     if (HTTPRequest isSynchronousHttp ctx.req) {
       for {
-        as     <- env.activity.read.recent(u)
+        as     <- env.activity.read.recentAndPreload(u)
         nbs    <- env.userNbGames(u, ctx, withCrosstable = false)
         info   <- env.userInfo(u, nbs, ctx)
+        _      <- env.userInfo.preloadTeams(info)
         social <- env.socialInfo(u, ctx)
       } yield status {
         lila.mon.chronoSync(_.user segment "renderSync") {
@@ -87,7 +88,7 @@ final class User(
         }
       }
     } else
-      env.activity.read.recent(u) map { as =>
+      env.activity.read.recentAndPreload(u) map { as =>
         status(html.activity(u, as))
       }
 
@@ -208,7 +209,7 @@ final class User(
               Json.toJson(
                 users
                   .take(getInt("nb", req).fold(10)(_ min max))
-                  .map(env.user.jsonView.full(_, withOnline = false, withRating = true))
+                  .map(env.user.jsonView.full(_, withRating = true, withProfile = true))
               )
             )
           }
@@ -288,44 +289,49 @@ final class User(
           api = _ =>
             fuccess {
               implicit val lpWrites = OWrites[UserModel.LightPerf](env.user.jsonView.lightPerfIsOnline)
-              Ok(
-                Json.obj(
-                  "bullet"        -> leaderboards.bullet,
-                  "blitz"         -> leaderboards.blitz,
-                  "rapid"         -> leaderboards.rapid,
-                  "classical"     -> leaderboards.classical,
-                  "ultraBullet"   -> leaderboards.ultraBullet,
-                  "crazyhouse"    -> leaderboards.crazyhouse,
-                  "chess960"      -> leaderboards.chess960,
-                  "kingOfTheHill" -> leaderboards.kingOfTheHill,
-                  "threeCheck"    -> leaderboards.threeCheck,
-                  "antichess"     -> leaderboards.antichess,
-                  "atomic"        -> leaderboards.atomic,
-                  "horde"         -> leaderboards.horde,
-                  "racingKings"   -> leaderboards.racingKings
-                )
-              )
+              import lila.user.JsonView.leaderboardsWrites
+              JsonOk(leaderboards)
             }
         )
       }
     }
 
+  def apiList = Action.async {
+    env.user.cached.top10.get {} map { leaderboards =>
+      implicit val lpWrites = OWrites[UserModel.LightPerf](env.user.jsonView.lightPerfIsOnline)
+      import lila.user.JsonView.leaderboardsWrites
+      JsonOk(leaderboards)
+    }
+  }
+
   def topNb(nb: Int, perfKey: String) =
     Open { implicit ctx =>
-      PerfType(perfKey) ?? { perfType =>
-        env.user.cached.top200Perf get perfType.id dmap { _ take (nb atLeast 1 atMost 200) } flatMap {
-          users =>
-            negotiate(
-              html = (nb == 200) ?? Ok(html.user.top(perfType, users)).fuccess,
-              api = _ =>
-                fuccess {
-                  implicit val lpWrites = OWrites[UserModel.LightPerf](env.user.jsonView.lightPerfIsOnline)
-                  Ok(Json.obj("users" -> users))
-                }
-            )
+      topNbUsers(nb, perfKey) flatMap {
+        _ ?? { case (users, perfType) =>
+          negotiate(
+            html = (nb == 200) ?? Ok(html.user.top(perfType, users)).fuccess,
+            api = _ => fuccess(topNbJson(users))
+          )
         }
       }
     }
+
+  def topNbApi(nb: Int, perfKey: String) =
+    Action.async {
+      topNbUsers(nb, perfKey) map { _ ?? { users => topNbJson(users._1) } }
+    }
+
+  private def topNbUsers(nb: Int, perfKey: String) =
+    PerfType(perfKey) ?? { perfType =>
+      env.user.cached.top200Perf get perfType.id dmap {
+        _.take(nb atLeast 1 atMost 200) -> perfType
+      } dmap some
+    }
+
+  private def topNbJson(users: List[UserModel.LightPerf]) = {
+    implicit val lpWrites = OWrites[UserModel.LightPerf](env.user.jsonView.lightPerfIsOnline)
+    Ok(Json.obj("users" -> users))
+  }
 
   def topWeek =
     Open { implicit ctx =>
@@ -391,7 +397,7 @@ final class User(
         val student = env.clas.api.student.findManaged(user).map2(view.student).dmap(~_)
 
         val reportLog = isGranted(_.SeeReport) ?? env.report.api
-          .byAndAbout(user, 20)
+          .byAndAbout(user, 20, holder)
           .flatMap { rs =>
             env.user.lightUserApi.preloadMany(rs.userIds) inject rs
           }
@@ -637,7 +643,9 @@ final class User(
 
   def redirect(username: String) =
     Open { implicit ctx =>
-      tryRedirect(username) getOrElse notFound
+      staticRedirect(username) | {
+        tryRedirect(username) getOrElse notFound
+      }
     }
 
   def tryRedirect(username: String)(implicit ctx: Context): Fu[Option[Result]] =

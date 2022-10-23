@@ -4,12 +4,12 @@ import org.joda.time.DateTime
 import reactivemongo.api._
 
 import lila.db.dsl._
+import lila.game.Game
+import lila.irc.IrcApi
 import lila.msg.MsgPreset
 import lila.report.{ Mod, ModId, Report, Suspect }
 import lila.security.Permission
 import lila.user.{ Holder, User, UserRepo }
-import lila.irc.IrcApi
-import lila.game.Game
 
 final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(implicit
     ec: scala.concurrent.ExecutionContext
@@ -17,7 +17,6 @@ final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(impl
 
   private def coll = repo.coll
 
-  import lila.db.BSON.BSONJodaDateTimeHandler
   implicit private val ModlogBSONHandler = reactivemongo.api.bson.Macros.handler[Modlog]
 
   private val markActions = List(Modlog.alt, Modlog.booster, Modlog.closeAccount, Modlog.engine, Modlog.troll)
@@ -139,16 +138,6 @@ final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(impl
         mod,
         none,
         if (closed) Modlog.closeTopic else Modlog.openTopic,
-        details = s"$categ/$topic".some
-      )
-    }
-
-  def toggleHideTopic(mod: User.ID, categ: String, topic: String, hidden: Boolean) =
-    add {
-      Modlog(
-        mod,
-        none,
-        if (hidden) Modlog.hideTopic else Modlog.showTopic,
         details = s"$categ/$topic".some
       )
     }

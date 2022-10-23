@@ -7,6 +7,7 @@ import scala.concurrent.duration._
 
 import lila.common.LilaStream
 import lila.db.dsl._
+import lila.user.User
 
 final private class PuzzleTagger(colls: PuzzleColls, openingApi: PuzzleOpeningApi)(implicit
     ec: scala.concurrent.ExecutionContext,
@@ -21,7 +22,8 @@ final private class PuzzleTagger(colls: PuzzleColls, openingApi: PuzzleOpeningAp
         .documentSource()
         .throttle(500, 1 second)
         .mapAsyncUnordered(2)(p => openingApi.updateOpening(p) inject p)
-        .mapAsyncUnordered(2)(addPhase)
+        .mapAsyncUnordered(2)(p => addPhase(p) inject p)
+        .mapAsyncUnordered(2)(checkFirstTheme)
         .runWith(LilaStream.sinkCount)
         .chronometer
         .log(logger)(count => s"Done tagging $count puzzles")
@@ -49,4 +51,26 @@ final private class PuzzleTagger(colls: PuzzleColls, openingApi: PuzzleOpeningAp
         logger.error(s"Can't compute phase of puzzle $puzzle")
         funit
     }
+
+  private def checkFirstTheme(puzzle: Puzzle): Funit = ~ {
+    for {
+      init <- puzzle.situationAfterInitialMove
+      if !puzzle.hasTheme(PuzzleTheme.mateIn1)
+      move  <- puzzle.line.tail.headOption
+      first <- init.move(move).toOption.map(_.situationAfter)
+    } yield first.check
+  } ?? {
+    colls.round {
+      _.update
+        .one(
+          $id(PuzzleRound.Id(User.lichessId, puzzle.id).toString),
+          $addToSet(PuzzleRound.BSONFields.themes -> PuzzleRound.Theme(PuzzleTheme.checkFirst.key, true))
+        )
+    } zip colls.puzzle {
+      _.update.one(
+        $id(puzzle.id),
+        $addToSet(Puzzle.BSONFields.themes -> PuzzleTheme.checkFirst.key)
+      )
+    } void
+  }
 }

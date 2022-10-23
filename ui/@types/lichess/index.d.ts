@@ -67,7 +67,6 @@ interface Lichess {
     update(data: any, mainline: any[]): void;
     (data: any, mainline: any[], trans: Trans, el: HTMLElement): void;
   };
-  movetimeChart: any;
   playMusic(): any;
   quietMode?: boolean;
   analysis?: any; // expose the analysis ctrl
@@ -142,6 +141,7 @@ interface Trans {
   (key: string, ...args: Array<string | number>): string;
   noarg: TransNoArg;
   plural(key: string, count: number, ...args: Array<string | number>): string;
+  pluralSame(key: string, count: number, ...args: Array<string | number>): string;
   vdom<T>(key: string, ...args: T[]): Array<string | T>;
   vdomPlural<T>(key: string, count: number, countArg: T, ...args: T[]): Array<string | T>;
 }
@@ -258,16 +258,6 @@ interface Window {
   readonly LichessPuzzleNvui?: Nvui;
   readonly LichessAnalyseNvui?: (ctrl: any) => {
     render(): any;
-  };
-  readonly LichessChartGame: {
-    acpl: {
-      (data: any, mainline: any[], trans: Trans, el: HTMLElement): Promise<void>;
-      update?(data: any, mainline: any[]): void;
-    };
-    movetime: {
-      (data: any, trans: Trans, hunter: boolean): Promise<void>;
-      render?(): void;
-    };
   };
   readonly LichessChartRatingHistory?: any;
   readonly LichessKeyboardMove?: any;

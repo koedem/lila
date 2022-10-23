@@ -30,7 +30,7 @@ final class Study(
       Reasonable(page) {
         if (text.trim.isEmpty)
           env.study.pager.all(ctx.me, Order.default, page) flatMap { pag =>
-            negotiate(
+            preloadMembers(pag) >> negotiate(
               html = Ok(html.study.list.all(pag, Order.default)).fuccess,
               api = _ => apiStudies(pag)
             )
@@ -45,22 +45,28 @@ final class Study(
       }
     }
 
+  def homeLang =
+    LangPage(routes.Study.allDefault())(allResults(Order.Hot.key, 1)(_)) _
+
   def allDefault(page: Int) = all(Order.Hot.key, page)
 
   def all(o: String, page: Int) =
     Open { implicit ctx =>
-      Reasonable(page) {
-        Order(o) match {
-          case order if !Order.withoutSelector.contains(order) =>
-            Redirect(routes.Study.allDefault(page)).fuccess
-          case order =>
-            env.study.pager.all(ctx.me, order, page) flatMap { pag =>
-              negotiate(
-                html = Ok(html.study.list.all(pag, order)).fuccess,
-                api = _ => apiStudies(pag)
-              )
-            }
-        }
+      allResults(o, page)
+    }
+
+  private def allResults(o: String, page: Int)(implicit ctx: Context) =
+    Reasonable(page) {
+      Order(o) match {
+        case order if !Order.withoutSelector.contains(order) =>
+          Redirect(routes.Study.allDefault(page)).fuccess
+        case order =>
+          env.study.pager.all(ctx.me, order, page) flatMap { pag =>
+            preloadMembers(pag) >> negotiate(
+              html = Ok(html.study.list.all(pag, order)).fuccess,
+              api = _ => apiStudies(pag)
+            )
+          }
       }
     }
 
@@ -71,7 +77,7 @@ final class Study(
       env.user.repo.named(username).flatMap {
         _.fold(notFound(ctx)) { owner =>
           env.study.pager.byOwner(owner, ctx.me, Order(order), page) flatMap { pag =>
-            negotiate(
+            preloadMembers(pag) >> negotiate(
               html = Ok(html.study.list.byOwner(pag, Order(order), owner)).fuccess,
               api = _ => apiStudies(pag)
             )
@@ -83,7 +89,7 @@ final class Study(
   def mine(order: String, page: Int) =
     Auth { implicit ctx => me =>
       env.study.pager.mine(me, Order(order), page) flatMap { pag =>
-        negotiate(
+        preloadMembers(pag) >> negotiate(
           html = env.study.topicApi.userTopics(me.id) map { topics =>
             Ok(html.study.list.mine(pag, Order(order), me, topics))
           },
@@ -95,7 +101,7 @@ final class Study(
   def minePublic(order: String, page: Int) =
     Auth { implicit ctx => me =>
       env.study.pager.minePublic(me, Order(order), page) flatMap { pag =>
-        negotiate(
+        preloadMembers(pag) >> negotiate(
           html = Ok(html.study.list.minePublic(pag, Order(order), me)).fuccess,
           api = _ => apiStudies(pag)
         )
@@ -105,7 +111,7 @@ final class Study(
   def minePrivate(order: String, page: Int) =
     Auth { implicit ctx => me =>
       env.study.pager.minePrivate(me, Order(order), page) flatMap { pag =>
-        negotiate(
+        preloadMembers(pag) >> negotiate(
           html = Ok(html.study.list.minePrivate(pag, Order(order), me)).fuccess,
           api = _ => apiStudies(pag)
         )
@@ -115,7 +121,7 @@ final class Study(
   def mineMember(order: String, page: Int) =
     Auth { implicit ctx => me =>
       env.study.pager.mineMember(me, Order(order), page) flatMap { pag =>
-        negotiate(
+        preloadMembers(pag) >> negotiate(
           html = env.study.topicApi.userTopics(me.id) map { topics =>
             Ok(html.study.list.mineMember(pag, Order(order), me, topics))
           },
@@ -127,7 +133,7 @@ final class Study(
   def mineLikes(order: String, page: Int) =
     Auth { implicit ctx => me =>
       env.study.pager.mineLikes(me, Order(order), page) flatMap { pag =>
-        negotiate(
+        preloadMembers(pag) >> negotiate(
           html = Ok(html.study.list.mineLikes(pag, Order(order))).fuccess,
           api = _ => apiStudies(pag)
         )
@@ -140,21 +146,25 @@ final class Study(
         case None => notFound
         case Some(topic) =>
           env.study.pager.byTopic(topic, ctx.me, Order(order), page) zip
-            ctx.me.??(u => env.study.topicApi.userTopics(u.id) dmap some) map { case (pag, topics) =>
-              Ok(html.study.topic.show(topic, pag, Order(order), topics))
+            ctx.me.??(u => env.study.topicApi.userTopics(u.id) dmap some) flatMap { case (pag, topics) =>
+              preloadMembers(pag) inject Ok(html.study.topic.show(topic, pag, Order(order), topics))
             }
       }
     }
+
+  private def preloadMembers(pag: Paginator[StudyModel.WithChaptersAndLiked]) =
+    env.user.lightUserApi.preloadMany(
+      pag.currentPageResults.view
+        .flatMap(_.study.members.members.values take StudyModel.previewNbMembers)
+        .map(_.id)
+        .toSeq
+    )
 
   private def apiStudies(pager: Paginator[StudyModel.WithChaptersAndLiked]) = {
     implicit val pagerWriter = Writes[StudyModel.WithChaptersAndLiked] { s =>
       env.study.jsonView.pagerData(s)
     }
-    Ok(
-      Json.obj(
-        "paginator" -> PaginatorJson(pager)
-      )
-    ).fuccess
+    Ok(Json.obj("paginator" -> PaginatorJson(pager))).fuccess
   }
 
   private def orRelay(id: String, chapterId: Option[String] = None)(
@@ -206,14 +216,17 @@ final class Study(
       pov = userAnalysisC.makePov(chapter.root.fen.some, chapter.setup.variant)
       analysis <- chapter.serverEval.exists(_.done) ?? env.analyse.analyser.byId(chapter.id.value)
       division = analysis.isDefined option env.study.serverEvalMerger.divisionOf(chapter)
-      baseData = env.round.jsonView.userAnalysisJson(
-        pov,
-        ctx.pref,
-        chapter.root.fen.some,
-        chapter.setup.orientation,
-        owner = false,
-        me = ctx.me,
-        division = division
+      baseData <- env.api.roundApi.withExternalEngines(
+        ctx.me,
+        env.round.jsonView.userAnalysisJson(
+          pov,
+          ctx.pref,
+          chapter.root.fen.some,
+          chapter.setup.orientation,
+          owner = false,
+          me = ctx.me,
+          division = division
+        )
       )
       studyJson <- env.study.jsonView(study, chapters, chapter, ctx.me)
     } yield WithChapter(study, chapter) -> JsData(
@@ -251,8 +264,8 @@ final class Study(
     }
 
   private[controllers] def chatOf(study: lila.study.Study)(implicit ctx: Context) = {
-    ctx.noKid && ctx.noBot // no public chats for kids and bots
-    ctx.me.fold(true) {    // anon can see public chats
+    ctx.noKid && ctx.noBot && // no public chats for kids and bots
+    ctx.me.fold(true) {       // anon can see public chats
       env.chat.panic.allowed
     }
   } ?? env.chat.api.userChat
@@ -517,12 +530,12 @@ final class Study(
       clocks = getBoolOpt("clocks", req) | true
     )
 
-  def chapterGif(id: String, chapterId: String) =
+  def chapterGif(id: String, chapterId: String, theme: Option[String], piece: Option[String]) =
     Open { implicit ctx =>
       env.study.api.byIdWithChapter(id, chapterId) flatMap {
         _.fold(notFound) { case WithChapter(study, chapter) =>
           CanView(study, ctx.me) {
-            env.study.gifExport.ofChapter(chapter) map { stream =>
+            env.study.gifExport.ofChapter(chapter, theme, piece) map { stream =>
               Ok.chunked(stream)
                 .pipe(asAttachmentStream(s"${env.study.pgnDump.filename(study, chapter)}.gif"))
                 .as("image/gif")

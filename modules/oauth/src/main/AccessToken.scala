@@ -20,7 +20,7 @@ case class AccessToken(
 ) {
   def isBrandNew = createdAt.exists(DateTime.now.minusSeconds(5).isBefore)
 
-  def expiresOrFarFuture = expires | DateTime.now.plusYears(1)
+  def isDangerous = scopes.exists(OAuthScope.dangerList.contains)
 }
 
 object AccessToken {
@@ -46,7 +46,6 @@ object AccessToken {
 
   import lila.db.BSON
   import lila.db.dsl._
-  import BSON.BSONJodaDateTimeHandler
   import OAuthScope.scopeHandler
 
   private[oauth] val forAuthProjection = $doc(

@@ -4,16 +4,20 @@ import chess.Clock
 import chess.format.FEN
 import chess.variant.FromPosition
 
-import lila.game.PerfPicker
+import lila.common.Days
+import lila.game.{ GameRule, PerfPicker }
 import lila.rating.PerfType
+import lila.user.User
 
 final case class OpenConfig(
     name: Option[String],
     variant: chess.variant.Variant,
     clock: Option[Clock.Config],
-    days: Option[Int],
+    days: Option[Days],
     rated: Boolean,
-    position: Option[FEN] = None
+    position: Option[FEN],
+    userIds: Option[(User.ID, User.ID)],
+    rules: Set[GameRule] = Set.empty
 ) {
 
   def perfType: Option[PerfType] = PerfPicker.perfType(chess.Speed(clock), variant, none)
@@ -31,9 +35,11 @@ object OpenConfig {
       n: Option[String],
       v: Option[String],
       cl: Option[Clock.Config],
-      days: Option[Int],
+      days: Option[Days],
       rated: Boolean,
-      pos: Option[FEN]
+      pos: Option[FEN],
+      usernames: Option[List[String]],
+      rules: Option[Set[GameRule]]
   ) =
     new OpenConfig(
       name = n.map(_.trim).filter(_.nonEmpty),
@@ -41,6 +47,10 @@ object OpenConfig {
       clock = cl,
       days = days,
       rated = rated,
-      position = pos
+      position = pos,
+      userIds = usernames.map(_.map(User.normalize)) collect { case List(w, b) =>
+        (w, b)
+      },
+      rules = ~rules
     ).autoVariant
 }

@@ -9,25 +9,25 @@ object Dependencies {
   val alleycats   = "org.typelevel"                %% "alleycats-core"                  % "2.8.0"
   val scalalib    = "com.github.ornicar"           %% "scalalib"                        % "7.1.0"
   val hasher      = "com.roundeights"              %% "hasher"                          % "1.2.1"
-  val jodaTime    = "joda-time"                     % "joda-time"                       % "2.11.0"
-  val chess       = "org.lichess"                  %% "scalachess"                      % "10.5.1"
+  val jodaTime    = "joda-time"                     % "joda-time"                       % "2.12.0"
+  val chess       = "org.lichess"                  %% "scalachess"                      % "10.6.3"
   val compression = "org.lichess"                  %% "compression"                     % "1.6"
   val maxmind     = "com.sanoma.cda"               %% "maxmind-geoip2-scala"            % "1.3.1-THIB"
   val prismic     = "io.prismic"                   %% "scala-kit"                       % "1.2.19-THIB213"
   val caffeine    = "com.github.ben-manes.caffeine" % "caffeine"                        % "3.1.1" % "compile"
-  val scaffeine   = "com.github.blemale"           %% "scaffeine"                       % "5.2.0" % "compile"
-  val googleOAuth = "com.google.auth"               % "google-auth-library-oauth2-http" % "1.10.0"
+  val scaffeine   = "com.github.blemale"           %% "scaffeine"                       % "5.2.1" % "compile"
+  val googleOAuth = "com.google.auth"               % "google-auth-library-oauth2-http" % "1.12.1"
   val galimatias  = "io.mola.galimatias"            % "galimatias"                      % "0.2.2-NF"
-  val scalatags   = "com.lihaoyi"                  %% "scalatags"                       % "0.11.1"
-  val lettuce     = "io.lettuce"                    % "lettuce-core"                    % "6.2.0.RELEASE"
-  val epoll = "io.netty" % "netty-transport-native-epoll" % "4.1.79.Final" classifier "linux-x86_64"
+  val scalatags   = "com.lihaoyi"                  %% "scalatags"                       % "0.12.0"
+  val lettuce     = "io.lettuce"                    % "lettuce-core"                    % "6.2.1.RELEASE"
+  val epoll = "io.netty" % "netty-transport-native-epoll" % "4.1.82.Final" classifier "linux-x86_64"
   val autoconfig   = "io.methvin.play"            %% "autoconfig-macros" % "0.3.2"  % "provided"
   val scalatest    = "org.scalatest"              %% "scalatest"         % "3.2.11" % Test
-  val uaparser     = "org.uaparser"               %% "uap-scala"         % "0.13.0"
-  val specs2Core   = "org.specs2"                 %% "specs2-core"       % "4.16.1" % Test
-  val specs2Cats   = "org.specs2"                 %% "specs2-cats"       % "4.16.1" % Test
+  val uaparser     = "org.uaparser"               %% "uap-scala"         % "0.14.0"
+  val specs2Core   = "org.specs2"                 %% "specs2-core"       % "4.17.0" % Test
+  val specs2Cats   = "org.specs2"                 %% "specs2-cats"       % "4.17.0" % Test
   val specs2Bundle = Seq(specs2Core, specs2Cats)
-  val apacheText   = "org.apache.commons"          % "commons-text"      % "1.9"
+  val apacheText   = "org.apache.commons"          % "commons-text"      % "1.10.0"
   val bloomFilter  = "com.github.alexandrnikitin" %% "bloom-filter"      % "0.13.1"
 
   object flexmark {
@@ -40,10 +40,10 @@ object Dependencies {
   }
 
   object macwire {
-    val version = "2.5.6"
+    val version = "2.5.8"
     val macros  = "com.softwaremill.macwire" %% "macros"  % version % "provided"
     val util    = "com.softwaremill.macwire" %% "util"    % version % "provided"
-    val tagging = "com.softwaremill.common"  %% "tagging" % "2.3.3"
+    val tagging = "com.softwaremill.common"  %% "tagging" % "2.3.4"
     def bundle  = Seq(macros, util, tagging)
   }
 
@@ -58,10 +58,9 @@ object Dependencies {
   }
 
   object play {
-    val version  = "2.8.16-lila_1.9"
-    val api      = "com.typesafe.play" %% "play"           % version
-    val json     = "com.typesafe.play" %% "play-json"      % "2.9.2"
-    val jsonJoda = "com.typesafe.play" %% "play-json-joda" % "2.9.2"
+    val api      = "com.typesafe.play" %% "play"           % "2.8.16-lila_1.13.1"
+    val json     = "com.typesafe.play" %% "play-json"      % "2.9.3"
+    val jsonJoda = "com.typesafe.play" %% "play-json-joda" % "2.9.3"
     val mailer   = "com.typesafe.play" %% "play-mailer"    % "8.0.1"
   }
 
@@ -73,14 +72,14 @@ object Dependencies {
   }
 
   object kamon {
-    val version    = "2.4.7"
+    val version    = "2.5.8"
     val core       = "io.kamon" %% "kamon-core"           % version
     val influxdb   = "io.kamon" %% "kamon-influxdb"       % version
     val metrics    = "io.kamon" %% "kamon-system-metrics" % version
     val prometheus = "io.kamon" %% "kamon-prometheus"     % version
   }
   object akka {
-    val version    = "2.6.19"
+    val version    = "2.6.20"
     val akka       = "com.typesafe.akka" %% "akka-actor"       % version
     val akkaTyped  = "com.typesafe.akka" %% "akka-actor-typed" % version
     val akkaStream = "com.typesafe.akka" %% "akka-stream"      % version

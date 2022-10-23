@@ -1,15 +1,20 @@
-export interface ChartElm extends HTMLElement {
-  highcharts: any;
-}
+import { PlyChart } from './interface';
 
 export interface MovePoint {
-  y: number;
+  y: number | null;
   x?: number;
   name?: any;
   marker?: any;
 }
 
 let highchartsPromise: Promise<any> | undefined;
+
+export function selectPly(this: PlyChart, ply: number, onMainline: boolean) {
+  const plyline = (this.xAxis[0] as any).plotLinesAndBands[0];
+  plyline.options.value = ply - 1 - this.firstPly;
+  plyline.svgElem?.dashstyleSetter(onMainline ? 'solid' : 'dash');
+  plyline.render();
+}
 
 export async function loadHighcharts(tpe: string) {
   if (highchartsPromise) return highchartsPromise;
@@ -38,7 +43,10 @@ export async function loadHighcharts(tpe: string) {
     const line = {
       weak: light ? '#ccc' : '#404040',
       strong: light ? '#a0a0a0' : '#606060',
-      fat: '#d85000', // light ? '#a0a0a0' : '#707070'
+      accent: '#d85000',
+      white: '#ffffff',
+      black: '#333333',
+      grey: light ? '#999999' : '#777777',
     };
     const area = {
       white: light ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)',

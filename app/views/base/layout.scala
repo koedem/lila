@@ -1,14 +1,16 @@
 package views.html.base
 
+import controllers.report.routes.{ Report => reportRoutes }
 import controllers.routes
 import play.api.i18n.Lang
 
 import lila.api.{ AnnounceStore, Context }
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
+import lila.common.base.StringUtils.escapeHtmlRaw
+import lila.common.LangPath
 import lila.common.String.html.safeJsonValue
 import lila.common.{ ContentSecurityPolicy, Nonce }
-import lila.common.base.StringUtils.escapeHtmlRaw
 
 object layout {
 
@@ -61,7 +63,7 @@ object layout {
   private def boardPreload(implicit ctx: Context) = frag(
     preload(assetUrl(s"images/board/${ctx.currentTheme.file}"), "image", crossorigin = false),
     ctx.pref.is3d option
-      preload(s"images/staunton/board/${ctx.currentTheme3d.file}", "image", crossorigin = false)
+      preload(assetUrl(s"images/staunton/board/${ctx.currentTheme3d.file}"), "image", crossorigin = false)
   )
   private def piecesPreload(implicit ctx: Context) =
     env.pieceImageExternal.get() option raw {
@@ -105,11 +107,12 @@ object layout {
         "Disable"
       else "Enable"} blind mode</button></form>""")
 
-  private def zenToggle(implicit ctx: Context) =
+  private def zenZone(implicit ctx: Context) =
     spaceless(s"""
-  <a data-icon="" id="zentog" class="text fbt active">
-    ${trans.preferences.zenMode.txt()}
-  </a>""")
+<div id="zenzone">
+  <a href="/" class="zen-home"></a>
+  <a data-icon="" id="zentog" class="text fbt active">${trans.preferences.zenMode.txt()}</a>
+</div>""")
 
   private def dasher(me: lila.user.User) =
     div(cls := "dasher")(
@@ -134,14 +137,17 @@ object layout {
 </div>""")
 
   private def anonDasher(implicit ctx: Context) =
-    spaceless(s"""<div class="dasher">
+    spaceless {
+      s"""<div class="dasher">
   <a class="toggle link anon">
     <span title="${trans.preferences.preferences.txt()}" data-icon=""></span>
   </a>
   <div id="dasher_app" class="dropdown"></div>
 </div>
-<a href="${routes.Auth.login}?referrer=${ctx.req.path}" class="signin button button-empty">${trans.signIn
-        .txt()}</a>""")
+<a href="${langHref(
+          routes.Auth.login
+        )}?referrer=${ctx.req.path}" class="signin button button-empty">${trans.signIn.txt()}</a>"""
+    }
 
   private val clinputLink = a(cls := "link")(span(dataIcon := ""))
 
@@ -185,12 +191,13 @@ object layout {
     )
 
   private def hrefLang(lang: String, path: String) =
-    s"""<link rel="alternate" hreflang="$lang" href="$netBaseUrl/$path"/>"""
+    s"""<link rel="alternate" hreflang="$lang" href="$netBaseUrl$path"/>"""
 
-  private def hrefLangs(path: String)(implicit ctx: Context) = raw {
-    hrefLang("x-default", path) + hrefLang("en", path) +
+  private def hrefLangs(path: LangPath)(implicit ctx: Context) = raw {
+    val pathEnd = if (path.value == "/") "" else path.value
+    hrefLang("x-default", path.value) + hrefLang("en", path.value) +
       lila.i18n.LangList.popularAlternateLanguageCodes.map { lang =>
-        hrefLang(lang, s"$lang$path")
+        hrefLang(lang, s"/$lang$pathEnd")
       }.mkString
   }
 
@@ -209,6 +216,7 @@ object layout {
   val dataSoundSet              = attr("data-sound-set")
   val dataTheme                 = attr("data-theme")
   val dataDirection             = attr("data-direction")
+  val dataBoardTheme            = attr("data-board-theme")
   val dataPieceSet              = attr("data-piece-set")
   val dataAssetUrl              = attr("data-asset-url")      := netConfig.assetBaseUrl.value
   val dataAssetVersion          = attr("data-asset-version")
@@ -228,7 +236,7 @@ object layout {
       csp: Option[ContentSecurityPolicy] = None,
       wrapClass: String = "",
       atomLinkTag: Option[Tag] = None,
-      withHrefLangs: Option[String] = None
+      withHrefLangs: Option[LangPath] = None
   )(body: Frag)(implicit ctx: Context): Frag =
     frag(
       doctype,
@@ -239,11 +247,7 @@ object layout {
           viewport,
           metaCsp(csp),
           metaThemeColor,
-          st.headTitle {
-            if (ctx.blind) "lichess"
-            else if (netConfig.isProd) fullTitle | s"$title • lichess.org"
-            else s"[dev] ${fullTitle | s"$title • lichess.dev"}"
-          },
+          st.headTitle(fullTitle | s"$title • $siteName"),
           cssTag("site"),
           ctx.pref.is3d option cssTag("board-3d"),
           ctx.pageData.inquiry.isDefined option cssTagNoTheme("mod.inquiry"),
@@ -306,6 +310,7 @@ object layout {
           dataAssetVersion := assetVersion.value,
           dataNonce        := ctx.nonce.ifTrue(sameAssetDomain).map(_.value),
           dataTheme        := ctx.currentBg,
+          dataBoardTheme   := ctx.currentTheme.name,
           dataPieceSet     := ctx.currentPieceSet.name,
           dataAnnounce     := AnnounceStore.get.map(a => safeJsonValue(a.json)),
           style            := zoomable option s"--zoom:${ctx.zoom}"
@@ -318,7 +323,7 @@ object layout {
             .get(ctx.req)
             .ifTrue(ctx.isAnon)
             .map(views.html.auth.bits.checkYourEmailBanner(_)),
-          zenable option zenToggle,
+          zenable option zenZone,
           siteHeader.apply,
           div(
             id := "main-wrap",
@@ -379,7 +384,7 @@ object layout {
                 "report-score--low"                        -> (score <= mid)
               ),
               title     := "Moderation",
-              href      := routes.Report.list,
+              href      := reportRoutes.list,
               dataCount := score,
               dataIcon  := ""
             )
@@ -411,10 +416,7 @@ object layout {
           h1(cls := "site-title")(
             if (ctx.kid) span(title := trans.kidMode.txt(), cls := "kiddo")(":)")
             else ctx.isBot option botImage,
-            a(href := "/")(
-              "lichess",
-              span(if (netConfig.isProd) ".org" else ".dev")
-            )
+            a(href := langHref("/"))(siteNameFrag)
           ),
           ctx.blind option h2("Navigation"),
           !ctx.isAppealUser option topnav()

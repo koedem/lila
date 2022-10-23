@@ -20,6 +20,7 @@ import scala.util.{ Success, Try }
 
 import lila.db.BSON
 import lila.db.dsl._
+import lila.common.Days
 
 object BSONHandlers {
 
@@ -38,6 +39,8 @@ object BSONHandlers {
     { case bin: BSONBinary => ByteArrayBSONHandler.readTry(bin) map BinaryFormat.unmovedRooks.read },
     x => ByteArrayBSONHandler.writeTry(BinaryFormat.unmovedRooks write x).get
   )
+
+  implicit val RulesHandler = valueMapHandler(GameRule.byKey)(_.key)
 
   implicit private[game] val crazyhouseDataBSONHandler = new BSON[Crazyhouse.Data] {
 
@@ -165,7 +168,7 @@ object BSONHandlers {
             _ = lila.mon.game.loadClockHistory.increment()
           } yield history,
         status = light.status,
-        daysPerTurn = r intO F.daysPerTurn,
+        daysPerTurn = r.getO[Days](F.daysPerTurn),
         binaryMoveTimes = r bytesO F.moveTimes,
         mode = Mode(r boolD F.rated),
         bookmarks = r intD F.bookmarks,
@@ -178,7 +181,8 @@ object BSONHandlers {
           swissId = r strO F.swissId,
           simulId = r strO F.simulId,
           analysed = r boolD F.analysed,
-          drawOffers = r.getD(F.drawOffers, GameDrawOffers.empty)
+          drawOffers = r.getD(F.drawOffers, GameDrawOffers.empty),
+          rules = r.getD(F.rules, Set.empty)
         )
       )
     }
@@ -218,7 +222,8 @@ object BSONHandlers {
         F.tournamentId      -> o.metadata.tournamentId,
         F.swissId           -> o.metadata.swissId,
         F.simulId           -> o.metadata.simulId,
-        F.analysed          -> w.boolO(o.metadata.analysed)
+        F.analysed          -> w.boolO(o.metadata.analysed),
+        F.rules             -> o.metadata.nonEmptyRules
       ) ++ {
         if (o.variant.standard)
           $doc(F.huffmanPgn -> PgnStorage.Huffman.encode(o.pgnMoves take Game.maxPlies))

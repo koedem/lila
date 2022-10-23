@@ -48,9 +48,7 @@ final class MarkdownRender(
     code: Boolean = false,
     gameExpand: Option[MarkdownRender.GameExpand] = None
 ) {
-
-  private type Key  = String
-  private type Html = String
+  import MarkdownRender.{ Html, Key }
 
   private val extensions = new java.util.ArrayList[com.vladsch.flexmark.util.misc.Extension]()
   if (table) extensions.add(TablesExtension.create())
@@ -108,6 +106,9 @@ final class MarkdownRender(
 }
 
 object MarkdownRender {
+
+  type Key  = String
+  type Html = String
 
   case class GameExpand(domain: config.NetDomain, getPgn: String => Option[String])
 
@@ -202,18 +203,18 @@ object MarkdownRender {
       )
 
     private val gameRegex =
-      s"""^(?:https?://)?${expander.domain}/(?:embed/)?(?:game/)?(\\w{8})(?:(?:/(white|black))|\\w{4}|)(#\\d+)?$$""".r
+      s"""^(?:https?://)?${expander.domain}/(?:embed/)?(?:game/)?(\\w{8})(?:(?:/(white|black))|\\w{4}|)(?:#(\\d+))?$$""".r
 
     private def renderLink(node: Link, context: NodeRendererContext, html: HtmlWriter): Unit =
       // Based on implementation in CoreNodeRenderer.
       if (context.isDoNotRenderLinks || CoreNodeRenderer.isSuppressedLinkPrefix(node.getUrl(), context))
         context.renderChildren(node)
       else {
-        var link         = context.resolveLink(LinkType.LINK, node.getUrl().unescape(), null, null)
+        val link         = context.resolveLink(LinkType.LINK, node.getUrl().unescape(), null, null)
         def justAsLink() = renderLink(node, context, html, link)
         link.getUrl match {
-          case gameRegex(id, _, _) =>
-            expander.getPgn(id).fold(justAsLink())(renderPgnViewer(node, html, link))
+          case gameRegex(id, color, ply) =>
+            expander.getPgn(id).fold(justAsLink())(renderPgnViewer(node, html, link, _, color, ply))
           case _ => justAsLink()
         }
       }
@@ -230,8 +231,8 @@ object MarkdownRender {
         val link         = context.resolveLink(LinkType.LINK, node.getUrl().unescape(), null, null)
         def justAsLink() = renderLink(node, context, html, link)
         link.getUrl match {
-          case gameRegex(id, _, _) =>
-            expander.getPgn(id).fold(justAsLink())(renderPgnViewer(node, html, link))
+          case gameRegex(id, color, ply) =>
+            expander.getPgn(id).fold(justAsLink())(renderPgnViewer(node, html, link, _, color, ply))
           case _ => justAsLink()
         }
       }
@@ -250,9 +251,18 @@ object MarkdownRender {
       html.tag("/a").unit
     }
 
-    private def renderPgnViewer(node: LinkNode, html: HtmlWriter, link: ResolvedLink)(pgn: String) =
+    private def renderPgnViewer(
+        node: LinkNode,
+        html: HtmlWriter,
+        link: ResolvedLink,
+        pgn: String,
+        color: String,
+        ply: String
+    ) =
       html
         .attr("data-pgn", pgn)
+        .attr("data-orientation", Option(color) | "white")
+        .attr("data-ply", Option(ply) | "")
         .attr("class", "lpv--autostart")
         .srcPos(node.getChars())
         .withAttr(link)

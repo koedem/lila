@@ -8,7 +8,7 @@ import lila.app.mashup.TeamInfo
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.paginator.Paginator
-import lila.common.String.html.{ richText, safeJsonValue }
+import lila.common.String.html.safeJsonValue
 import lila.team.Team
 import lila.mod.Modlog
 
@@ -33,7 +33,7 @@ object show {
         .OpenGraph(
           title = s"${t.name} team",
           url = s"$netBaseUrl${routes.Team.show(t.id).url}",
-          description = shorten(t.description.value, 152)
+          description = t.intro ?? { shorten(_, 152) }
         )
         .some,
       moreJs = frag(
@@ -194,6 +194,11 @@ object show {
           ),
           div(cls := "team-show__content__col2")(
             standardFlash(),
+            t.intro.isEmpty && info.ledByMe option div(cls := "flash flash-warning")(
+              div(cls := "flash__content")(
+                a(href := routes.Team.edit(t.id))("Give your team a short introduction text!")
+              )
+            ),
             log.nonEmpty option renderLog(log),
             (t.enabled || manageTeamEnabled) option st.section(cls := "team-show__desc")(
               bits.markdown(t, t.descPrivate.ifTrue(info.mine) | t.description)

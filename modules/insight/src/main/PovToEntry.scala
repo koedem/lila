@@ -9,7 +9,7 @@ import scala.util.chaining._
 import lila.analyse.{ AccuracyCP, AccuracyPercent, Advice, WinPercent }
 import lila.game.{ Game, Pov }
 import lila.user.User
-import lila.common.{ LilaOpening, LilaOpeningFamily }
+import lila.common.{ LilaOpeningFamily, SimpleOpening }
 
 case class RichPov(
     pov: Pov,
@@ -211,7 +211,6 @@ final private class PovToEntry(
       opening  = findOpening(from)
     } yield InsightEntry(
       id = InsightEntry povToId pov,
-      number = 0, // temporary :-/ the Indexer will set it
       userId = myId,
       color = pov.color,
       perf = perfType,
@@ -236,15 +235,15 @@ final private class PovToEntry(
     )
   }
 
-  private def findOpening(from: RichPov): Option[LilaOpening] =
+  private def findOpening(from: RichPov): Option[SimpleOpening] =
     from.pov.game.variant.standard ??
       from.situations.tail.view
-        .takeWhile(_.board.actors.size > 16)
-        .foldRight(none[LilaOpening]) {
+        .takeWhile(_.board.actors.sizeIs >= 20)
+        .foldRight(none[SimpleOpening]) {
           case (sit, None) =>
             FullOpeningDB
               .findByFen(FEN(Forsyth exportStandardPositionTurnCastlingEp sit))
-              .flatMap(LilaOpening.apply)
+              .flatMap(SimpleOpening.apply)
           case (_, found) => found
         }
 }

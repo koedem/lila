@@ -48,7 +48,6 @@ final class PostApi(
         number = topic.nbPosts + 1,
         lang = lang.map(_.language),
         troll = me.marks.troll,
-        hidden = topic.hidden,
         categId = categ.id,
         modIcon = modIcon option true
       )
@@ -56,9 +55,7 @@ final class PostApi(
         case Some(dup) if !post.modIcon.getOrElse(false) => fuccess(dup)
         case _ =>
           postRepo.coll.insert.one(post) >>
-            topicRepo.coll.update.one($id(topic.id), topic withPost post) >> {
-              shouldHideOnPost(topic) ?? topicRepo.hide(topic.id, value = true)
-            } >>
+            topicRepo.coll.update.one($id(topic.id), topic withPost post) >>
             categRepo.coll.update.one($id(categ.id), categ.withPost(topic, post)) >>- {
               !categ.quiet ?? (indexer ! InsertPost(post))
               promotion.save(me, post.text)
@@ -69,7 +66,7 @@ final class PostApi(
               if (anonMod) logAnonPost(me.id, post, edit = false)
               else if (!post.troll && !categ.quiet && !topic.isTooBig)
                 timeline ! Propagate(ForumPost(me.id, topic.id.some, topic.name, post.id)).pipe {
-                  _ toFollowersOf me.id toUsers topicUserIds exceptUser me.id
+                  _ toFollowersOf me.id toUsers topicUserIds exceptUser me.id withTeam categ.team
                 }
               lila.mon.forum.post.create.increment()
               mentionNotifier.notifyMentionedUsers(post, topic)
@@ -92,16 +89,6 @@ final class PostApi(
               logAnonPost(user.id, newPost, edit = true)
             } >>- promotion.save(user, newPost.text)
           } inject newPost
-      }
-    }
-
-  private val quickHideCategs = Set("lichess-feedback", "off-topic-discussion")
-
-  private def shouldHideOnPost(topic: Topic) =
-    topic.visibleOnHome && {
-      (quickHideCategs(topic.categId) && topic.nbPosts == 1) || {
-        topic.nbPosts == config.postMaxPerPage.value ||
-        (!topic.looksLikeTeamForum && topic.createdAt.isBefore(DateTime.now minusDays 5))
       }
     }
 
@@ -188,12 +175,6 @@ final class PostApi(
   def allUserIds(topicId: Topic.ID) = postRepo allUserIdsByTopicId topicId
 
   def nbByUser(userId: String) = postRepo.coll.countSel($doc("userId" -> userId))
-
-  def allByUser(userId: User.ID): AkkaStreamCursor[Post] =
-    postRepo.coll
-      .find($doc("userId" -> userId))
-      .sort($doc("createdAt" -> -1))
-      .cursor[Post](ReadPreference.secondaryPreferred)
 
   def categsForUser(teams: Iterable[String], forUser: Option[User]): Fu[List[CategView]] =
     for {

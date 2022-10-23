@@ -18,6 +18,7 @@ trait ScalatagsAttrs {
   val dataCount              = attr("data-count")
   val dataColor              = attr("data-color")
   val dataFen                = attr("data-fen")
+  val dataUci                = attr("data-uci")
   val dataRel                = attr("data-rel")
   val dataTitle              = attr("data-title")
   val novalidate             = attr("novalidate").empty
@@ -27,6 +28,7 @@ trait ScalatagsAttrs {
   val downloadAttr           = attr("download").empty
   val viewBoxAttr            = attr("viewBox")
   def attrData(name: String) = attr(s"data-$name")
+  def aria(key: String)      = attr(s"aria-$key")
 
   object frame {
     val scrolling       = attr("scrolling")
@@ -44,8 +46,8 @@ trait ScalatagsSnippets extends Cap {
 
   import scalatags.Text.all._
 
-  val nbsp                                   = raw("&nbsp;")
-  val amp                                    = raw("&amp;")
+  val nbsp: Frag                             = raw("&nbsp;")
+  val amp: Frag                              = raw("&amp;")
   def iconTag(icon: Char): Tag               = iconTag(icon.toString)
   def iconTag(icon: String): Tag             = i(dataIcon := icon)
   def iconTag(icon: Char, text: Frag): Tag   = iconTag(icon.toString, text)
@@ -60,6 +62,8 @@ trait ScalatagsSnippets extends Cap {
   val svgTag                                 = tag("svg")
   val svgGroupTag                            = tag("g")
   val svgTextTag                             = tag("text")
+  val details                                = tag("details")
+  val summary                                = tag("summary")
 
   def userTitleTag(t: Title) =
     span(

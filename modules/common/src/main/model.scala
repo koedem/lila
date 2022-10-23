@@ -2,8 +2,10 @@ package lila.common
 
 import io.mola.galimatias.IPv4Address.parseIPv4Address
 import io.mola.galimatias.IPv6Address.parseIPv6Address
-import scala.util.Try
+import play.api.mvc.Call
 import scala.concurrent.duration._
+import scala.util.Try
+import lila.base.LilaTypes
 
 case class ApiVersion(value: Int) extends AnyVal with IntValue with Ordered[ApiVersion] {
   def compare(other: ApiVersion) = Integer.compare(value, other.value)
@@ -71,11 +73,16 @@ object Domain {
   }
 }
 
+case class LangPath(value: String) extends AnyVal
+object LangPath { def apply(call: Call): LangPath = LangPath(call.url) }
+
 case class Strings(value: List[String]) extends AnyVal
 case class UserIds(value: List[String]) extends AnyVal
 case class Ints(value: List[Int])       extends AnyVal
 
 case class Template(value: String) extends AnyVal
+
+case class Days(value: Int) extends AnyVal with LilaTypes.IntValue
 
 case class Preload[A](value: Option[A]) extends AnyVal {
   def orLoad(f: => Fu[A]): Fu[A] = value.fold(f)(fuccess)

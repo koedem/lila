@@ -1,16 +1,18 @@
 package lila.challenge
 
-import reactivemongo.api.bson._
-
 import chess.variant.Variant
+import reactivemongo.api.bson._
+import scala.util.Success
+
+import lila.common.Days
 import lila.db.BSON
 import lila.db.BSON.{ Reader, Writer }
 import lila.db.dsl._
-import scala.util.Success
 
 private object BSONHandlers {
 
   import Challenge._
+  import lila.game.BSONHandlers.RulesHandler
 
   implicit val ColorChoiceBSONHandler = BSONIntegerHandler.as[ColorChoice](
     {
@@ -30,7 +32,7 @@ private object BSONHandlers {
       (r.intO("l"), r.intO("i")) mapN { (limit, inc) =>
         TimeControl.Clock(chess.Clock.Config(limit, inc))
       } orElse {
-        r intO "d" map TimeControl.Correspondence.apply
+        r.getO[Days]("d") map TimeControl.Correspondence.apply
       } getOrElse TimeControl.Unlimited
     def writes(w: Writer, t: TimeControl) =
       t match {
@@ -39,14 +41,10 @@ private object BSONHandlers {
         case TimeControl.Unlimited                       => $empty
       }
   }
-  implicit val VariantBSONHandler = tryHandler[Variant](
-    { case BSONInteger(v) => Variant(v) toTry s"No such variant: $v" },
-    x => BSONInteger(x.id)
-  )
-  implicit val StatusBSONHandler = tryHandler[Status](
-    { case BSONInteger(v) => Status(v) toTry s"No such status: $v" },
-    x => BSONInteger(x.id)
-  )
+  implicit val VariantBSONHandler       = valueMapHandler(Variant.byId)(_.id)
+  implicit val StatusBSONHandler        = valueMapHandler(Status.byId)(_.id)
+  implicit val DeclineReasonBSONHandler = valueMapHandler(DeclineReason.byKey)(_.key)
+
   implicit val RatingBSONHandler = new BSON[Rating] {
     def reads(r: Reader) = Rating(r.int("i"), r.boolD("p"))
     def writes(w: Writer, r: Rating) =
@@ -67,10 +65,6 @@ private object BSONHandlers {
     def reads(r: Reader)                           = Challenger.Anonymous(r.str("s"))
     def writes(w: Writer, a: Challenger.Anonymous) = $doc("s" -> a.secret)
   }
-  implicit val DeclineReasonBSONHandler = tryHandler[DeclineReason](
-    { case BSONString(k) => Success(Challenge.DeclineReason(k)) },
-    r => BSONString(r.key)
-  )
   implicit val ChallengerBSONHandler = new BSON[Challenger] {
     def reads(r: Reader) =
       if (r contains "id") RegisteredBSONHandler reads r
@@ -84,5 +78,7 @@ private object BSONHandlers {
       }
   }
 
-  implicit val ChallengeBSONHandler = Macros.handler[Challenge]
+  implicit private val OpenForIdsBSONHandler = tuple2BSONHandler[lila.user.User.ID]
+  implicit val ChallengeOpenBSONHandler      = Macros.handler[Challenge.Open]
+  implicit val ChallengeBSONHandler          = Macros.handler[Challenge]
 }

@@ -20,20 +20,24 @@ object login {
         jsModule("login"),
         embedJsUnsafeLoadThen("""loginSignup.loginStart()""")
       ),
-      moreCss = cssTag("auth")
+      moreCss = cssTag("auth"),
+      withHrefLangs = lila.common.LangPath(routes.Auth.login).some
     ) {
+      def referrerParameter = referrer.?? { ref => s"?referrer=${urlencode(ref)}" }
       main(cls := "auth auth-login box box-pad")(
         h1(trans.signIn()),
         postForm(
-          cls := "form3",
-          action := s"${routes.Auth.authenticate}${referrer.?? { ref =>
-              s"?referrer=${urlencode(ref)}"
-            }}"
+          cls    := "form3",
+          action := s"${routes.Auth.authenticate}$referrerParameter"
         )(
           div(cls := "one-factor")(
             form3.globalError(form),
             auth.bits.formFields(form("username"), form("password"), none, register = false),
-            form3.submit(trans.signIn(), icon = none)
+            form3.submit(trans.signIn(), icon = none),
+            label(cls    := "login-remember")(
+              input(name := "remember", value := "true", tpe := "checkbox", checked),
+              trans.rememberMe()
+            )
           ),
           div(cls := "two-factor none")(
             form3.group(
@@ -48,7 +52,7 @@ object login {
           )
         ),
         div(cls := "alternative")(
-          a(href := routes.Auth.signup)(trans.signUp()),
+          a(href := s"${langHref(routes.Auth.signup)}$referrerParameter")(trans.signUp()),
           a(href := routes.Auth.passwordReset)(trans.passwordReset()),
           a(href := routes.Auth.magicLink)("Log in by email")
         )

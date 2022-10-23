@@ -5,11 +5,11 @@ import play.api.data._, Forms._
 import play.api.libs.json._
 import play.api.mvc._
 import scala.annotation.nowarn
+import views._
 
+import lila.api.Context
 import lila.app._
 import lila.hub.actorApi.captcha.ValidCaptcha
-import makeTimeout.large
-import views._
 
 final class Main(
     env: Env,
@@ -48,6 +48,7 @@ final class Main(
 
   def captchaCheck(id: String) =
     Open { implicit ctx =>
+      import makeTimeout.large
       env.hub.captcher.actor ? ValidCaptcha(id, ~get("solution")) map { case valid: Boolean =>
         Ok(if (valid) 1 else 0)
       }
@@ -69,13 +70,14 @@ final class Main(
       }
     }
 
-  def mobile =
-    Open { implicit ctx =>
-      pageHit
-      OptionOk(prismicC getBookmark "mobile-apk") { case (doc, resolver) =>
-        html.mobile(doc, resolver)
-      }
+  def mobile     = Open(serveMobile(_))
+  def mobileLang = LangPage(routes.Main.mobile)(serveMobile(_)) _
+  private def serveMobile(implicit ctx: Context) = {
+    pageHit
+    OptionOk(prismicC getBookmark "mobile-apk") { case (doc, resolver) =>
+      html.mobile(doc, resolver)
     }
+  }
 
   def dailyPuzzleSlackApp =
     Open { implicit ctx =>
@@ -94,14 +96,6 @@ final class Main(
         name = get("n", ctx.req) | "?"
       )
       NoContent.fuccess
-    }
-
-  /** Event monitoring endpoint
-    */
-  def jsmon(event: String) =
-    Action {
-      lila.mon.http.jsmon(event).increment()
-      NoContent
     }
 
   val robots = Action { req =>
@@ -186,7 +180,7 @@ Allow: /
 
   def keyboardMoveHelp =
     Open { implicit ctx =>
-      Ok(html.site.helpModal.keyboardMove).fuccess
+      Ok(html.site.keyboardHelpModal.keyboardMove).fuccess
     }
 
   def movedPermanently(to: String) =
@@ -201,7 +195,7 @@ Allow: /
       else
         fuccess {
           Redirect(s"${routes.Lobby.home}#pool/10+0").withCookies(
-            env.lilaCookie.withSession { s =>
+            env.lilaCookie.withSession(remember = true) { s =>
               s + ("theme" -> "ic") + ("pieceSet" -> "icpieces")
             }
           )

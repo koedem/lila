@@ -10,7 +10,6 @@ import reactivemongo.api.commands.WriteResult
 import reactivemongo.api.{ Cursor, ReadPreference, WriteConcern }
 
 import lila.common.ThreadLocalRandom
-import lila.db.BSON.BSONJodaDateTimeHandler
 import lila.db.dsl._
 import lila.db.isDuplicateKey
 import lila.user.User
@@ -276,6 +275,8 @@ final class GameRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionCont
 
   def isAnalysed(id: ID): Fu[Boolean] =
     coll.exists($id(id) ++ Query.analysed(true))
+
+  def analysed(id: ID) = coll.one[Game]($id(id) ++ Query.analysed(true))
 
   def exists(id: ID) = coll.exists($id(id))
 

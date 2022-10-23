@@ -4,8 +4,8 @@ import BuildSettings._
 import Dependencies._
 
 lazy val root = Project("lila", file("."))
-  .enablePlugins(PlayScala, if (useEpoll) PlayNettyServer else PlayAkkaHttpServer)
-  .disablePlugins(if (useEpoll) PlayAkkaHttpServer else PlayNettyServer)
+  .enablePlugins(PlayScala, PlayNettyServer)
+  .disablePlugins(PlayAkkaHttpServer)
   .dependsOn(api)
   .aggregate(api)
   .settings(buildSettings)
@@ -61,7 +61,7 @@ lazy val i18n = smallModule("i18n",
     MessageCompiler(
       sourceDir = new File("translation/source"),
       destDir = new File("translation/dest"),
-      dbs = "site arena emails learn activity coordinates study class contact patron coach broadcast streamer tfa settings preferences team perfStat search tourname faq lag swiss puzzle puzzleTheme challenge storm ublog insight keyboardMove timeago".split(' ').toList,
+      dbs = "site arena emails learn activity coordinates study class contact patron coach broadcast streamer tfa settings preferences team perfStat search tourname faq lag swiss puzzle puzzleTheme challenge storm ublog insight keyboardMove timeago oauthScope".split(' ').toList,
       compileTo = (Compile / sourceManaged).value
     )
   }.taskValue
@@ -171,7 +171,7 @@ lazy val room = module("room",
 )
 
 lazy val timeline = module("timeline",
-  Seq(common, db, game, user, hub, security, relation),
+  Seq(common, db, game, user, hub, security, relation, team),
   reactivemongo.bundle
 )
 
@@ -212,7 +212,7 @@ lazy val bot = module("bot",
 
 lazy val analyse = module("analyse",
   Seq(common, hub, game, user, notifyModule, evalCache),
-  reactivemongo.bundle
+  specs2Bundle ++ reactivemongo.bundle
 )
 
 lazy val round = module("round",
@@ -256,8 +256,8 @@ lazy val tutor = module("tutor",
 )
 
 lazy val opening = module("opening",
-  Seq(common, memo),
-  Seq()
+  Seq(common, memo, game),
+  specs2Bundle
 )
 
 lazy val tournament = module("tournament",

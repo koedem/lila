@@ -22,6 +22,7 @@ final private class StudySocket(
     chatApi: lila.chat.ChatApi
 )(implicit
     ec: scala.concurrent.ExecutionContext,
+    scheduler: akka.actor.Scheduler,
     mode: play.api.Mode
 ) {
 
@@ -229,7 +230,8 @@ final private class StudySocket(
     logger,
     _ => _ => none, // the "talk" event is handled by the study API
     localTimeout = Some { (roomId, modId, suspectId) =>
-      api.isContributor(roomId, modId) >>& !api.isMember(roomId, suspectId)
+      api.isContributor(roomId, modId) >>& !api.isMember(roomId, suspectId) >>&
+        !Bus.ask("isOfficialRelay") { actorApi.IsOfficialRelay(roomId, _) }
     },
     chatBusChan = _.Study
   )
@@ -451,9 +453,10 @@ object StudySocket {
         case class SetRole(userId: String, role: String)
         implicit val SetRoleReader: Reads[SetRole]               = Json.reads[SetRole]
         implicit val ChapterModeReader: Reads[ChapterMaker.Mode] = optRead(ChapterMaker.Mode.apply)
-        implicit val ChapterOrientationReader: Reads[ChapterMaker.Orientation] = stringRead(
-          ChapterMaker.Orientation.apply
-        )
+        implicit val ChapterOrientationReader: Reads[ChapterMaker.Orientation] =
+          stringRead(ChapterMaker.Orientation.apply)
+        implicit val UserSelectionReader: Reads[Settings.UserSelection] =
+          optRead(Settings.UserSelection.byKey.get)
         implicit val VariantReader: Reads[chess.variant.Variant] = optRead(chess.variant.Variant.apply)
         implicit val ChapterDataReader: Reads[ChapterMaker.Data] = Json.reads[ChapterMaker.Data]
         implicit val ChapterEditDataReader: Reads[ChapterMaker.EditData] = Json.reads[ChapterMaker.EditData]

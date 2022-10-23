@@ -7,6 +7,7 @@ import play.api.data.Forms._
 
 import lila.rating.RatingRange
 import lila.user.{ User, UserContext }
+import lila.common.{ Days, Form => LilaForm }
 
 object SetupForm {
 
@@ -90,7 +91,7 @@ object SetupForm {
         timeMode = if (d.isDefined) TimeMode.Correspondence else TimeMode.RealTime,
         time = t | 10,
         increment = i | 5,
-        days = d | 7,
+        days = d | Days(7),
         mode = chess.Mode(~r),
         color = lila.lobby.Color.orDefault(c),
         ratingRange = g.fold(RatingRange.default)(RatingRange.orDefault)
@@ -100,33 +101,6 @@ object SetupForm {
       .verifying(
         "Invalid time control",
         hook => hook.makeClock.exists(lila.game.Game.isBoardCompatible) || hook.makeDaysPerTurn.isDefined
-      )
-  )
-
-  lazy val boardApiSeek = Form(
-    mapping(
-      "time"        -> time,
-      "increment"   -> increment,
-      "variant"     -> optional(boardApiVariantKeys),
-      "rated"       -> optional(boolean),
-      "color"       -> optional(color),
-      "ratingRange" -> optional(ratingRange)
-    )((t, i, v, r, c, g) =>
-      HookConfig(
-        variant = v.flatMap(Variant.apply) | Variant.default,
-        timeMode = TimeMode.RealTime,
-        time = t,
-        increment = i,
-        days = 1,
-        mode = chess.Mode(~r),
-        color = lila.lobby.Color.orDefault(c),
-        ratingRange = g.fold(RatingRange.default)(RatingRange.orDefault)
-      )
-    )(_ => none)
-      .verifying("Invalid clock", _.validClock)
-      .verifying(
-        "Invalid time control",
-        hook => hook.makeClock ?? lila.game.Game.isBoardCompatible
       )
   )
 
@@ -140,6 +114,8 @@ object SetupForm {
         .verifying("Invalid clock", c => c.estimateTotalTime > chess.Centis(0))
 
     lazy val clock = "clock" -> optional(clockMapping)
+
+    lazy val optionalDays = "days" -> optional(days)
 
     lazy val variant =
       "variant" -> optional(text.verifying(Variant.byKey.contains _))
@@ -160,13 +136,14 @@ object SetupForm {
       mapping(
         variant,
         clock,
-        "days"            -> optional(days),
+        optionalDays,
         "rated"           -> boolean,
         "color"           -> optional(color),
         "fen"             -> fenField,
         "acceptByToken"   -> optional(nonEmptyText),
         "message"         -> message,
-        "keepAliveStream" -> optional(boolean)
+        "keepAliveStream" -> optional(boolean),
+        "rules"           -> optional(gameRules)
       )(ApiConfig.from)(_ => none)
         .verifying("invalidFen", _.validFen)
         .verifying("can't be rated", _.validRated)
@@ -176,7 +153,7 @@ object SetupForm {
         "level" -> level,
         variant,
         clock,
-        "days"  -> optional(days),
+        optionalDays,
         "color" -> optional(color),
         "fen"   -> fenField
       )(ApiAiConfig.from)(_ => none).verifying("invalidFen", _.validFen)
@@ -184,15 +161,19 @@ object SetupForm {
 
     lazy val open = Form(
       mapping(
-        "name" -> optional(lila.common.Form.cleanNonEmptyText(maxLength = 200)),
+        "name" -> optional(LilaForm.cleanNonEmptyText(maxLength = 200)),
         variant,
         clock,
-        "days"  -> optional(days),
+        optionalDays,
         "rated" -> boolean,
-        "fen"   -> fenField
+        "fen"   -> fenField,
+        "users" -> optional(
+          LilaForm.strings.separator(",").verifying("Must be 2 usernames, white and black", _.sizeIs == 2)
+        ),
+        "rules" -> optional(gameRules)
       )(OpenConfig.from)(_ => none)
         .verifying("invalidFen", _.validFen)
-        .verifying("rated without a clock", c => c.clock.isDefined || !c.rated)
+        .verifying("rated without a clock", c => c.clock.isDefined || c.days.isDefined || !c.rated)
     )
   }
 }

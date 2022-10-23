@@ -69,26 +69,26 @@ final class Account(
     Auth { implicit ctx => me =>
       negotiate(
         html = notFound,
-        api = _ => {
-          env.pref.api.getPref(me) zip
-            env.round.proxyRepo.urgentGames(me) zip
-            env.challenge.api.countInFor.get(me.id) zip
-            env.playban.api.currentBan(me.id) map { case (((prefs, povs), nbChallenges), playban) =>
-              Ok {
-                import lila.pref.JsonView._
-                env.user.jsonView.full(me, withOnline = true, withRating = ctx.pref.showRatings) ++ Json
-                  .obj(
-                    "prefs"        -> prefs,
-                    "nowPlaying"   -> JsArray(povs take 50 map env.api.lobbyApi.nowPlaying),
-                    "nbChallenges" -> nbChallenges
-                  )
-                  .add("kid" -> me.kid)
-                  .add("troll" -> me.marks.troll)
-                  .add("playban" -> playban)
-                  .add("announce" -> AnnounceStore.get.map(_.json))
-              }.withHeaders(CACHE_CONTROL -> s"max-age=15")
-            }
-        }
+        api = _ =>
+          for {
+            povs         <- env.round.proxyRepo urgentGames me
+            nbChallenges <- env.challenge.api.countInFor get me.id
+            playban      <- env.playban.api currentBan me.id
+          } yield Ok {
+            import lila.pref.JsonView._
+            env.user.jsonView
+              .full(me, withRating = ctx.pref.showRatings, withProfile = false) ++ Json
+              .obj(
+                "prefs"        -> ctx.pref,
+                "nowPlaying"   -> JsArray(povs take 50 map env.api.lobbyApi.nowPlaying),
+                "nbChallenges" -> nbChallenges,
+                "online"       -> true
+              )
+              .add("kid" -> me.kid)
+              .add("troll" -> me.marks.troll)
+              .add("playban" -> playban)
+              .add("announce" -> AnnounceStore.get.map(_.json))
+          }.withHeaders(CACHE_CONTROL -> "max-age=15")
       )
     }
 
@@ -163,6 +163,7 @@ final class Account(
   private def refreshSessionId(me: UserModel, result: Result)(implicit ctx: Context): Fu[Result] =
     env.security.store.closeAllSessionsOf(me.id) >>
       env.push.webSubscriptionApi.unsubscribeByUser(me) >>
+      env.push.unregisterDevices(me) >>
       env.security.api.saveAuthentication(me.id, ctx.mobileApiVersion) map { sessionId =>
         result.withCookies(env.lilaCookie.session(env.security.api.sessionIdKey, sessionId))
       }
@@ -222,6 +223,7 @@ final class Account(
           (prevEmail.exists(_.isNoReply) ?? env.clas.api.student.release(user)) >>
             auth.authenticateUser(
               user,
+              remember = true,
               result =
                 if (prevEmail.exists(_.isNoReply))
                   Some(_ => Redirect(routes.User.show(user.username)).flashSuccess)
@@ -458,7 +460,7 @@ final class Account(
           notFound
         case Some(user) =>
           env.report.api.reopenReports(lila.report.Suspect(user)) >>
-            auth.authenticateUser(user) >>-
+            auth.authenticateUser(user, remember = true) >>-
             lila.mon.user.auth.reopenConfirm("success").increment().unit
       }
     }

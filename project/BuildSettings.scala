@@ -25,7 +25,8 @@ object BuildSettings {
       Compile / doc / sources                := Seq.empty,
       Compile / packageDoc / publishArtifact := false,
       Compile / packageSrc / publishArtifact := false,
-      javaOptions ++= Seq("-Xms64m", "-Xmx256m"),
+      Compile / run / fork                   := true,
+      javaOptions ++= Seq("-Xms64m", "-Xmx512m"),
       // com.typesafe.play:play-ahc-ws-standalone_2.13:2.1.3 brings in 0.9.0, but we want 1.0.0:
       libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
     )

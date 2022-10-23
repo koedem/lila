@@ -49,7 +49,9 @@ final class JsonView(
                 "desc" -> a.description.txt()
               )
               .add("chapter" -> a.asTheme.flatMap(PuzzleTheme.studyChapterIds.get))
-              .add("isOpening" -> a.asTheme.isEmpty)
+              .add("opening" -> a.opening.map { op =>
+                Json.obj("key" -> op.key, "name" -> op.name)
+              })
           }
         )
     }

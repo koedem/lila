@@ -66,6 +66,7 @@ final private class MsgSecurity(
     ): Fu[Verdict] = {
       val text = rawText.trim
       if (text.isEmpty) fuccess(Invalid)
+      else if (contacts.orig.isLichess && !contacts.dest.isLichess) fuccess(Ok)
       else
         may.post(contacts, isNew) flatMap {
           case false => fuccess(Block)
@@ -91,7 +92,7 @@ final private class MsgSecurity(
               )
 
           case Spam =>
-            if (dirtSpamDedup(text))
+            if (dirtSpamDedup(text) && !contacts.orig.isTroll)
               logger.warn(s"PM spam from ${contacts.orig.id} to ${contacts.dest.id}: $text")
 
           case _ =>
@@ -135,7 +136,7 @@ final private class MsgSecurity(
       }
 
     def post(contacts: User.Contacts, isNew: Boolean): Fu[Boolean] =
-      fuccess(contacts.dest.id != User.lichessId) >>& {
+      fuccess(!contacts.dest.isLichess) >>& {
         fuccess(Granter.byRoles(_.PublicMod)(~contacts.orig.roles)) >>| {
           !relationApi.fetchBlocks(contacts.dest.id, contacts.orig.id) >>&
             (create(contacts) >>| reply(contacts)) >>&

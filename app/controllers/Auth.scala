@@ -28,19 +28,25 @@ final class Auth(
   private def mobileUserOk(u: UserModel, sessionId: String)(implicit ctx: Context): Fu[Result] =
     env.round.proxyRepo urgentGames u map { povs =>
       Ok {
-        env.user.jsonView.full(u, withOnline = true, withRating = ctx.pref.showRatings) ++ Json.obj(
+        env.user.jsonView.full(
+          u,
+          withRating = ctx.pref.showRatings,
+          withProfile = true
+        ) ++ Json.obj(
           "nowPlaying" -> JsArray(povs take 20 map env.api.lobbyApi.nowPlaying),
           "sessionId"  -> sessionId
         )
       }
     }
 
-  private def getReferrer(implicit ctx: Context): String =
-    get("referrer").flatMap(env.api.referrerRedirect.valid) orElse
-      ctxReq.session.get(api.AccessUri) getOrElse
-      routes.Lobby.home.url
+  private def getReferrerOption(implicit ctx: Context): Option[String] =
+    get("referrer").flatMap(env.api.referrerRedirect.valid) orElse ctxReq.session.get(
+      api.AccessUri
+    )
 
-  def authenticateUser(u: UserModel, result: Option[String => Result] = None)(implicit
+  private def getReferrer(implicit ctx: Context): String = getReferrerOption | routes.Lobby.home.url
+
+  def authenticateUser(u: UserModel, remember: Boolean, result: Option[String => Result] = None)(implicit
       ctx: Context
   ): Fu[Result] =
     api.saveAuthentication(u.id, ctx.mobileApiVersion) flatMap { sessionId =>
@@ -49,7 +55,7 @@ final class Auth(
           result.fold(Redirect(getReferrer))(_(getReferrer))
         },
         api = _ => mobileUserOk(u, sessionId)
-      ) map authenticateCookie(sessionId)
+      ) map authenticateCookie(sessionId, remember)
     } recoverWith authRecovery
 
   private def authenticateAppealUser(u: UserModel, redirect: String => Result)(implicit
@@ -57,14 +63,17 @@ final class Auth(
   ): Fu[Result] =
     api.appeal.saveAuthentication(u.id) flatMap { sessionId =>
       negotiate(
-        html = redirect(routes.Appeal.landing.url).fuccess map authenticateCookie(sessionId),
+        html = redirect(appeal.routes.Appeal.landing.url).fuccess map
+          authenticateCookie(sessionId, remember = false),
         api = _ => NotFound.fuccess
       )
     } recoverWith authRecovery
 
-  private def authenticateCookie(sessionId: String)(result: Result)(implicit req: RequestHeader) =
+  private def authenticateCookie(sessionId: String, remember: Boolean)(
+      result: Result
+  )(implicit req: RequestHeader) =
     result.withCookies(
-      env.lilaCookie.withSession {
+      env.lilaCookie.withSession(remember = remember) {
         _ + (api.sessionIdKey -> sessionId) - api.AccessUri - lila.security.EmailConfirm.cookie.name
       }
     )
@@ -77,14 +86,15 @@ final class Auth(
       }
   }
 
-  def login =
-    Open { implicit ctx =>
-      val referrer = get("referrer").flatMap(env.api.referrerRedirect.valid)
-      referrer ifTrue ctx.isAuth match {
-        case Some(url) => Redirect(url).fuccess // redirect immediately if already logged in
-        case None      => Ok(html.auth.login(api.loginForm, referrer)).fuccess
-      }
+  def login     = Open(serveLogin(_))
+  def loginLang = LangPage(routes.Auth.login)(serveLogin(_)) _
+  private def serveLogin(implicit ctx: Context) = NoBot {
+    val referrer = get("referrer") flatMap env.api.referrerRedirect.valid
+    referrer ifTrue ctx.isAuth match {
+      case Some(url) => Redirect(url).fuccess // redirect immediately if already logged in
+      case None      => Ok(html.auth.login(api.loginForm, referrer)).fuccess
     }
+  }
 
   private val is2fa = Set("MissingTotpToken", "InvalidTotpToken")
 
@@ -94,7 +104,7 @@ final class Auth(
         Firewall {
           def redirectTo(url: String) = if (HTTPRequest isXhr ctx.req) Ok(s"ok:$url") else Redirect(url)
           implicit val req            = ctx.body
-          val referrer = get("referrer").filterNot(env.api.referrerRedirect.sillyLoginReferrers.contains)
+          val referrer = get("referrer").filterNot(env.api.referrerRedirect.sillyLoginReferrers)
           api.usernameOrEmailForm
             .bindFromRequest()
             .fold(
@@ -136,7 +146,8 @@ final class Auth(
                               env.user.repo.email(u.id) foreach {
                                 _ foreach { garbageCollect(u, _) }
                               }
-                              authenticateUser(u, Some(redirectTo))
+                              val remember = api.rememberForm.bindFromRequest().value | true
+                              authenticateUser(u, remember, Some(redirectTo))
                           }
                       )
                   }
@@ -169,12 +180,12 @@ final class Auth(
       )
     }
 
-  def signup =
-    Open { implicit ctx =>
-      NoTor {
-        forms.signup.website map { form =>
-          Ok(html.auth.signup(form))
-        }
+  def signup     = Open(serveSignup(_))
+  def signupLang = LangPage(routes.Auth.signup)(serveSignup(_)) _
+  private def serveSignup(implicit ctx: Context) =
+    NoTor {
+      forms.signup.website map { form =>
+        Ok(html.auth.signup(form))
       }
     }
 
@@ -217,7 +228,7 @@ final class Auth(
                   case Signup.Bad(err)           => jsonFormError(err)
                   case Signup.ConfirmEmail(_, _) => Ok(Json.obj("email_confirm" -> true)).fuccess
                   case Signup.AllSet(user, email) =>
-                    welcome(user, email, sendWelcomeEmail = true) >> authenticateUser(user)
+                    welcome(user, email, sendWelcomeEmail = true) >> authenticateUser(user, remember = true)
                 }
           )
         }
@@ -308,9 +319,9 @@ final class Auth(
   private def redirectNewUser(user: UserModel)(implicit ctx: Context) = {
     api.saveAuthentication(user.id, ctx.mobileApiVersion) flatMap { sessionId =>
       negotiate(
-        html = Redirect(routes.User.show(user.username)).fuccess,
+        html = Redirect(getReferrerOption | routes.User.show(user.username).url).fuccess,
         api = _ => mobileUserOk(user, sessionId)
-      ) map authenticateCookie(sessionId)
+      ) map authenticateCookie(sessionId, remember = true)
     } recoverWith authRecovery
   }
 
@@ -410,7 +421,8 @@ final class Auth(
                 env.user.repo.disableTwoFactor(user.id) >>
                 env.security.store.closeAllSessionsOf(user.id) >>
                 env.push.webSubscriptionApi.unsubscribeByUser(user) >>
-                authenticateUser(user) >>-
+                env.push.unregisterDevices(user) >>
+                authenticateUser(user, remember = true) >>-
                 lila.mon.user.auth.passwordResetConfirm("success").increment().unit
             }(rateLimitedFu)
           }
@@ -479,19 +491,21 @@ final class Auth(
 
   def magicLinkLogin(token: String) =
     Open { implicit ctx =>
-      Firewall {
-        magicLinkLoginRateLimitPerToken(token) {
-          env.security.magicLink confirm token flatMap {
-            case None =>
-              lila.mon.user.auth.magicLinkConfirm("token_fail").increment()
-              notFound
-            case Some(user) =>
-              authLog(user.username, "-", "Magic link")
-              authenticateUser(user) >>-
-                lila.mon.user.auth.magicLinkConfirm("success").increment().unit
-          }
-        }(rateLimitedFu)
-      }
+      if (ctx.isAuth) Redirect(routes.Lobby.home).fuccess
+      else
+        Firewall {
+          magicLinkLoginRateLimitPerToken(token) {
+            env.security.magicLink confirm token flatMap {
+              case None =>
+                lila.mon.user.auth.magicLinkConfirm("token_fail").increment()
+                notFound
+              case Some(user) =>
+                authLog(user.username, "-", "Magic link")
+                authenticateUser(user, remember = true) >>-
+                  lila.mon.user.auth.magicLinkConfirm("success").increment().unit
+            }
+          }(rateLimitedFu)
+        }
     }
 
   private def loginTokenFor(me: UserModel) = JsonOk {
@@ -504,7 +518,14 @@ final class Auth(
   }
 
   def makeLoginToken =
-    AuthOrScoped(_.Web.Login)(_ => loginTokenFor, _ => loginTokenFor)
+    AuthOrScoped(_.Web.Login)(
+      _ => loginTokenFor,
+      req =>
+        user => {
+          lila.log("oauth").info(s"api makeLoginToken ${user.id} ${HTTPRequest printClient req}")
+          loginTokenFor(user)
+        }
+    )
 
   def loginWithToken(token: String) =
     Open { implicit ctx =>
@@ -524,7 +545,7 @@ final class Auth(
       if (ctx.isAuth) Redirect(getReferrer).fuccess
       else
         Firewall {
-          consumingToken(token) { authenticateUser(_) }
+          consumingToken(token) { authenticateUser(_, remember = true) }
         }
     }
 

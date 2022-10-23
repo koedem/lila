@@ -12,13 +12,21 @@ final class JsonView(isOnline: lila.socket.IsOnline) {
   implicit private val profileWrites  = Json.writes[Profile]
   implicit private val playTimeWrites = Json.writes[PlayTime]
 
-  def full(u: User, onlyPerf: Option[PerfType] = None, withOnline: Boolean, withRating: Boolean): JsObject =
+  def full(
+      u: User,
+      onlyPerf: Option[PerfType] = None,
+      withRating: Boolean,
+      withProfile: Boolean
+  ): JsObject =
     if (u.disabled) disabled(u)
     else
       base(u, onlyPerf, withRating = withRating) ++ Json
         .obj("createdAt" -> u.createdAt)
-        .add("online" -> withOnline.option(isOnline(u.id)))
-        .add("profile" -> u.profile.map(p => profileWrites.writes(p.filterTroll(u.marks.troll)).noNull))
+        .add(
+          "profile" -> u.profile
+            .ifTrue(withProfile)
+            .map(p => profileWrites.writes(p.filterTroll(u.marks.troll)).noNull)
+        )
         .add("seenAt" -> u.seenAt)
         .add("playTime" -> u.playTime)
 
@@ -144,5 +152,26 @@ object JsonView {
           .add("mod", note.mod)
           .add("dox", note.dox)
       }
+    }
+
+  implicit def leaderboardsWrites(implicit
+      lightPerfWrites: OWrites[User.LightPerf]
+  ): Writes[Perfs.Leaderboards] =
+    Writes[Perfs.Leaderboards] { leaderboards =>
+      Json.obj(
+        "bullet"        -> leaderboards.bullet,
+        "blitz"         -> leaderboards.blitz,
+        "rapid"         -> leaderboards.rapid,
+        "classical"     -> leaderboards.classical,
+        "ultraBullet"   -> leaderboards.ultraBullet,
+        "crazyhouse"    -> leaderboards.crazyhouse,
+        "chess960"      -> leaderboards.chess960,
+        "kingOfTheHill" -> leaderboards.kingOfTheHill,
+        "threeCheck"    -> leaderboards.threeCheck,
+        "antichess"     -> leaderboards.antichess,
+        "atomic"        -> leaderboards.atomic,
+        "horde"         -> leaderboards.horde,
+        "racingKings"   -> leaderboards.racingKings
+      )
     }
 }
