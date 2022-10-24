@@ -44,6 +44,7 @@ case class Ask(
   def isTally: Boolean     = tags contains "tally"
   def isConcluded: Boolean = tags contains "concluded"
   def isCenter: Boolean    = tags contains "center"
+  def isRandom: Boolean    = tags contains "random"
   def isVertical: Boolean  = tags exists (_ startsWith "vert")
   def isStretch: Boolean   = tags.exists(_ startsWith "stretch")
   def isFeedback: Boolean  = tags contains "feedback"

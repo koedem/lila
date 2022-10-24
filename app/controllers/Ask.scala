@@ -6,32 +6,32 @@ import play.api.data.Forms.single
 
 final class Ask(env: Env) extends LilaController(env) {
 
-  def picks(id: String, picks: Option[String]) =
+  def picks(id: String, picks: Option[String], view: Option[String]) =
     AuthBody { implicit ctx => me =>
       // don't validate picks here, parseable but illegal picks are handled elsewhere
       env.ask.api.setPicks(
         id,
         me.id,
-        picks map (_ split ('-') filter (_ nonEmpty) map (_ toInt) toList)
+        paramToList(picks)
       ) map {
-        case Some(ask) => Ok(views.html.ask.renderInner(ask))
+        case Some(ask) => Ok(views.html.ask.renderInner(ask, paramToList(view)))
         case None      => NotFound(s"Ask $id not found")
       }
     }
 
-  def feedback(id: String) =
+  def feedback(id: String, view: Option[String]) =
     AuthBody { implicit ctx => me =>
       implicit val req = ctx.body
       env.ask.api.setFeedback(id, me.id, feedbackForm.bindFromRequest().value) map {
-        case Some(ask) => Ok(views.html.ask.renderInner(ask))
+        case Some(ask) => Ok(views.html.ask.renderInner(ask, paramToList(view)))
         case None      => NotFound(s"Ask $id not found")
       }
     }
 
-  def unset(id: String) =
+  def unset(id: String, view: Option[String]) =
     AuthBody { implicit ctx => me =>
       env.ask.api.unset(id, me.id) map {
-        case Some(ask) => Ok(views.html.ask.renderInner(ask))
+        case Some(ask) => Ok(views.html.ask.renderInner(ask, paramToList(view)))
         case None      => NotFound(s"Ask $id not found")
       }
     }
@@ -90,6 +90,10 @@ final class Ask(env: Env) extends LilaController(env) {
             }
       }
     }
+
+  private def paramToList(param: Option[String]) =
+    param map (_ split ('-') filter (_ nonEmpty) map (_ toInt) toList)
+
   private val feedbackForm =
     Form[String](single("text" -> lila.common.Form.cleanNonEmptyText(maxLength = 80)))
 }

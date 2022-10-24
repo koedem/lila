@@ -42,9 +42,9 @@ object askAdmin {
       div(cls := "header")(
         as.question,
         div(cls := "actions")(
-          button(tpe := "submit", formaction := routes.Ask.delete(as._id))("Delete"),
-          button(tpe := "submit", formaction := routes.Ask.reset(as._id))("Reset"),
-          button(tpe := "submit", formaction := routes.Ask.conclude(as._id))("Conclude")
+          button(cls := "action", tpe := "submit", formaction := routes.Ask.delete(as._id))("Delete"),
+          button(cls := "action", tpe := "submit", formaction := routes.Ask.reset(as._id))("Reset"),
+          button(cls := "action", tpe := "submit", formaction := routes.Ask.conclude(as._id))("Conclude")
         )
       ),
       div(cls := "inset")(

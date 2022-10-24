@@ -9,10 +9,12 @@ class Ask {
   el: Element;
   submitEl?: Element;
   feedbackEl?: HTMLInputElement;
+  view: string; // the initial order of picks when 'random' tag is used
   db: 'clean' | 'hasPicks'; // clean means no picks for this (ask, user) in the db
   constructor(askEl: Element) {
     this.el = askEl;
     this.db = askEl.hasAttribute('value') ? 'hasPicks' : 'clean';
+    this.view = Array.from($('.choice', this.el), e => e?.getAttribute('value')).join('-');
     wireExclusiveChoices(this);
     wireRankedChoices(this);
     wireActions(this);
@@ -20,7 +22,7 @@ class Ask {
     wireSubmit(this);
   }
   ranking(): string {
-    return Array.from($('.ranked-choice', this.el), e => e?.getAttribute('value')).join('-');
+    return Array.from($('.choice.rank', this.el), e => e?.getAttribute('value')).join('-');
   }
   feedbackState(state: 'clean' | 'dirty' | 'success') {
     this.submitEl?.classList.remove('dirty', 'success');
@@ -53,10 +55,10 @@ const askXhr = (req: { ask: Ask; url: string; method?: string; body?: FormData; 
   );
 
 const wireExclusiveChoices = (ask: Ask): Cash =>
-  $('.exclusive-choice', ask.el).on('click', function (e: Event) {
+  $('.choice.exclusive', ask.el).on('click', function (e: Event) {
     const target = e.target as Element;
     const picks = target.classList.contains('selected') ? '' : `?picks=${target.getAttribute('value')}`;
-    askXhr({ ask: ask, url: `/ask/${ask.el.id}${picks}` });
+    askXhr({ ask: ask, url: `/ask/${ask.el.id}${picks}${picks ? '&' : '?'}view=${ask.view}` });
   });
 
 const wireFeedback = (ask: Ask): void => {
@@ -83,7 +85,7 @@ const wireSubmit = (ask: Ask): void => {
   ask.submitEl = $('.feedback-submit', ask.el).get(0);
   if (!ask.submitEl) return;
   $('input', ask.submitEl).on('click', () => {
-    const path = `/ask/feedback/${ask.el.id}`;
+    const path = `/ask/feedback/${ask.el.id}?view=${ask.view}`;
     const body = ask.feedbackEl?.value ? xhr.form({ text: ask.feedbackEl.value }) : undefined;
     askXhr({
       ask: ask,
@@ -124,7 +126,7 @@ const wireRankedChoices = (ask: Ask): void => {
       updateCursor(d, e);
     });
 
-  $('.ranked-choice', ask.el) // wire each draggable
+  $('.choice.rank', ask.el) // wire each draggable
     .on('dragstart', (e: DragEvent) => {
       e.dataTransfer!.effectAllowed = 'move';
       e.dataTransfer!.setData('text/plain', '');
@@ -136,7 +138,7 @@ const wireRankedChoices = (ask: Ask): void => {
         box: dragEl.parentElement!.getBoundingClientRect(),
         cursorEl: cursorEl!,
         breakEl: breakEl,
-        choices: Array.from($('.ranked-choice', ask.el), e => e!),
+        choices: Array.from($('.choice.rank', ask.el), e => e!),
         isDone: false,
       };
     })
@@ -150,7 +152,7 @@ const wireRankedChoices = (ask: Ask): void => {
 
       const newOrder = ask.ranking();
       if (newOrder == initialOrder) return;
-      const path = `/ask/${ask.el.id}?picks=${newOrder}`;
+      const path = `/ask/${ask.el.id}?picks=${newOrder}&view=${ask.view}`;
       askXhr({
         ask: ask,
         url: path,

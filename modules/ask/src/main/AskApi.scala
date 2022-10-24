@@ -17,7 +17,9 @@ import lila.security.Granter
  */
 
 final class AskApi(
-    yolo: lila.db.AsyncColl,
+    askDb: lila.db.AsyncColl,
+    //picksDb: lila.db.AsyncColl,
+    //feedbackDb: lila.db.AsyncColl,
     timeline: lila.hub.actors.Timeline
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
@@ -25,7 +27,7 @@ final class AskApi(
 
   implicit val AskBSONHandler: BSONDocumentHandler[Ask] = Macros.handler[Ask]
 
-  def get(id: Ask.ID): Fu[Option[Ask]] = yolo { coll =>
+  def get(id: Ask.ID): Fu[Option[Ask]] = askDb { coll =>
     coll.byId[Ask](id)
   }
 
@@ -41,7 +43,7 @@ final class AskApi(
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
   def conclude(id: Ask.ID): Fu[Option[Ask]] =
-    yolo { coll =>
+    askDb { coll =>
       coll.ext.findAndUpdate[Ask]($id(id), $addToSet("tags" -> "concluded"), fetchNewObject = true) collect {
         case Some(ask) =>
           timeline ! Propagate(AskConcluded(ask.creator, ask.question, ~ask.url))
@@ -53,18 +55,22 @@ final class AskApi(
 
   def reset(ask: Ask): Fu[Option[Ask]] = reset(ask._id)
 
-  def reset(id: Ask.ID): Fu[Option[Ask]] = update(id, $unset("picks"))
+  def reset(id: Ask.ID): Fu[Option[Ask]] = 
+    askDb { coll =>
+      coll.ext.findAndUpdate[Ask]($id(id), $doc($unset("picks"), $pull("tags"->"concluded")), fetchNewObject = true)
+    }
 
-  def byUser(uid: User.ID): Fu[List[Ask]] = yolo { coll =>
+
+  def byUser(uid: User.ID): Fu[List[Ask]] = askDb { coll =>
     coll.find($doc("creator" -> uid)).sort($sort desc "createdAt").cursor[Ask]().list(1000)
   }
 
-  def deleteAll(text: String): Funit = yolo { coll =>
+  def deleteAll(text: String): Funit = askDb { coll =>
     coll.delete.one($inIds(extractIds(text))).void
   }
 
   // None values in the asksIn list are still important for sequencing
-  def asksIn(text: String): Fu[List[Option[Ask]]] = yolo { coll =>
+  def asksIn(text: String): Fu[List[Option[Ask]]] = askDb { coll =>
     coll.optionsByOrderedIds[Ask, Ask.ID](extractIds(text))(_._id)
   }
 
@@ -110,7 +116,7 @@ final class AskApi(
   }
 
   // call this after freezeAsync on form submission for edits
-  def setUrl(frozen: String, url: Option[String]): Funit = yolo { coll =>
+  def setUrl(frozen: String, url: Option[String]): Funit = askDb { coll =>
     if (!hasAskId(frozen)) funit
     else coll.update.one($inIds(extractIds(frozen)), $set("url" -> url), multi = true).void
   }
@@ -138,7 +144,7 @@ final class AskApi(
       id: Ask.ID,
       update: BSONDocument
   ): Fu[Option[Ask]] =
-    yolo { coll =>
+    askDb { coll =>
       coll.ext.findAndUpdate[Ask](
         selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
         update = update,
@@ -150,7 +156,7 @@ final class AskApi(
     }
 
   // only preserve votes if important fields haven't been altered
-  private def upsert(ask: Ask): Fu[Ask] = yolo { coll =>
+  private def upsert(ask: Ask): Fu[Ask] = askDb { coll =>
     coll.byId[Ask](ask._id) flatMap {
       case Some(dbAsk) =>
         val mergedAsk = ask.merge(dbAsk)
@@ -162,7 +168,7 @@ final class AskApi(
     }
   }
 
-  def delete(id: Ask.ID): Funit = yolo { coll =>
+  def delete(id: Ask.ID): Funit = askDb { coll =>
     coll.delete.one($id(id)).void
   }
 }

@@ -1,6 +1,7 @@
 package views.html
 
 import scala.collection.mutable
+import scala.util.Random.shuffle
 
 import controllers.routes
 import lila.api.Context
@@ -29,33 +30,34 @@ object ask {
         )
       )
 
-  def renderInner(ask: Ask)(implicit ctx: Context): Frag =
+  def renderInner(ask: Ask, prevView: Option[List[Int]] = None)(implicit ctx: Context): Frag = {
+    val view = prevView getOrElse (if (ask.isRandom) shuffle(ask.choices.indices.toList) else ask.choices.indices.toList)
     fieldset(cls := "ask", id := ask._id, hasPick(ask) option (value := ""))(
-      header(ask),
+      header(ask, view.nonEmpty ?? view.mkString("-")),
       ask.isConcluded option label(
         if (ask.choices.nonEmpty) s"${ask.picks ?? (_ size)} votes"
         else s"${ask.feedback ?? (_ size)} responses"
       ),
       if (ask.choices.isEmpty) emptyFrag
-      else
-        RenderType(ask) match {
-          case POLL    => pollBody(ask)
-          case RANK    => rankBody(ask)
-          case QUIZ    => quizBody(ask)
-          case BAR     => barGraphBody(ask)
-          case RANKBAR => rankGraphBody(ask)
-        },
+      else RenderType(ask) match {
+        case POLL    => pollBody(ask, view)
+        case RANK    => rankBody(ask, view)
+        case QUIZ    => quizBody(ask, view)
+        case BAR     => barGraphBody(ask)
+        case RANKBAR => rankGraphBody(ask)
+      },
       footer(ask)
     )
+  }
 
-  private def header(ask: Ask)(implicit ctx: Context): Frag =
+  private def header(ask: Ask, viewParam: String)(implicit ctx: Context): Frag =
     legend(
       span(cls := "ask__header")(
         label(ask.question),
         button(
           cls := s"action unset${(hasPick(ask) && !ask.isConcluded) ?? " visible"}",
           formmethod := "POST",
-          formaction := s"${routes.Ask.unset(ask._id)}",
+          formaction := s"${routes.Ask.unset(ask._id, viewParam.some)}",
           title      := trans.delete.txt()
         ),
         ctx.me.exists(_ is ask.creator) option button(
@@ -93,37 +95,38 @@ object ask {
       }
     )
 
-  private def pollBody(ask: Ask)(implicit ctx: Context): Frag = frag {
+  private def pollBody(ask: Ask, view: List[Int])(implicit ctx: Context): Frag = frag {
     val pick = getPick(ask)
-    choiceContainer(ask)(
-      ask.choices.zipWithIndex map { case (choiceText, choice) =>
+    choiceContainer(ask) {
+      (view.pp map ask.choices.zipWithIndex).pp("goodies") map { case (choiceText, choice) =>
         div(
-          cls := s"exclusive-choice ${if (pick.contains(choice)) "selected" else "enabled"}${ask.isStretch ?? " stretch"}",
+          cls := s"choice exclusive${if (pick.contains(choice)) " selected" else " enabled"}${ask.isStretch ?? " stretch"}",
           title := tooltip(ask, choice),
           value := choice
         )(label(choiceText))
       }
-    )
+    }
   }
 
-  private def rankBody(ask: Ask)(implicit ctx: Context): Seq[Frag] = Seq[Frag](
+  private def rankBody(ask: Ask, view: List[Int])(implicit ctx: Context): Seq[Frag] = Seq[Frag](
     choiceContainer(ask)(
       validRanking(ask).zipWithIndex map { case (choice, index) =>
-        val clz = s"ranked-choice${ask.isStretch ?? " stretch"}${hasPick(ask) ?? " badge"}"
+        val clz = s"choice rank${ask.isStretch ?? " stretch"}${hasPick(ask) ?? " badge"}"
         div(cls := clz, value := choice, draggable := true)(
           div(s"${index + 1}"),
-          label(ask.choices(choice))
+          label(ask.choices(choice)),
+          i
         )
       }
     )
   )
 
-  private def quizBody(ask: Ask)(implicit ctx: Context): Frag = {
+  private def quizBody(ask: Ask, view: List[Int])(implicit ctx: Context): Frag = {
     val pick = getPick(ask)
     choiceContainer(ask)(
-      ask.choices.zipWithIndex map { case (choiceText, choice) =>
+      view map ask.choices.zipWithIndex map { case (choiceText, choice) =>
         val classes =
-          if (pick isEmpty) "exclusive-choice enabled"
+          if (pick isEmpty) "choice exclusive enabled"
           else if (ask.answer map (a => ask.choices indexOf a) contains choice) "choice correct"
           else if (pick contains choice) "choice wrong"
           else "choice disabled"
@@ -238,9 +241,9 @@ object ask {
   }
 
   private def validRanking(ask: Ask)(implicit ctx: Context): Vector[Int] = {
-    val initialOrder = (0 until ask.choices.size).toVector
+    val initialOrder = if (ask.isRandom) shuffle((0 until ask.choices.size).toVector) else (0 until ask.choices.size).toVector
     getRanking(ask).fold(initialOrder) { r =>
-      if (r == Nil || r.distinct.sorted != initialOrder) {
+      if (r == Nil || r.distinct.sorted != initialOrder.sorted) {
         // it's late to be doing this but i think it beats counting the choices in an
         // aggregation stage in every db update or storing choices.size in a redundant field
         ctx.me.map(u => env.ask.api.setPicks(ask._id, u.id, Some(Nil))) // blow away the bad

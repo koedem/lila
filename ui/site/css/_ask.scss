@@ -109,7 +109,7 @@ span.ask__header {
 div.ask__footer {
   margin: $gap 0;
   display: grid;
-  grid-template-columns: auto max-content;
+  grid-template-columns: auto min-content;
 
   // feedback prompt or quiz reveal
   label {
@@ -177,9 +177,7 @@ div.ask__choices {
   align-items: flex-start;
 
   // a single clickable/draggable choice button
-  .choice,
-  .exclusive-choice,
-  .ranked-choice {
+  .choice {
     @extend %metal, %box-radius;
     margin: 0 0 $gap $gap;
     padding: $gap (2 * $gap);
@@ -199,7 +197,7 @@ div.ask__choices {
   }
 
   // a draggable choice button
-  .ranked-choice {
+  .rank {
     @extend %lighten-hover;
     display: flex;
     justify-content: space-between;
