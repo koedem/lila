@@ -2,14 +2,10 @@ import play.sbt.PlayImport._
 import sbt._, Keys._
 
 object Dependencies {
-  val (os, notifier) = if (System.getProperty("os.name").toLowerCase.startsWith("mac"))
-    ("osx", "kqueue")
-  else
-    ("linux", "epoll")
-  val arch = if (System.getProperty("os.arch").toLowerCase.startsWith("aarch"))
-    "aarch_64"
-  else
-    "x86_64"
+  val arch = if (System.getProperty("os.arch").toLowerCase.startsWith("aarch")) "aarch_64" else "x86_64"
+  val (os, notifier) =
+    if (System.getProperty("os.name").toLowerCase.startsWith("mac")) ("osx", "kqueue")
+    else ("linux", "epoll")
 
   val lilaMaven = "lila-maven" at "https://schlawg.org:30080"//"https://raw.githubusercontent.com/lichess-org/lila-maven/master"
 
@@ -60,13 +56,13 @@ object Dependencies {
 
     val driver = "org.reactivemongo" %% "reactivemongo"               % version
     val stream = "org.reactivemongo" %% "reactivemongo-akkastream"    % version
-    val epoll  = "org.reactivemongo"  % "reactivemongo-shaded-native" % s"$version-linux-x86-64"
+    val shaded = "org.reactivemongo"  % "reactivemongo-shaded-native" % s"$version-$os-x86-64"
     val kamon  = "org.reactivemongo" %% "reactivemongo-kamon"         % "1.0.8"
     def bundle = Seq(driver, stream)
   }
 
   object play {
-    val api      = "com.typesafe.play" %% "play"           % "2.8.16-lila_1.14.1-SNAPSHOT"
+    val api      = "com.typesafe.play" %% "play"           % "2.8.16-lila_1.15"
     val json     = "com.typesafe.play" %% "play-json"      % "2.9.3"
     val jsonJoda = "com.typesafe.play" %% "play-json-joda" % "2.9.3"
     val mailer   = "com.typesafe.play" %% "play-mailer"    % "8.0.1"

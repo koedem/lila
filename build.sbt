@@ -23,13 +23,13 @@ libraryDependencies ++= akka.bundle ++ playWs.bundle ++ Seq(
   kamon.core, kamon.influxdb, kamon.metrics, kamon.prometheus,
   scaffeine, caffeine, lettuce, uaparser, nettyTransport
 ) ++ {
-  if (useEpoll) Seq(reactivemongo.epoll)
-  else Seq.empty
+  if (shadedMongo) Seq(reactivemongo.shaded)
+  else Seq.empty // until reactivemongo includes aarch_64 kqueue versions
 }
 
-ThisBuild / libraryDependencySchemes ++= Seq(
+/*ThisBuild / libraryDependencySchemes ++= Seq(
   "org.scala-lang.modules" %% "scala-xml" % VersionScheme.Always
-)
+)*/
 lazy val modules = Seq(
   common, db, rating, user, security, hub, socket,
   msg, notifyModule, i18n, game, bookmark, search,
