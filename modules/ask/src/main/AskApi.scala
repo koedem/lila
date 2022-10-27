@@ -207,7 +207,7 @@ object AskApi {
     sb ++= s"?= id{${ask._id}}"
     sb ++= s"${ask.isPublic ?? " public"}${ask.isTally ?? " tally"}${ask.isRanked ?? " rank"}"
     sb ++= s"${ask.isVertical ?? " vertical"}${ask.isCenter ?? " center"}${ask.isStretch ?? " stretch"}"
-    sb ++= s"${ask.isFeedback ?? " feedback"}${ask.isConcluded ?? " concluded"}\n"
+    sb ++= s"${ask.isRandom ?? " random"}${ask.isFeedback ?? " feedback"}${ask.isConcluded ?? " concluded"}\n"
     sb ++= ask.choices.map(c => s"?${if (ask.answer.contains(c)) "@" else "#"} $c\n").mkString
     sb ++= s"${ask.footer.fold("")(r => s"?! $r\n")}"
     sb.toString
