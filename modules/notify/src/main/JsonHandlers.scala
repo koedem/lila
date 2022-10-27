@@ -21,11 +21,10 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
             "category"    -> category.value,
             "postId"      -> postId.value
           )
-        case StreamStartNote(streamerId, streamerName, text) =>
+        case StreamStartNote(streamerId, streamerName) =>
           Json.obj(
             "sid"  -> streamerId,
             "name" -> streamerName,
-            "text" -> text
           )
         case InvitedToStudy(invitedBy, studyName, studyId) =>
           Json.obj(
@@ -103,6 +102,7 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
   private val i18nKeys: List[lila.i18n.MessageKey] = List(
     trans.mentionedYouInX,
     trans.xMentionedYouInY,
+    trans.xStartedStreaming,
     trans.invitedYouToX,
     trans.xInvitedYouToY,
     trans.youAreNowPartOfTeam,
@@ -124,14 +124,11 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
 
   def apply(notify: Notification.AndUnread)(implicit lang: Lang) =
     andUnreadWrites.writes(notify) ++ Json.obj(
-      "i18n" -> JsDump.keysToObject(i18nKeys, lang),
-      "alert" -> false
+      "i18n" -> JsDump.keysToObject(i18nKeys, lang)
     )
 
-  def apply(notify: Notification.SingleAndUnread)(implicit lang: Lang) =
+  def apply(badge: Notification.UpdateBell) =
     Json.obj(
-      "note"   -> notify.note,
-      "unread" -> notify.unread,
-      "alert" -> notify.alert
+      "unread" -> badge.unread
     )
 }

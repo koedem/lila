@@ -107,42 +107,29 @@ final class NotifyApi(
     streamStarter.getNotiflowersAndPush(streamerId, streamerName) flatMap { res =>
       val views = streamStarter.NotiflowerView(res, streamerId, streamerName)
 
-      repo.bulkUnreadCount(views.users) flatMap { countList => // count before insert is intentional
-        bumpCountCache(countList filter (recents => views.byUser(recents._1).recentlyOnline))
+      repo.bulkUnreadCount(views.users) flatMap { countList =>
+        bumpCountCache(countList filter (recent => views.byUser(recent._1).recentlyOnline))
 
         repo.insertMany(views.noteList) andThen { case _ =>
-          views.notesByLang map { case (lang, sameLangNotes) =>
-            notesByCount(sameLangNotes, countList.toMap) map { case (count, (users, note)) =>
-              val (alertUsers, obliviousUsers) = views.alertPartition(users)
-              sendTos(alertUsers, note, count, true, lang)
-              sendTos(obliviousUsers, note, count, false, lang)
-            }
+          countList.toMap groupBy(_._2) map (group => (group._2.keySet, group._1)) map { case (users, count) =>
+            sendTos(users, count)
           }
         }
       }
     }
 
-  private def sendTos(users: Set[String], note: Notification, count: Int, alert: Boolean, lang: play.api.i18n.Lang) =
+  private def sendTos(users: Set[String], count: Int) =
     Bus.publish(
       SendTos(
         users,
         "notifications",
-        jsonHandlers(Notification.SingleAndUnread(note, UnreadCount(count + 1), alert = alert))(lang)
+        jsonHandlers(Notification.UpdateBell(UnreadCount(count + 1)))
       ),
       "socketUsers"
     )
 
-  private def notesByCount(
-      notes: Iterable[Option[Notification]],
-      countMap: Map[String, Int]
-  ) =
-    notes
-      .collect { case Some(note) =>
-        (countMap.getOrElse(note.notifies.value, 0), note) // (count, note) tuple list
-      }
-      .groupMapReduce(_._1)                     // group list by count
-      { t => (Set(t._2.notifies.value), t._2) } // wrap note.userId in set
-      { (a, b) => (a._1 | b._1, a._2) }         // join userId sets and discard identical note
+  private def notesByCount(countList: List[(String, Int)]): List[(Set[String], Int)] =
+    countList.toMap groupBy(_._2) map (x => (x._2.keySet, x._1)) toList
 
   private def bumpCountCache(countList: List[(String, Int)]) =
     countList map { case (userId, veryRecentCount) =>
@@ -181,7 +168,7 @@ final class NotifyApi(
               "notifications",
               () => {
                 userRepo langOf note.notifies.value map I18nLangPicker.byStrOrDefault map { implicit lang =>
-                  jsonHandlers(SingleAndUnread(note, UnreadCount(count), allows.web))
+                  jsonHandlers(UpdateBell(UnreadCount(count)))
                 }
               }
             ),

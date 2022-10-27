@@ -43,7 +43,7 @@ final private class StreamStartHelper(
     val notiflowers = unfiltered.filter(x => Allows(x.allows).bell)
 
     val noteList: List[Notification] =
-      notiflowers map { x => StreamStartNote.make(x.userId, sid, name, x.text) } toList
+      notiflowers map { x => StreamStartNote.make(x.userId, sid, name) } toList
 
     val byUser: Map[String, NotifiableFollower] =
       notiflowers.groupMapReduce(_.userId)(identity)((x, _) => x)
@@ -55,12 +55,6 @@ final private class StreamStartHelper(
 
     val notesByLang: Map[play.api.i18n.Lang, Iterable[Option[Notification]]] =
       notiflowers.groupMap(_.lang)(x => notesByUser.get(x.userId))
-
-    def alertPartition(users: Set[String]): (Set[String], Set[String]) = {
-      val alertUsers = users.filter(x => Allows(byUser(x).allows).web)
-      (alertUsers, users diff alertUsers)
-      // alertUsers have browser/web enabled in prefs
-    }
   }
 
   private def lookupNotifiable(

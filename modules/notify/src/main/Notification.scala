@@ -26,7 +26,7 @@ object Notification {
 
   case class UnreadCount(value: Int) extends AnyVal
   case class AndUnread(pager: Paginator[Notification], unread: UnreadCount)
-  case class SingleAndUnread(note: Notification, unread: UnreadCount, alert: Boolean)
+  case class UpdateBell(unread: UnreadCount)
   case class Notifies(value: String) extends AnyVal with StringValue
   case class NotificationRead(value: Boolean) extends AnyVal
 
@@ -58,12 +58,11 @@ object MentionedInThread {
 case class StreamStartNote(
     streamerId: String,
     streamerName: String,
-    text: String
 ) extends NotificationContent("streamStart")
 
 object StreamStartNote {
-  def make(userId: String, streamerId: String, streamerName: String, text: String): Notification =
-    Notification.make(Notification.Notifies(userId), new StreamStartNote(streamerId, streamerName, text))
+  def make(userId: String, streamerId: String, streamerName: String): Notification =
+    Notification.make(Notification.Notifies(userId), new StreamStartNote(streamerId, streamerName))
 }
 
 case class InvitedToStudy(

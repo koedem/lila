@@ -1,7 +1,6 @@
-import { Ctrl, NotifyOpts, NotifyData, SingleNotifyData, Redraw } from './interfaces';
+import { Ctrl, NotifyOpts, NotifyData, UpdateBell, Redraw } from './interfaces';
 
 import * as xhr from 'common/xhr';
-import notify from 'common/notification';
 
 export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
   let data: NotifyData | undefined,
@@ -18,7 +17,7 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     }
   });
 
-  function update(d: SingleNotifyData) {
+  function updateBell(d: UpdateBell) {
     if (opts.isVisible()) {
       loadPage(1);
       return;
@@ -26,13 +25,10 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     data = undefined;
     opts.setCount(d.unread);
     opts.pulse();
-
-    if (!lichess.quietMode || d.note.content.user?.id == 'lichess') lichess.sound.playOnce('newPM');
-    if (d.alert) notify(d.note.content.text);
     redraw();
   }
 
-  function updatePage(d: NotifyData) {
+  function updateNotes(d: NotifyData) {
     data = d;
     if (data.pager.currentPage === 1 && data.unread && opts.isVisible()) {
       opts.setNotified();
@@ -47,7 +43,7 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
 
   const loadPage = (page: number) =>
     xhr.json(xhr.url('/notify', { page: page || 1 })).then(
-      d => updatePage(d),
+      d => updateNotes(d),
       _ => lichess.announce({ msg: 'Failed to load notifications' })
     );
 
@@ -98,7 +94,7 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
         method: 'post',
       })
       .then(
-        _ => updatePage(emptyNotifyData),
+        _ => updateNotes(emptyNotifyData),
         _ => lichess.announce({ msg: 'Failed to clear notifications' })
       );
   }
@@ -107,7 +103,8 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     data: () => data,
     initiating: () => initiating,
     scrolling: () => scrolling,
-    update,
+    updateBell,
+    updateNotes,
     nextPage,
     previousPage,
     loadPage,

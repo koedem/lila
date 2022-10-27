@@ -13,11 +13,14 @@ export default function LichessNotify(element: Element, opts: NotifyOpts) {
     vnode = patch(vnode, view(ctrl));
   }
 
-  if (opts.data) ctrl.update(opts.data, opts.incoming);
-  else ctrl.loadPage(1);
+  if (opts.data)
+    ('pager' in opts.data) ? ctrl.updateNotes(opts.data) : ctrl.updateBell(opts.data);
+  else 
+    ctrl.loadPage(1);
 
   return {
-    update: ctrl.update,
+    updateBell: ctrl.updateBell,
+    updateNotes: ctrl.updateNotes,
     setVisible: ctrl.setVisible,
     setMsgRead: ctrl.setMsgRead,
     redraw,

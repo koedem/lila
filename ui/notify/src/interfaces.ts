@@ -1,7 +1,7 @@
 import { VNode } from 'snabbdom';
 
 export interface NotifyOpts {
-  data?: NotifyData | SingleNotifyData;
+  data?: NotifyData|UpdateBell;
   incoming: boolean;
   isVisible(): boolean;
   setCount(nb: number): void;
@@ -16,10 +16,8 @@ export interface NotifyData {
   i18n: I18nDict;
 }
 
-export interface SingleNotifyData {
-  note: Notification;
+export interface UpdateBell {
   unread: number;
-  alert: boolean;
 }
 
 interface NotificationUser {
@@ -42,10 +40,11 @@ export interface Notification {
 }
 
 export interface Ctrl {
-  update(data: NotifyData | SingleNotifyData, incoming: boolean): void;
   data(): NotifyData | undefined;
   initiating(): boolean;
   scrolling(): boolean;
+  updateBell(data: UpdateBell): void;
+  updateNotes(data: NotifyData): void;
   nextPage(): void;
   previousPage(): void;
   loadPage(page: number): void;

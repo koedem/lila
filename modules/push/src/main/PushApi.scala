@@ -321,7 +321,7 @@ final private class PushApi(
         Allows(target.allows),
         PushApi.Data(
           title = target.streamerName,
-          body = target.text,
+          body = s"${target.streamerName} started streaming",//target.text,
           stacking = Stacking.StreamStart,
           payload = Json.obj(
             "userId"   -> target.userId,
