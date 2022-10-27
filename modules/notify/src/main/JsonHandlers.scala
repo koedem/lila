@@ -127,8 +127,8 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
       "i18n" -> JsDump.keysToObject(i18nKeys, lang)
     )
 
-  def apply(badge: Notification.UpdateBell) =
+  def apply(bellUpdate: Notification.UpdateBell) =
     Json.obj(
-      "unread" -> badge.unread
+      "unread" -> bellUpdate.unread
     )
 }

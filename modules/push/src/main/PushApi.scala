@@ -216,27 +216,6 @@ final private class PushApi(
       }
     }
 
-  def forumMention(userId: User.ID, title: String, postId: String): Funit =
-    postApi.getPost(postId) flatMap { post =>
-      maybePush(
-        userId,
-        _.forumMention,
-        NotificationPref.ForumMention,
-        PushApi.Data(
-          title = title,
-          body = post.fold(title)(p => shorten(p.text, 57 - 3, "...")),
-          stacking = Stacking.ForumMention,
-          payload = Json.obj(
-            "userId" -> userId,
-            "userData" -> Json.obj(
-              "type"   -> "forumMention",
-              "postId" -> postId
-            )
-          )
-        )
-      )
-    }
-
   def challengeCreate(c: Challenge): Funit =
     c.destUser ?? { dest =>
       c.challengerUser.ifFalse(c.hasClock) ?? { challenger =>
@@ -312,6 +291,28 @@ final private class PushApi(
       )
     }
 
+  def forumMention(userId: User.ID, title: String, postId: String): Funit =
+    postApi.getPost(postId) flatMap { post =>
+      userId.pp("forumMention")
+      maybePush(
+        userId,
+        _.forumMention,
+        NotificationPref.ForumMention,
+        PushApi.Data(
+          title = title,
+          body = post.fold(title)(p => shorten(p.text, 57 - 3, "...")),
+          stacking = Stacking.ForumMention,
+          payload = Json.obj(
+            "userId" -> userId,
+            "userData" -> Json.obj(
+              "type"   -> "forumMention",
+              "postId" -> postId
+            )
+          )
+        )
+      )
+    }
+
   import NotificationPref._
   def streamStart(streamerId: User.ID, notifyList: List[NotifiableFollower]): Funit =
     Future.applySequentially(notifyList) { target =>
@@ -321,7 +322,7 @@ final private class PushApi(
         Allows(target.allows),
         PushApi.Data(
           title = target.streamerName,
-          body = s"${target.streamerName} started streaming",//target.text,
+          body = target.text,
           stacking = Stacking.StreamStart,
           payload = Json.obj(
             "userId"   -> target.userId,

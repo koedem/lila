@@ -18,6 +18,7 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
   });
 
   function updateBell(d: UpdateBell) {
+    console.log(d, "update bell");
     if (opts.isVisible()) {
       loadPage(1);
       return;
@@ -29,6 +30,7 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
   }
 
   function updateNotes(d: NotifyData) {
+    console.log(d, "update botes");
     data = d;
     if (data.pager.currentPage === 1 && data.unread && opts.isVisible()) {
       opts.setNotified();

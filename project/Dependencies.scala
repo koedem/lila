@@ -7,7 +7,7 @@ object Dependencies {
     if (System.getProperty("os.name").toLowerCase.startsWith("mac")) ("osx", "kqueue")
     else ("linux", "epoll")
 
-  val lilaMaven = "lila-maven" at "https://schlawg.org:30080"//"https://raw.githubusercontent.com/lichess-org/lila-maven/master"
+  val lilaMaven = "lila-maven" at "https://raw.githubusercontent.com/lichess-org/lila-maven/master"
 
   val cats        = "org.typelevel"                %% "cats-core"                       % "2.8.0"
   val alleycats   = "org.typelevel"                %% "alleycats-core"                  % "2.8.0"
@@ -62,7 +62,7 @@ object Dependencies {
   }
 
   object play {
-    val api      = "com.typesafe.play" %% "play"           % "2.8.16-lila_1.15"
+    val api      = "com.typesafe.play" %% "play"           % "2.8.16-lila_1.13.1"
     val json     = "com.typesafe.play" %% "play-json"      % "2.9.3"
     val jsonJoda = "com.typesafe.play" %% "play-json-joda" % "2.9.3"
     val mailer   = "com.typesafe.play" %% "play-mailer"    % "8.0.1"

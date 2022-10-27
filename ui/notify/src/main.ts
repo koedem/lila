@@ -1,7 +1,7 @@
 import { init, classModule, attributesModule } from 'snabbdom';
 import makeCtrl from './ctrl';
 import view from './view';
-import { NotifyOpts } from './interfaces';
+import { NotifyOpts, NotifyData, UpdateBell } from './interfaces';
 
 const patch = init([classModule, attributesModule]);
 
@@ -12,15 +12,13 @@ export default function LichessNotify(element: Element, opts: NotifyOpts) {
   function redraw() {
     vnode = patch(vnode, view(ctrl));
   }
-
-  if (opts.data)
-    ('pager' in opts.data) ? ctrl.updateNotes(opts.data) : ctrl.updateBell(opts.data);
-  else 
-    ctrl.loadPage(1);
+  const update = (data: NotifyData|UpdateBell) => ('pager' in data) ? ctrl.updateNotes(data) : ctrl.updateBell(data);
+  
+  if (opts.data) update(opts.data)
+  else ctrl.loadPage(1);
 
   return {
-    updateBell: ctrl.updateBell,
-    updateNotes: ctrl.updateNotes,
+    update: update,
     setVisible: ctrl.setVisible,
     setMsgRead: ctrl.setMsgRead,
     redraw,

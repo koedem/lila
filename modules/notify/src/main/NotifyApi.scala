@@ -62,14 +62,10 @@ final class NotifyApi(
   def addNotification(notification: Notification): Fu[Boolean] =
     // Add to database and then notify any connected clients of the new notification
     insertOrDiscardNotification(notification) map {
-
-      /*_ foreach { notif =>
-        notifyUser(notif)
-      }*/
       case Some(note) =>
         notifyUser(note)
         true
-      case None => false
+      case None => false.pp("oh noes oh noes")
     }
 
   def addNotificationWithoutSkipOrEvent(notification: Notification): Funit =
@@ -87,26 +83,10 @@ final class NotifyApi(
 
   def exists = repo.exists _
 
-  /*
-  look up the followers, filter by notification pref, push web/firebase if necessary,
-  and assemble a NotiflowerView (see StreamStartHelper) where the text is translated
-  for all recipients. bulk lookup the unread counts for users and update the unread cache.
-  group notes by unique (lang, unreadCount, alert) tuples to determine the user set for SendTos.
-  each SendTos message contains a single notification (no pager) with the translated text,
-  streamer name/id, unread count, and either true/false whether to use Notification API if
-  backgrounded (sigh..  yes we further group SendTos based on whether the user set has push
-  enabled on streamStart)
-
-  meanwhile, the typescript has been modified to handle these slimmed down messages
-  (see ui/notify/_.ts).  a full page of notifications won't be delivered until they
-  actually click the bell.  there is no per-user db access in this entire flow and
-  it's streamlined wrt lila-ws tells.  magnus, please stay retired.
-   */
-
   def notifyStreamStart(streamerId: String, streamerName: String): Funit =
     streamStarter.getNotiflowersAndPush(streamerId, streamerName) flatMap { res =>
       val views = streamStarter.NotiflowerView(res, streamerId, streamerName)
-
+      views.pp("NotiflowerView")
       repo.bulkUnreadCount(views.users) flatMap { countList =>
         bumpCountCache(countList filter (recent => views.byUser(recent._1).recentlyOnline))
 
@@ -137,7 +117,7 @@ final class NotifyApi(
       unreadCountCache.put(Notifies(userId), Future({ veryRecentCount + 1 })) // +1 for the streamStart
     }
 
-  private def shouldSkip(notification: Notification) =
+  private def shouldSkip(notification: Notification) = 
     (!notification.isMsg ?? userRepo.isKid(notification.notifies.value)) >>| {
       notification.content match {
         case MentionedInThread(_, _, topicId, _, _) =>
@@ -159,22 +139,22 @@ final class NotifyApi(
     }
 
   private def notifyUser(note: Notification) =
-      getAllows(note.notifies.value, note) zip unreadCountCache.get(note.notifies) collect {
-        case (allows, count) =>
-          if (allows.push) pushToUser(note)
-          if (allows.bell) Bus.publish(
+    getAllows(note.notifies.value, note) map { allows =>
+      if (allows.push) pushToUser(note)
+      if (allows.bell) {
+        val u = note.notifies
+        getNotifications(u, 1) zip unreadCount(u) dmap (AndUnread.apply _).tupled map { msg =>
+          Bus.publish(
             SendTo.async(
-              note.notifies.value,
-              "notifications",
-              () => {
-                userRepo langOf note.notifies.value map I18nLangPicker.byStrOrDefault map { implicit lang =>
-                  jsonHandlers(UpdateBell(UnreadCount(count)))
-                }
-              }
+              u.value, 
+              "notifications", 
+              () => userRepo langOf u.value map I18nLangPicker.byStrOrDefault map(implicit lang => jsonHandlers(msg))                
             ),
             "socketUsers"
           )
+        }
       }
+    }
 
   private def pushToUser(note: Notification) = {
     note.content match {
@@ -195,10 +175,9 @@ final class NotifyApi(
       case MentionedInThread(commenter, topic, _, _, postId) =>
         userRepo.langOf(note.notifies.value) collect { case langOption =>
           implicit val lang: play.api.i18n.Lang = I18nLangPicker.byStrOrDefault(langOption)
-
           Bus.publish(
             ForumMention(
-              commenter.value,
+              note.notifies.value,
               I18nKeys.xMentionedYouInY.txt(commenter, topic),
               postId.value
             ),
@@ -211,10 +190,10 @@ final class NotifyApi(
 
   import lila.pref.NotificationPref._
   private def getAllows(uid: String, note: Notification): Fu[Allows] =
-    prefApi.getNotificationPref(uid) map { pref =>
+    prefApi.getNotificationPref(uid) map { pref => pref.pp("full notificationPref")
       note.content match {
-        case _: PrivateMessage => pref.allows(InboxMsg)
-        case _: MentionedInThread => pref.allows(ForumMention)
+        case _: PrivateMessage => pref.allows(InboxMsg).pp("inbox msg!")
+        case _: MentionedInThread => pref.allows(ForumMention).pp("forum mention!")
         case _ => Allows(BELL)
       }
     }

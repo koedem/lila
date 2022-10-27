@@ -646,8 +646,8 @@ object mon {
       val takeback    = send("takeback") _
       val corresAlarm = send("corresAlarm") _
       val finish      = send("finish") _
-      val forumMention     = send("forumMention") _
-      val streamStart    = send("streamStart") _
+      val forumMention = send("forumMention") _
+      val streamStart = send("streamStart") _
       val message     = send("message") _
       val tourSoon    = send("tourSoon") _
       object challenge {
