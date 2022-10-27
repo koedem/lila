@@ -21,12 +21,15 @@ libraryDependencies ++= akka.bundle ++ playWs.bundle ++ Seq(
   chess, compression, scalalib, hasher,
   reactivemongo.driver, reactivemongo.kamon, maxmind, prismic, scalatags,
   kamon.core, kamon.influxdb, kamon.metrics, kamon.prometheus,
-  scaffeine, caffeine, lettuce, uaparser
+  scaffeine, caffeine, lettuce, uaparser, nettyTransport
 ) ++ {
-  if (useEpoll) Seq(epoll, reactivemongo.epoll)
+  if (useEpoll) Seq(reactivemongo.epoll)
   else Seq.empty
 }
 
+ThisBuild / libraryDependencySchemes ++= Seq(
+  "org.scala-lang.modules" %% "scala-xml" % VersionScheme.Always
+)
 lazy val modules = Seq(
   common, db, rating, user, security, hub, socket,
   msg, notifyModule, i18n, game, bookmark, search,
@@ -341,7 +344,7 @@ lazy val playban = module("playban",
 )
 
 lazy val push = module("push",
-  Seq(common, db, user, game, challenge, msg),
+  Seq(common, db, user, game, challenge, msg, pref, forum),
   Seq(googleOAuth) ++ reactivemongo.bundle
 )
 
@@ -421,7 +424,7 @@ lazy val explorer = module("explorer",
 )
 
 lazy val notifyModule = module("notify",
-  Seq(common, db, game, user, hub, relation),
+  Seq(common, db, game, user, hub, relation, pref),//, timeline),
   reactivemongo.bundle
 )
 

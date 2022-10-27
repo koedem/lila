@@ -71,7 +71,7 @@ final class PrefApi(
   private def unmentionableIds(userIds: Set[User.ID]): Fu[Set[User.ID]] =
     coll.secondaryPreferred.distinctEasy[User.ID, Set](
       "_id",
-      $inIds(userIds) ++ $doc("mention" -> false)
+      $inIds(userIds) ++ $doc("notification.forumMention" -> 0)
     )
 
   def mentionableIds(userIds: Set[User.ID]): Fu[Set[User.ID]] =
@@ -107,4 +107,16 @@ final class PrefApi(
     val reqPref = RequestPref fromRequest req
     (reqPref != Pref.default) ?? setPref(reqPref.copy(_id = user.id))
   }
+
+  def getNotificationPref(uid: User.ID): Fu[NotificationPref] =
+    cache.getIfPresent(uid) map(_ collect {
+      case Some(pref) => pref.notification
+    }) getOrElse {
+      // maybe don't want to crowd the cache here, and no need for the whole pref
+      // object. these lookups can often be triggered when the user is not active
+      coll.find($id(uid), $doc("notification" -> true).some).one[NotificationPref] map {
+        case Some(notification) => notification
+        case None => NotificationPref.default
+      }
+    }
 }

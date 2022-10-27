@@ -6,7 +6,7 @@ import chess.variant.Variant
 import play.api.i18n.Lang
 
 import lila.i18n.{ I18nKeys => trans }
-import lila.pref.Pref
+import lila.pref.{ NotificationPref, Pref }
 import lila.report.Reason
 import lila.setup.TimeMode
 
@@ -69,6 +69,12 @@ trait SetupHelper { self: I18nHelper =>
     ("1", "One day", none) :: List(2, 3, 5, 7, 10, 14).map { d =>
       (d.toString, s"$d days", none)
     }
+
+  def translatedBooleanIntChoices(implicit lang: Lang) =
+    Seq(
+      0 -> trans.no.txt(),
+      1 -> trans.yes.txt()
+    )
 
   def translatedTimeModeChoices(implicit lang: Lang) =
     List(

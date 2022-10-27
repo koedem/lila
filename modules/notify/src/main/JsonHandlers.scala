@@ -21,6 +21,12 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
             "category"    -> category.value,
             "postId"      -> postId.value
           )
+        case StreamStartNote(streamerId, streamerName, text) =>
+          Json.obj(
+            "sid"  -> streamerId,
+            "name" -> streamerName,
+            "text" -> text
+          )
         case InvitedToStudy(invitedBy, studyName, studyId) =>
           Json.obj(
             "invitedBy" -> getLightUser(invitedBy.value),
@@ -94,12 +100,6 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
   }
   implicit val andUnreadWrites: OWrites[Notification.AndUnread] = Json.writes[Notification.AndUnread]
 
-  implicit val newNotificationWrites: Writes[NewNotification] = (newNotification: NewNotification) =>
-    Json.obj(
-      "notification" -> newNotification.notification,
-      "unread"       -> newNotification.unreadNotifications
-    )
-
   private val i18nKeys: List[lila.i18n.MessageKey] = List(
     trans.mentionedYouInX,
     trans.xMentionedYouInY,
@@ -124,6 +124,14 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
 
   def apply(notify: Notification.AndUnread)(implicit lang: Lang) =
     andUnreadWrites.writes(notify) ++ Json.obj(
-      "i18n" -> JsDump.keysToObject(i18nKeys, lang)
+      "i18n" -> JsDump.keysToObject(i18nKeys, lang),
+      "alert" -> false
+    )
+
+  def apply(notify: Notification.SingleAndUnread)(implicit lang: Lang) =
+    Json.obj(
+      "note"   -> notify.note,
+      "unread" -> notify.unread,
+      "alert" -> notify.alert
     )
 }

@@ -81,8 +81,8 @@ final private class MsgNotify(
               PrivateMessage.Sender(msg.user),
               PrivateMessage.Text(shorten(msg.text, 40))
             )
-          ) map (_ ?? lila.common.Bus.publish(MsgThread.Unread(thread), "msgUnread"))
+          ) //map (_ ?? lila.common.Bus.publish(MsgThread.Unread(thread), "msgUnread"))
         }
       }
-    }
+    } void
 }

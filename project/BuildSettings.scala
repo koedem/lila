@@ -107,5 +107,12 @@ object BuildSettings {
     Test / scalaSource    := (Test / sourceDirectory).value
   )
 
+  def evictionSettings: Seq[Setting[_]] = Seq(
+    // This avoids a lot of dependency resolution warnings to be showed.
+    (update / evictionWarningOptions) := EvictionWarningOptions.default
+      .withWarnTransitiveEvictions(false)
+      .withWarnDirectEvictions(false)
+  )
+
   def projectToRef(p: Project): ProjectReference = LocalProject(p.id)
 }

@@ -28,7 +28,9 @@ final class Env(
     userRepo: lila.user.UserRepo,
     getLightUser: lila.common.LightUser.Getter,
     proxyRepo: lila.round.GameProxyRepo,
-    gameRepo: lila.game.GameRepo
+    gameRepo: lila.game.GameRepo,
+    prefApi: lila.pref.PrefApi,
+    postApi: lila.forum.PostApi
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
@@ -75,6 +77,8 @@ final class Env(
     "msgUnread",
     "challenge",
     "corresAlarm",
+    "streamStart",
+    "forumMention",
     "offerEventCorres",
     "tourSoon"
   ) {
@@ -86,14 +90,18 @@ final class Env(
       logUnit { pushApi takebackOffer gameId }
     case lila.hub.actorApi.round.CorresDrawOfferEvent(gameId) =>
       logUnit { pushApi drawOffer gameId }
-    case lila.msg.MsgThread.Unread(t) =>
-      logUnit { pushApi newMsg t }
+    case lila.hub.actorApi.push.InboxMsg(userId: String, senderId: String, senderName: String, text: String) =>
+      logUnit { pushApi newMsg(userId, senderId, senderName, text) }
     case lila.challenge.Event.Create(c) =>
       logUnit { pushApi challengeCreate c }
     case lila.challenge.Event.Accept(c, joinerId) =>
       logUnit { pushApi.challengeAccept(c, joinerId) }
     case lila.game.actorApi.CorresAlarmEvent(pov) =>
       logUnit { pushApi corresAlarm pov }
+    case lila.hub.actorApi.streamer.StreamStart(streamerId, notifyList) =>
+      logUnit { pushApi streamStart (streamerId, notifyList) }
+    case lila.hub.actorApi.push.ForumMention(commenter, title, postId) =>
+      logUnit { pushApi forumMention (commenter, title, postId) }
     case t: lila.hub.actorApi.push.TourSoon =>
       logUnit { pushApi tourSoon t }
   }
