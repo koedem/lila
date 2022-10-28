@@ -43,6 +43,12 @@ final class SwissForm(implicit mode: Mode) {
             s"Maximum forbidden pairings: ${Swiss.maxForbiddenPairings}",
             str => str.linesIterator.size <= Swiss.maxForbiddenPairings
           )
+        ),
+        "manualPairings" -> optional(
+          cleanNonEmptyText.verifying(
+            s"Maximum manual pairings: ${Swiss.maxForbiddenPairings}",
+            str => str.linesIterator.size <= Swiss.maxForbiddenPairings
+          )
         )
       )(SwissData.apply)(SwissData.unapply)
         .verifying("15s and 0+1 variant games cannot be rated", _.validRatedVariant)
@@ -64,7 +70,8 @@ final class SwissForm(implicit mode: Mode) {
       roundInterval = Swiss.RoundInterval.auto.some,
       password = None,
       conditions = SwissCondition.DataForm.AllSetup.default,
-      forbiddenPairings = none
+      forbiddenPairings = none,
+      manualPairings = none
     )
 
   def edit(user: User, s: Swiss) =
@@ -81,7 +88,8 @@ final class SwissForm(implicit mode: Mode) {
       roundInterval = s.settings.roundInterval.toSeconds.toInt.some,
       password = s.settings.password,
       conditions = SwissCondition.DataForm.AllSetup(s.settings.conditions),
-      forbiddenPairings = s.settings.forbiddenPairings.some.filter(_.nonEmpty)
+      forbiddenPairings = s.settings.forbiddenPairings.some.filter(_.nonEmpty),
+      manualPairings = s.settings.manualPairings.some.filter(_.nonEmpty)
     )
 
   def nextRound =
@@ -95,7 +103,7 @@ final class SwissForm(implicit mode: Mode) {
 object SwissForm {
 
   val clockLimits: Seq[Int] = Seq(0, 15, 30, 45, 60, 90) ++ {
-    (120 to 420 by 60) ++ (600 to 1800 by 300) ++ (2400 to 10800 by 600)
+    (120 to 480 by 60) ++ (600 to 1800 by 300) ++ (2400 to 10800 by 600)
   }
 
   val clockLimitChoices = options(
@@ -158,7 +166,8 @@ object SwissForm {
       roundInterval: Option[Int],
       password: Option[String],
       conditions: SwissCondition.DataForm.AllSetup,
-      forbiddenPairings: Option[String]
+      forbiddenPairings: Option[String],
+      manualPairings: Option[String]
   ) {
     def realVariant  = variant flatMap Variant.apply getOrElse Variant.default
     def realStartsAt = startsAt | DateTime.now.plusMinutes(10)

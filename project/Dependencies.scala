@@ -3,9 +3,10 @@ import sbt._, Keys._
 
 object Dependencies {
   val arch = if (System.getProperty("os.arch").toLowerCase.startsWith("aarch")) "aarch_64" else "x86_64"
-  val (os, notifier) =
-    if (System.getProperty("os.name").toLowerCase.startsWith("mac")) ("osx", "kqueue")
-    else ("linux", "epoll")
+  val (os, notifier) = if (System.getProperty("os.name").toLowerCase.startsWith("mac"))
+      ("osx", "kqueue")
+    else
+      ("linux", "epoll")
 
   val lilaMaven = "lila-maven" at "https://raw.githubusercontent.com/lichess-org/lila-maven/master"
 

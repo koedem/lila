@@ -339,3 +339,7 @@ package push {
   case class ForumMention(userId: String, title: String, postId: String)
   case class InboxMsg(userId: String, senderId: String, senderName: String, text: String)
 }
+
+package oauth {
+  case class TokenRevoke(id: String)
+}
