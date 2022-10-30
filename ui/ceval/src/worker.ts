@@ -2,7 +2,7 @@ import { Work, Redraw } from './types';
 import { Protocol } from './protocol';
 import { Cache } from './cache';
 import { randomToken } from 'common/random';
-import { readNdJson } from 'common/ndjson';
+import { NdJsonSink } from 'common/ndjson';
 
 export enum CevalState {
   Initial,
@@ -214,8 +214,7 @@ export interface ExternalEngine {
   variants: VariantKey[];
   maxThreads: number;
   maxHash: number;
-  shallowDepth: number;
-  deepDepth: number;
+  defaultDepth: number;
   clientSecret: string;
   officialStockfish?: boolean;
   endpoint: string;
@@ -255,7 +254,7 @@ export class ExternalWorker implements CevalWorker {
   private async analyse(work: Work, signal: AbortSignal): Promise<void> {
     try {
       const url = new URL(`${this.opts.endpoint}/api/external-engine/${this.opts.id}/analyse`);
-      const deep = work.maxDepth >= 99;
+      const infinite = work.maxDepth >= 99;
       const res = await fetch(url.href, {
         signal,
         method: 'post',
@@ -270,7 +269,7 @@ export class ExternalWorker implements CevalWorker {
             sessionId: this.sessionId,
             threads: work.threads,
             hash: work.hashSize || 16,
-            deep,
+            infinite,
             multiPv: work.multiPv,
             variant: work.variant,
             initialFen: work.initialFen,
@@ -279,20 +278,27 @@ export class ExternalWorker implements CevalWorker {
         }),
       });
 
-      await readNdJson<ExternalEngineOutput>(res, line => {
-        this.state = CevalState.Computing;
-        work.emit({
-          fen: work.currentFen,
-          maxDepth: deep ? this.opts.deepDepth : this.opts.shallowDepth,
-          depth: line.pvs[0]?.depth || 0,
-          knps: line.nodes / Math.max(line.time, 1),
-          nodes: line.nodes,
-          cp: line.pvs[0]?.cp,
-          mate: line.pvs[0]?.mate,
-          millis: line.time,
-          pvs: line.pvs,
-        });
-      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+
+      await res.body!.pipeTo(
+        new WritableStream(
+          new NdJsonSink<ExternalEngineOutput>(line => {
+            this.state = CevalState.Computing;
+            work.emit({
+              fen: work.currentFen,
+              maxDepth: infinite ? 99 : this.opts.defaultDepth,
+              depth: line.pvs[0]?.depth || 0,
+              knps: line.nodes / Math.max(line.time, 1),
+              nodes: line.nodes,
+              cp: line.pvs[0]?.cp,
+              mate: line.pvs[0]?.mate,
+              millis: line.time,
+              pvs: line.pvs,
+            });
+          })
+        ),
+        { signal }
+      );
 
       this.state = CevalState.Initial;
     } catch (err: unknown) {
@@ -307,7 +313,7 @@ export class ExternalWorker implements CevalWorker {
   }
 
   stop() {
-    this.req?.abort('ceval stopped');
+    this.req?.abort();
   }
 
   engineName() {
