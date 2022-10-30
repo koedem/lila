@@ -15,7 +15,6 @@ final private class Streaming(
     ws: StandaloneWSClient,
     api: StreamerApi,
     isOnline: User.ID => Boolean,
-    timeline: lila.hub.actors.Timeline,
     keyword: Stream.Keyword,
     alwaysFeatured: () => lila.common.UserIds,
     googleApiKey: Secret,

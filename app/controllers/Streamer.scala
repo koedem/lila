@@ -21,8 +21,8 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
           val requests = getBool("requests") && isGranted(_.Streamers)
           for {
             liveStreams <- env.streamer.liveStreamApi.all
-            live        <- api withUsers liveStreams
-            pager       <- env.streamer.pager.notLive(page, liveStreams, requests)
+            live        <- api.withUsers(liveStreams, ctx.me.map(_.id))
+            pager       <- env.streamer.pager.get(page, liveStreams, ctx.me.map(_.id), requests)
           } yield Ok(html.streamer.index(live, pager, requests))
         }
       }
@@ -66,9 +66,10 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
       OptionFuResult(api find username) { s =>
         WithVisibleStreamer(s) {
           for {
-            sws      <- env.streamer.liveStreamApi of s
-            activity <- env.activity.read.recentAndPreload(sws.user)
-          } yield Ok(html.streamer.show(sws, activity))
+            sws        <- env.streamer.liveStreamApi of s
+            activity   <- env.activity.read.recentAndPreload(sws.user)
+            subscribed <- env.relation.subs.isSubscribed(s.user.id, ctx.me ?? (_.id))
+          } yield Ok(html.streamer.show(sws, activity, subscribed))
         }
       }
     }
@@ -187,7 +188,14 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
       }
     }
 
-  private def AsStreamer(f: StreamerModel.WithUser => Fu[Result])(implicit ctx: Context) =
+  def subscribe(streamerId: String, equals: Boolean) =
+    AuthBody { implicit ctx => me =>
+      if (equals) env.relation.subs.subscribe(me.id, streamerId)
+      else env.relation.subs.unsubscribe(me.id, streamerId)
+      fuccess(Ok)
+    }
+
+  private def AsStreamer(f: StreamerModel.With => Fu[Result])(implicit ctx: Context) =
     ctx.me.fold(notFound) { me =>
       if (StreamerModel.canApply(me) || isGranted(_.Streamers))
         api.find(get("u").ifTrue(isGranted(_.Streamers)) | me.id) flatMap {
@@ -201,7 +209,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
         ).fuccess
     }
 
-  private def WithVisibleStreamer(s: StreamerModel.WithUser)(f: Fu[Result])(implicit ctx: Context) =
+  private def WithVisibleStreamer(s: StreamerModel.With)(f: Fu[Result])(implicit ctx: Context) =
     ctx.noKid ?? {
       if (s.streamer.isListed || ctx.me.??(s.streamer.is) || isGranted(_.Admin)) f
       else notFound

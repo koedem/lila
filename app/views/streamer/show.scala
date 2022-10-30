@@ -13,8 +13,10 @@ object show {
 
   def apply(
       s: lila.streamer.Streamer.WithUserAndStream,
-      activities: Vector[lila.activity.ActivityView]
-  )(implicit ctx: Context) =
+      activities: Vector[lila.activity.ActivityView],
+      subscribed: Boolean
+  )(implicit ctx: Context) = {
+    val streamerId = s.streamer.userId
     views.html.base.layout(
       title = s"${s.titleName} streams chess",
       moreCss = cssTag("streamer.show"),
@@ -50,7 +52,7 @@ object show {
                 }
             }
           ),
-          bits.menu("show", s.withoutStream.some)
+          bits.menu("show", s.some)
         ),
         div(cls := "page-menu__content")(
           s.stream match {
@@ -73,7 +75,7 @@ object show {
               } getOrElse div(cls := "box embed")(div(cls := "nostream")(offline()))
           },
           div(cls := "box streamer")(
-            views.html.streamer.header(s),
+            views.html.streamer.header(s, subscribed.some),
             div(cls := "description")(richText(s.streamer.description.fold("")(_.value))),
             ctx.pref.showRatings option a(cls := "ratings", href := routes.User.show(s.user.username))(
               s.user.best6Perfs.map { showPerfRating(s.user, _) }
@@ -83,4 +85,5 @@ object show {
         )
       )
     )
+  }
 }

@@ -90,8 +90,9 @@ final class Env(
       logUnit { pushApi takebackOffer gameId }
     case lila.hub.actorApi.round.CorresDrawOfferEvent(gameId) =>
       logUnit { pushApi drawOffer gameId }
-    case lila.hub.actorApi.push.InboxMsg(userId: String, senderId: String, senderName: String, text: String) =>
-      logUnit { pushApi newMsg(userId, senderId, senderName, text) }
+    case lila.hub.actorApi.push
+          .InboxMsg(userId: String, senderId: String, senderName: String, text: String) =>
+      logUnit { pushApi newMsg (userId, senderId, senderName, text) }
     case lila.challenge.Event.Create(c) =>
       logUnit { pushApi challengeCreate c }
     case lila.challenge.Event.Accept(c, joinerId) =>

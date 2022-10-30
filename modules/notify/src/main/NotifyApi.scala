@@ -8,7 +8,7 @@ import lila.common.paginator.Paginator
 import lila.common.String.shorten
 import lila.db.dsl._
 import lila.db.paginator.Adapter
-import lila.hub.actorApi.socket.{SendTo, SendTos}
+import lila.hub.actorApi.socket.{ SendTo, SendTos }
 import lila.hub.actorApi.push._
 import lila.memo.CacheApi._
 import lila.user.UserRepo
@@ -22,7 +22,7 @@ final class NotifyApi(
     cacheApi: lila.memo.CacheApi,
     streamStarter: StreamStartHelper,
     maxPerPage: MaxPerPage,
-    prefApi : lila.pref.PrefApi,
+    prefApi: lila.pref.PrefApi,
     getLightUser: lila.common.LightUser.Getter
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
@@ -86,13 +86,12 @@ final class NotifyApi(
   def notifyStreamStart(streamerId: String, streamerName: String): Funit =
     streamStarter.getNotiflowersAndPush(streamerId, streamerName) flatMap { res =>
       val views = streamStarter.NotiflowerView(res, streamerId, streamerName)
-      views.pp("NotiflowerView")
       repo.bulkUnreadCount(views.users) flatMap { countList =>
         bumpCountCache(countList filter (recent => views.byUser(recent._1).recentlyOnline))
 
         repo.insertMany(views.noteList) andThen { case _ =>
-          countList.toMap groupBy(_._2) map (group => (group._2.keySet, group._1)) map { case (users, count) =>
-            sendTos(users, count)
+          countList.toMap groupBy (_._2) map (group => (group._2.keySet, group._1)) map {
+            case (users, count) => sendTos(users, count)
           }
         }
       }
@@ -109,7 +108,7 @@ final class NotifyApi(
     )
 
   private def notesByCount(countList: List[(String, Int)]): List[(Set[String], Int)] =
-    countList.toMap groupBy(_._2) map (x => (x._2.keySet, x._1)) toList
+    countList.toMap groupBy (_._2) map (x => (x._2.keySet, x._1)) toList
 
   private def bumpCountCache(countList: List[(String, Int)]) =
     countList map { case (userId, veryRecentCount) =>
@@ -117,7 +116,7 @@ final class NotifyApi(
       unreadCountCache.put(Notifies(userId), Future({ veryRecentCount + 1 })) // +1 for the streamStart
     }
 
-  private def shouldSkip(notification: Notification) = 
+  private def shouldSkip(notification: Notification) =
     (!notification.isMsg ?? userRepo.isKid(notification.notifies.value)) >>| {
       notification.content match {
         case MentionedInThread(_, _, topicId, _, _) =>
@@ -146,9 +145,12 @@ final class NotifyApi(
         getNotifications(u, 1) zip unreadCount(u) dmap (AndUnread.apply _).tupled map { msg =>
           Bus.publish(
             SendTo.async(
-              u.value, 
-              "notifications", 
-              () => userRepo langOf u.value map I18nLangPicker.byStrOrDefault map(implicit lang => jsonHandlers(msg))                
+              u.value,
+              "notifications",
+              () =>
+                userRepo langOf u.value map I18nLangPicker.byStrOrDefault map (implicit lang =>
+                  jsonHandlers(msg)
+                )
             ),
             "socketUsers"
           )
@@ -158,7 +160,7 @@ final class NotifyApi(
 
   private def pushToUser(note: Notification) = {
     note.content match {
-      case PrivateMessage(sender: PrivateMessage.Sender, text:PrivateMessage.Text) =>
+      case PrivateMessage(sender: PrivateMessage.Sender, text: PrivateMessage.Text) =>
         getLightUser(sender.value) map {
           case Some(luser) =>
             Bus.publish(
@@ -190,11 +192,12 @@ final class NotifyApi(
 
   import lila.pref.NotificationPref._
   private def getAllows(uid: String, note: Notification): Fu[Allows] =
-    prefApi.getNotificationPref(uid) map { pref => pref.pp("full notificationPref")
+    prefApi.getNotificationPref(uid) map { pref =>
+      pref.pp("full notificationPref")
       note.content match {
-        case _: PrivateMessage => pref.allows(InboxMsg).pp("inbox msg!")
+        case _: PrivateMessage    => pref.allows(InboxMsg).pp("inbox msg!")
         case _: MentionedInThread => pref.allows(ForumMention).pp("forum mention!")
-        case _ => Allows(BELL)
+        case _                    => Allows(BELL)
       }
     }
 }

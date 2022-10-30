@@ -1,7 +1,7 @@
 import { VNode } from 'snabbdom';
 
 export interface NotifyOpts {
-  data?: NotifyData|UpdateBell;
+  data?: NotifyData | UpdateBell;
   incoming: boolean;
   isVisible(): boolean;
   setCount(nb: number): void;

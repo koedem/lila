@@ -28,8 +28,7 @@ final class Env(
     picfitApi: lila.memo.PicfitApi,
     notifyApi: lila.notify.NotifyApi,
     userRepo: lila.user.UserRepo,
-    timeline: lila.hub.actors.Timeline,
-    relationApi: lila.relation.RelationApi,
+    subsRepo: lila.relation.SubscriptionRepo,
     prefApi: lila.pref.PrefApi,
     db: lila.db.Db
 )(implicit
@@ -71,7 +70,6 @@ final class Env(
     ws = ws,
     api = api,
     isOnline = isOnline,
-    timeline = timeline,
     keyword = config.keyword,
     alwaysFeatured = alwaysFeaturedSetting.get _,
     googleApiKey = config.googleApiKey,

@@ -424,7 +424,7 @@ lazy val explorer = module("explorer",
 )
 
 lazy val notifyModule = module("notify",
-  Seq(common, db, game, user, hub, relation, pref),//, timeline),
+  Seq(common, db, game, user, hub, relation, pref),
   reactivemongo.bundle
 )
 

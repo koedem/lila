@@ -12,9 +12,9 @@ export default function LichessNotify(element: Element, opts: NotifyOpts) {
   function redraw() {
     vnode = patch(vnode, view(ctrl));
   }
-  const update = (data: NotifyData|UpdateBell) => ('pager' in data) ? ctrl.updateNotes(data) : ctrl.updateBell(data);
-  
-  if (opts.data) update(opts.data)
+  const update = (data: NotifyData | UpdateBell) => ('pager' in data ? ctrl.updateNotes(data) : ctrl.updateBell(data));
+
+  if (opts.data) update(opts.data);
   else ctrl.loadPage(1);
 
   return {

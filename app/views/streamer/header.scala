@@ -10,9 +10,24 @@ object header {
 
   import trans.streamer._
 
-  def apply(s: lila.streamer.Streamer.WithUserAndStream)(implicit ctx: Context) =
+  def apply(s: lila.streamer.Streamer.WithUserAndStream, subscribedO: Option[Boolean] = None)(implicit
+      ctx: Context
+  ) =
     div(cls := "streamer-header")(
       picture.thumbnail(s.streamer, s.user),
+      subscribedO.fold(emptyFrag) { subscribed =>
+        val ctrlId = s"subscribe-${s.streamer.userId}"
+        span(
+          input(
+            id         := ctrlId,
+            cls        := "cmn-toggle subscribe-switch",
+            tpe        := "checkbox",
+            formaction := s"${routes.Streamer.subscribe(s.streamer.userId, !subscribed)}",
+            subscribed option st.checked
+          ),
+          label(`for` := ctrlId)("Subscribe")
+        )
+      },
       div(cls := "overview")(
         h1(dataIcon := "")(
           titleTag(s.user.title),

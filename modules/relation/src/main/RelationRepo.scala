@@ -7,16 +7,16 @@ import org.joda.time.DateTime
 import lila.db.dsl._
 import lila.user.User
 
-final private class RelationRepo(coll: Coll, userRepo: lila.user.UserRepo)(implicit
+final private class RelationRepo(colls: Colls, userRepo: lila.user.UserRepo)(implicit
     ec: scala.concurrent.ExecutionContext
 ) {
 
   import RelationRepo._
+  val coll = colls.relation
 
   def following(userId: ID) = relating(userId, Follow)
-
-  def blockers(userId: ID) = relaters(userId, Block)
-  def blocking(userId: ID) = relating(userId, Block)
+  def blockers(userId: ID)  = relaters(userId, Block)
+  def blocking(userId: ID)  = relating(userId, Block)
 
   def freshFollowersFromSecondary(userId: ID, daysAgo: Int): Fu[List[User.ID]] =
     coll

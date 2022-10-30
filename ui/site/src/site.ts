@@ -62,6 +62,13 @@ lichess.load.then(() => {
       return false;
     });
 
+    $('.streamer-show').on('change', '.subscribe-switch', (e: Event) => {
+      const el = e.target as HTMLInputElement;
+      xhr
+        .text(el.formAction, { method: 'post' })
+        .then(() => (el.formAction = el.formAction.replace(/equals=.+/, `equals=${!el.checked}`)));
+    });
+
     $('.mselect .button').on('click', function (this: HTMLElement) {
       const $p = $(this).parent();
       $p.toggleClass('shown');

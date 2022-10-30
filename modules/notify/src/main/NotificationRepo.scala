@@ -40,7 +40,7 @@ final private class NotificationRepo(val coll: Coll)(implicit ec: scala.concurre
     )
 
   private def hasUnread =
-    $doc( // recent, read
+    $doc(                                           // recent, read
       "createdAt" $gt DateTime.now.minusMinutes(10) // wtf?
     )
 

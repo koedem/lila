@@ -21,7 +21,7 @@ object PrefForm {
 
   private val allowsMapping = mapping(
     "bell" -> boolean,
-    "push" -> boolean,
+    "push" -> boolean
   )(Allows.fromForm)(Allows.toForm)
 
   val pref = Form(

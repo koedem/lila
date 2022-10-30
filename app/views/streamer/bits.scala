@@ -31,7 +31,7 @@ object bits {
       )
     )
 
-  def menu(active: String, s: Option[lila.streamer.Streamer.WithUser])(implicit ctx: Context) =
+  def menu(active: String, s: Option[lila.streamer.Streamer.With])(implicit ctx: Context) =
     st.nav(cls := "subnav")(
       a(cls := active.active("index"), href := routes.Streamer.index())(allStreamers()),
       s.map { st =>

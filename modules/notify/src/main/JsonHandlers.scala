@@ -24,7 +24,7 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
         case StreamStartNote(streamerId, streamerName) =>
           Json.obj(
             "sid"  -> streamerId,
-            "name" -> streamerName,
+            "name" -> streamerName
           )
         case InvitedToStudy(invitedBy, studyName, studyId) =>
           Json.obj(

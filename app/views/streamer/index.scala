@@ -15,13 +15,13 @@ object index {
 
   def apply(
       live: List[lila.streamer.Streamer.WithUserAndStream],
-      pager: Paginator[lila.streamer.Streamer.WithUser],
+      pager: Paginator[lila.streamer.Streamer.With],
       requests: Boolean
   )(implicit ctx: Context) = {
 
     val title = if (requests) "Streamer approval requests" else lichessStreamers.txt()
 
-    def widget(s: lila.streamer.Streamer.WithUser, stream: Option[lila.streamer.Stream]) =
+    def widget(s: lila.streamer.Streamer.With, stream: Option[lila.streamer.Stream]) =
       frag(
         if (requests) a(href := s"${routes.Streamer.edit}?u=${s.user.username}", cls := "overlay")
         else
@@ -69,7 +69,7 @@ object index {
           boxTop(h1(dataIcon := "", cls := "text"))(title),
           !requests option div(cls := "list live")(
             live.map { s =>
-              st.article(cls := "streamer")(widget(s.withoutStream, s.stream))
+              st.article(cls := "streamer")(widget(s, s.stream))
             }
           ),
           div(cls := "list infinite-scroll")(

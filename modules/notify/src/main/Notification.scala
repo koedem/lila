@@ -9,7 +9,7 @@ case class Notification(
     notifies: Notification.Notifies,
     content: NotificationContent,
     read: Notification.NotificationRead,
-    createdAt: DateTime,
+    createdAt: DateTime
 ) {
   def id = _id
 
@@ -27,7 +27,7 @@ object Notification {
   case class UnreadCount(value: Int) extends AnyVal
   case class AndUnread(pager: Paginator[Notification], unread: UnreadCount)
   case class UpdateBell(unread: UnreadCount)
-  case class Notifies(value: String) extends AnyVal with StringValue
+  case class Notifies(value: String)          extends AnyVal with StringValue
   case class NotificationRead(value: Boolean) extends AnyVal
 
   def make(notifies: Notification.Notifies, content: NotificationContent): Notification = {
@@ -57,7 +57,7 @@ object MentionedInThread {
 
 case class StreamStartNote(
     streamerId: String,
-    streamerName: String,
+    streamerName: String
 ) extends NotificationContent("streamStart")
 
 object StreamStartNote {

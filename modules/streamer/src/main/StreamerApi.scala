@@ -14,7 +14,8 @@ final class StreamerApi(
     userRepo: UserRepo,
     cacheApi: lila.memo.CacheApi,
     picfitApi: PicfitApi,
-    notifyApi: lila.notify.NotifyApi
+    notifyApi: lila.notify.NotifyApi,
+    subsRepo: lila.relation.SubscriptionRepo
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   import BsonHandlers._
@@ -38,16 +39,62 @@ final class StreamerApi(
       coll.insert.one(s.streamer) inject s.some
     }
 
-  def withUser(s: Stream): Fu[Option[Streamer.WithUserAndStream]] =
+  /*def withUser(s: Stream): Fu[Option[Streamer.WithUserAndStream]] =
     userRepo named s.streamer.userId dmap {
       _ map { user =>
         Streamer.WithUserAndStream(s.streamer, user, s.some)
       }
     }
+   */
+  /*  def withUsers(live: LiveStreams, userId: Option[User.ID]): Fu[List[Streamer.WithUserAndStream]] = {
+    val uids = live.streams.map(_.streamer.userId)
+    for {
+      users <- userRepo.byIds(uids)
+      subs <- userId.fold(Map[User.ID,Boolean](), u => subsRepo.isSubscribed(u, uids))
+    }
+    yield live.streams.flatMap { x =>
+      users.find(_.id == x.streamer.userId) map {
+        u => Streamer.WithUserAndStream(x.streamer, u, x.some, ~subs.get(u.id))
+      }
+    }
+  }
+  db.user4.aggregate([
+  { $match: { _id: { $in: ['ana','yaroslava','angel','boris']}}},
+  { $project: { "user": "$$CURRENT" }},
+  { $lookup: {from: "relation_sub", as: "subs", localField: "_id", foreignField: "s"}},
+  { $project: {"subscribed": { $in: ['boris', "$subs.u"]}, "user": 1} }
+])
 
-  def withUsers(live: LiveStreams): Fu[List[Streamer.WithUserAndStream]] =
-    live.streams.map(withUser).sequenceFu.dmap(_.flatten)
-
+   */
+  def withUsers(live: LiveStreams, userId: Option[User.ID]): Fu[List[Streamer.WithUserAndStream]] = {
+    val uids = live.streams.map(_.streamer.userId)
+    userRepo.coll
+      .aggregateList(100, readPreference = ReadPreference.secondaryPreferred) { framework =>
+        import framework._
+        Match($inIds(uids)) -> List(
+          Project($doc("user" -> "$$CURRENT")),
+          PipelineOperator(
+            $lookup.simple(
+              from = subsRepo.coll,
+              as = "subs",
+              local = "_id",
+              foreign = "s"
+            )
+          ),
+          Project(
+            $doc("subscribed" -> $doc("$in" -> List(~userId, "$subs.u")), "user" -> 1)
+          )
+        )
+      }
+      .map { docs =>
+        for {
+          doc        <- docs
+          user       <- doc.getAsOpt[User]("user")
+          stream     <- live.streams.find(_.streamer.userId == user.id)
+          subscribed <- doc.getAsOpt[Boolean]("subscribed")
+        } yield Streamer.WithUserAndStream(stream.streamer, user, stream.some, subscribed)
+      }
+  }
   def allListedIds: Fu[Set[Streamer.Id]] = cache.listedIds.getUnit
 
   def setSeenAt(user: User): Funit =

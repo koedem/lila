@@ -15,27 +15,27 @@ case class NotificationPref(
 ) {
 
   def allows(event: Event): Allows = event match {
-    case InboxMsg => inboxMsg
-    case Challenge => challenge
-    case ForumMention => forumMention
-    case StreamStart => streamStart
+    case InboxMsg       => inboxMsg
+    case Challenge      => challenge
+    case ForumMention   => forumMention
+    case StreamStart    => streamStart
     case TournamentSoon => tournamentSoon
-    case GameEvent => gameEvent
+    case GameEvent      => gameEvent
   }
 }
 
 object NotificationPref {
-  val BELL            = 1
-  val WEB             = 2 // web push & browser alerts from notify/*.ts
-  val DEVICE          = 4 // firebase
-  val PUSH            = WEB|DEVICE  // may need to separate when macOS ventura happens
+  val BELL   = 1
+  val WEB    = 2            // web push & browser alerts from notify/*.ts
+  val DEVICE = 4            // firebase
+  val PUSH   = WEB | DEVICE // may need to separate when macOS ventura happens
 
   case class Allows(value: Int) extends AnyVal with IntValue {
-    def push: Boolean = (value & (WEB|DEVICE)) != 0
-    def web: Boolean = (value & WEB) != 0
+    def push: Boolean   = (value & (WEB | DEVICE)) != 0
+    def web: Boolean    = (value & WEB) != 0
     def device: Boolean = (value & DEVICE) != 0
-    def bell: Boolean = (value & BELL) != 0
-    def any: Boolean = value != 0
+    def bell: Boolean   = (value & BELL) != 0
+    def any: Boolean    = value != 0
   }
 
   sealed trait Event {
@@ -53,8 +53,8 @@ object NotificationPref {
   case object GameEvent      extends Event
 
   lazy val default: NotificationPref = NotificationPref(
-    inboxMsg = Allows(BELL|PUSH),
-    challenge = Allows(BELL|PUSH),
+    inboxMsg = Allows(BELL | PUSH),
+    challenge = Allows(BELL | PUSH),
     forumMention = Allows(BELL),
     streamStart = Allows(0),
     tournamentSoon = Allows(PUSH),
@@ -71,7 +71,7 @@ object NotificationPref {
   object Allows {
 
     def fromForm(bell: Boolean, push: Boolean): Allows =
-      Allows((bell ?? BELL)|(push ?? PUSH))
+      Allows((bell ?? BELL) | (push ?? PUSH))
 
     def toForm(allows: Allows): Some[(Boolean, Boolean)] =
       Some((allows.bell, allows.push))

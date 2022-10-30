@@ -17,14 +17,14 @@ import lila.user.User
 final private class StreamStartHelper(
     userRepo: lila.user.UserRepo,
     prefApi: lila.pref.PrefApi,
-    //timeline: lila.hub.actors.Timeline,
-    relationApi: lila.relation.RelationApi
+    // timeline: lila.hub.actors.Timeline,
+    subsRepo: lila.relation.SubscriptionRepo
 )(implicit
     ec: scala.concurrent.ExecutionContext
 ) {
 
   def getNotiflowersAndPush(streamerId: User.ID, streamerName: String): Fu[Iterable[NotifiableFollower]] =
-    relationApi.freshFollowersFromSecondary(streamerId, 14).flatMap { followers =>
+    subsRepo.subscribersOnlineSince(streamerId, 14).flatMap { followers =>
       /*timeline ! {
         import lila.hub.actorApi.timeline.{ Propagate, StreamStart }
         Propagate(StreamStart(streamerId, streamerName)) toUsers followers

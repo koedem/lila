@@ -9,10 +9,10 @@ import lila.common.config.CollName
 import lila.db.dsl.Coll
 
 final class AsyncDb(
-                     name: String,
-                     uri: String,
-                     driver: AsyncDriver
-                   )(implicit ec: scala.concurrent.ExecutionContext) {
+    name: String,
+    uri: String,
+    driver: AsyncDriver
+)(implicit ec: scala.concurrent.ExecutionContext) {
 
   private lazy val connection: Fu[(MongoConnection, Option[String])] =
     MongoConnection.fromString(uri) flatMap { parsedUri =>
@@ -33,10 +33,10 @@ final class AsyncDb(
 }
 
 final class Db(
-                name: String,
-                uri: String,
-                driver: AsyncDriver,
-              )(implicit ec: scala.concurrent.ExecutionContext) {
+    name: String,
+    uri: String,
+    driver: AsyncDriver
+)(implicit ec: scala.concurrent.ExecutionContext) {
 
   private val logger = lila.db.logger branch name
 

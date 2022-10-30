@@ -109,14 +109,14 @@ final class PrefApi(
   }
 
   def getNotificationPref(uid: User.ID): Fu[NotificationPref] =
-    cache.getIfPresent(uid) map(_ collect {
-      case Some(pref) => pref.notification
+    cache.getIfPresent(uid) map (_ collect { case Some(pref) =>
+      pref.notification
     }) getOrElse {
       // maybe don't want to crowd the cache here, and no need for the whole pref
       // object. these lookups can often be triggered when the user is not active
       coll.find($id(uid), $doc("notification" -> true).some).one[NotificationPref] map {
         case Some(notification) => notification
-        case None => NotificationPref.default
+        case None               => NotificationPref.default
       }
     }
 }

@@ -11,17 +11,17 @@ object notification {
 
   def fieldSet(form: play.api.data.Form[_], inactive: Boolean)(implicit ctx: Context) =
     div(cls := List("none" -> inactive))(
-      table( cls := "allows-grid")(
+      table(cls := "allows-grid")(
         thead(
           tr(th, th(notifyBell()), th(notifyPush()))
         ),
         tbody(
-          makeRow(form, notifyStreamStart(),filterName="streamStart"),
+          makeRow(form, notifyStreamStart(), filterName = "streamStart"),
           makeRow(form, notifyForumMention(), "forumMention"),
           makeRow(form, notifyInboxMsg(), "inboxMsg"),
           makeRow(form, notifyChallenge(), "challenge"),
-          makeRow(form, notifyTournamentSoon(), filterName="tournamentSoon"),
-          makeRow(form, notifyGameEvent(), "gameEvent"),
+          makeRow(form, notifyTournamentSoon(), filterName = "tournamentSoon"),
+          makeRow(form, notifyGameEvent(), "gameEvent")
         )
       ),
       setting(
@@ -34,7 +34,7 @@ object notification {
     tr(
       td(transTxt),
       Seq("bell", "push") map { allow =>
-        val name = s"notification.$filterName.$allow"
+        val name    = s"notification.$filterName.$allow"
         val checked = form.data(name).contains("true")
         td(
           if (editable(s"$filterName.$allow"))
@@ -47,8 +47,8 @@ object notification {
               form3.hidden(name, "true"), // force form value
               filterName match {
                 case "challenge" => iconTag('\ue048')
-                case "inboxMsg" => iconTag( '\ue00f')
-                case _ => emptyFrag
+                case "inboxMsg"  => iconTag('\ue00f')
+                case _           => emptyFrag
               }
             )
         )
@@ -56,10 +56,10 @@ object notification {
     )
 
   private def editable(name: String) = name match {
-    case "inboxMsg.bell" => false
+    case "inboxMsg.bell"       => false
     case "tournamentSoon.bell" => false
-    case "gameEvent.bell" => false
-    case "challenge.bell" => false
-    case _ => true
+    case "gameEvent.bell"      => false
+    case "challenge.bell"      => false
+    case _                     => true
   }
 }
