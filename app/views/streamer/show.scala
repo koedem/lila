@@ -14,7 +14,6 @@ object show {
   def apply(
       s: lila.streamer.Streamer.WithUserAndStream,
       activities: Vector[lila.activity.ActivityView],
-      subscribed: Boolean
   )(implicit ctx: Context) = {
     val streamerId = s.streamer.userId
     views.html.base.layout(
@@ -75,7 +74,7 @@ object show {
               } getOrElse div(cls := "box embed")(div(cls := "nostream")(offline()))
           },
           div(cls := "box streamer")(
-            views.html.streamer.header(s, subscribed.some),
+            views.html.streamer.header(s),
             div(cls := "description")(richText(s.streamer.description.fold("")(_.value))),
             ctx.pref.showRatings option a(cls := "ratings", href := routes.User.show(s.user.username))(
               s.user.best6Perfs.map { showPerfRating(s.user, _) }

@@ -2,9 +2,10 @@ package lila.pref
 
 import play.api.mvc.RequestHeader
 import reactivemongo.api.bson._
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import lila.db.dsl._
+import lila.hub.actorApi.notify.NotifyAllows
 import lila.memo.CacheApi._
 import lila.user.User
 
@@ -71,7 +72,7 @@ final class PrefApi(
   private def unmentionableIds(userIds: Set[User.ID]): Fu[Set[User.ID]] =
     coll.secondaryPreferred.distinctEasy[User.ID, Set](
       "_id",
-      $inIds(userIds) ++ $doc("notification.forumMention" -> 0)
+      $inIds(userIds) ++ $doc("notification.mention" -> 0)
     )
 
   def mentionableIds(userIds: Set[User.ID]): Fu[Set[User.ID]] =
@@ -112,11 +113,22 @@ final class PrefApi(
     cache.getIfPresent(uid) map (_ collect { case Some(pref) =>
       pref.notification
     }) getOrElse {
-      // maybe don't want to crowd the cache here, and no need for the whole pref
-      // object. these lookups can often be triggered when the user is not active
+      // no need for the whole pref object, and don't trigger the cache.
+      // these lookups often happen when the user is not active
       coll.find($id(uid), $doc("notification" -> true).some).one[NotificationPref] map {
         case Some(notification) => notification
         case None               => NotificationPref.default
       }
+    }
+
+  def getNotifyAllows(userIds: Iterable[User.ID], eventClass: String): Fu[List[NotifyAllows]] =
+    coll.find($inIds(userIds), $doc(s"notification.$eventClass" -> true).some)
+      .cursor[Bdoc]().list() dmap { docs =>
+      for {
+        doc <- docs
+        userId <- doc string "_id"
+        allows <- doc child "notification" map (_ int eventClass)
+        allowCode = allows getOrElse NotificationPref.default.allows(eventClass).value
+      } yield NotifyAllows(userId, allowCode)
     }
 }

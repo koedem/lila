@@ -78,7 +78,7 @@ final class Env(
       scheduler.scheduleOnce(5 minutes) { write.study(id).unit }.unit
     case lila.hub.actorApi.team.CreateTeam(id, _, userId)  => write.team(id, userId).unit
     case lila.hub.actorApi.team.JoinTeam(id, userId)       => write.team(id, userId).unit
-    case lila.hub.actorApi.streamer.StreamStart(userId, _) => write.streamStart(userId).unit
+    case lila.hub.actorApi.push.StreamStart(userId, _, _) => write.streamStart(userId).unit
     case lila.swiss.SwissFinish(swissId, ranking)          => write.swiss(swissId, ranking).unit
   }
 }

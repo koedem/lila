@@ -26,8 +26,21 @@ object index {
         if (requests) a(href := s"${routes.Streamer.edit}?u=${s.user.username}", cls := "overlay")
         else
           bits.redirectLink(s.user.username, stream.isDefined.some)(cls := "overlay"),
-        stream.isDefined option span(cls := "ribbon")(span(trans.streamer.live())),
-        picture.thumbnail(s.streamer, s.user),
+        stream.isDefined option span(cls := "live-ribbon")(span(trans.streamer.live())),
+        div(cls:="picture")(
+          picture.thumbnail(s.streamer, s.user),
+          !requests && ctx.me.nonEmpty option span(cls := "subscribe-ribbon-bottom-left")(
+            span(
+              input(
+                cls        := "std-toggle subscribe-switch",
+                tpe        := "checkbox",
+                formaction := s"${routes.Streamer.subscribe(s.streamer.userId, !s.subscribed)}",
+                s.subscribed option st.checked
+              ),
+              trans.subscribe()
+            )
+          )
+        ),
         div(cls := "overview")(
           h1(dataIcon := "")(titleTag(s.user.title), s.streamer.name),
           s.streamer.headline.map(_.value).map { d =>
@@ -35,6 +48,11 @@ object index {
               cls := s"headline ${if (d.length < 60) "small" else if (d.length < 120) "medium" else "large"}"
             )(d)
           },
+          button(
+            cls := "test-xhr button button-metal",
+            style := "z-index: 4; align-self: flex-start;",
+            formaction := routes.Streamer.testLiveToggle(s.streamer.userId))("toggle online/offline"
+          ),
           div(cls := "services")(
             s.streamer.twitch.map { twitch =>
               div(cls := "service twitch")(twitch.minUrl)
@@ -44,16 +62,18 @@ object index {
             }
           ),
           div(cls := "ats")(
-            stream.map { s =>
-              p(cls := "at")(
-                currentlyStreaming(strong(s.cleanStatus))
+            div(
+              stream.map { s =>
+                p(cls := "at")(
+                  currentlyStreaming(strong(s.cleanStatus))
+                )
+              } getOrElse frag(
+                p(cls := "at")(trans.lastSeenActive(momentFromNow(s.streamer.seenAt))),
+                s.streamer.liveAt.map { liveAt =>
+                  p(cls := "at")(lastStream(momentFromNow(liveAt)))
+                }
               )
-            } getOrElse frag(
-              p(cls := "at")(trans.lastSeenActive(momentFromNow(s.streamer.seenAt))),
-              s.streamer.liveAt.map { liveAt =>
-                p(cls := "at")(lastStream(momentFromNow(liveAt)))
-              }
-            )
+            ),
           )
         )
       )

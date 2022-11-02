@@ -16,31 +16,31 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
       notificationContent match {
         case MentionedInThread(mentionedBy, topic, _, category, postId) =>
           Json.obj(
-            "mentionedBy" -> getLightUser(mentionedBy.value),
-            "topic"       -> topic.value,
-            "category"    -> category.value,
-            "postId"      -> postId.value
+            "mentionedBy" -> getLightUser(mentionedBy),
+            "topic"       -> topic,
+            "category"    -> category,
+            "postId"      -> postId
           )
-        case StreamStartNote(streamerId, streamerName) =>
+        case StreamStart(streamerId, streamerName) =>
           Json.obj(
             "sid"  -> streamerId,
             "name" -> streamerName
           )
         case InvitedToStudy(invitedBy, studyName, studyId) =>
           Json.obj(
-            "invitedBy" -> getLightUser(invitedBy.value),
-            "studyName" -> studyName.value,
-            "studyId"   -> studyId.value
+            "invitedBy" -> getLightUser(invitedBy),
+            "studyName" -> studyName,
+            "studyId"   -> studyId
           )
         case PrivateMessage(senderId, text) =>
           Json.obj(
-            "user" -> getLightUser(senderId.value),
-            "text" -> text.value
+            "user" -> getLightUser(senderId),
+            "text" -> text
           )
         case TeamJoined(id, name) =>
           Json.obj(
-            "id"   -> id.value,
-            "name" -> name.value
+            "id"   -> id,
+            "name" -> name
           )
         case ReportedBanned | CoachReview => Json.obj()
         case TitledTournamentInvitation(id, text) =>
@@ -50,9 +50,9 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
           )
         case GameEnd(gameId, opponentId, win) =>
           Json.obj(
-            "id"       -> gameId.value,
-            "opponent" -> opponentId.map(_.value).flatMap(getLightUser),
-            "win"      -> win.map(_.value)
+            "id"       -> gameId,
+            "opponent" -> opponentId.flatMap(getLightUser),
+            "win"      -> win
           )
         case _: PlanStart  => Json.obj()
         case _: PlanExpire => Json.obj()
@@ -88,15 +88,12 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
       Json.obj(
         "content" -> writeBody(notification.content),
         "type"    -> notification.content.key,
-        "read"    -> notification.read.value,
+        "read"    -> notification.read,
         "date"    -> notification.createdAt
       )
   }
 
   import lila.common.paginator.PaginatorJson._
-  implicit val unreadWrites = Writes[Notification.UnreadCount] { v =>
-    JsNumber(v.value)
-  }
   implicit val andUnreadWrites: OWrites[Notification.AndUnread] = Json.writes[Notification.AndUnread]
 
   private val i18nKeys: List[lila.i18n.MessageKey] = List(
@@ -122,13 +119,8 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
     trans.timeAlmostUp
   ).map(_.key)
 
-  def apply(notify: Notification.AndUnread)(implicit lang: Lang) =
+  def apply(notify: Notification.AndUnread)(implicit lang: Lang): JsObject =
     andUnreadWrites.writes(notify) ++ Json.obj(
       "i18n" -> JsDump.keysToObject(i18nKeys, lang)
-    )
-
-  def apply(bellUpdate: Notification.UpdateBell) =
-    Json.obj(
-      "unread" -> bellUpdate.unread
     )
 }

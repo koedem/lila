@@ -68,8 +68,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
           for {
             sws        <- env.streamer.liveStreamApi of s
             activity   <- env.activity.read.recentAndPreload(sws.user)
-            subscribed <- env.relation.subs.isSubscribed(s.user.id, ctx.me ?? (_.id))
-          } yield Ok(html.streamer.show(sws, activity, subscribed))
+          } yield Ok(html.streamer.show(sws, activity))
         }
       }
     }
@@ -188,12 +187,19 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
       }
     }
 
-  def subscribe(streamerId: String, equals: Boolean) =
+  def subscribe(streamerId: String, set: Boolean) =
     AuthBody { implicit ctx => me =>
-      if (equals) env.relation.subs.subscribe(me.id, streamerId)
+      if (set) env.relation.subs.subscribe(me.id, streamerId)
       else env.relation.subs.unsubscribe(me.id, streamerId)
       fuccess(Ok)
     }
+
+  def testLiveToggle(streamerId: String) = {
+    OpenBody { implicit ctx =>
+      env.streamer.liveStreamApi.toggleFakeOnline(streamerId)
+      fuccess(Ok)
+    }
+  }
 
   private def AsStreamer(f: StreamerModel.With => Fu[Result])(implicit ctx: Context) =
     ctx.me.fold(notFound) { me =>

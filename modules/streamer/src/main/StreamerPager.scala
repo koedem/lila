@@ -68,9 +68,7 @@ final class StreamerPager(
                   foreign = "s"
                 )
               ),
-              AddFields(
-                $doc("subscribed" -> $doc("$in" -> List(~forUser, "$subs.u")))
-              )
+              AddFields($doc("subscribed" -> $doc("$in" -> List(~forUser, "$subs.u"))))
             )
           }
           .map { docs =>

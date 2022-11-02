@@ -36,6 +36,4 @@
 @import 'component/reconnecting';
 @import 'component/announce';
 @import 'component/agreement';
-
-@import 'form/cmn-toggle'; // fixme, does this belong here?
-// if not, should i really make a new streamer.css download to get it?
+@import 'component/std-toggle';

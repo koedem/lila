@@ -157,15 +157,11 @@ final class KaladinApi(
     private[KaladinApi] def apply(user: KaladinUser): Funit =
       subs.get(user.suspectId) ?? { modIds =>
         subs = subs - user.suspectId
-        import lila.notify.{ KaladinDone, Notification }
-        modIds
-          .map { modId =>
-            notifyApi.addNotification(
-              Notification.make(Notification.Notifies(modId.value), KaladinDone(user.suspectId.value))
-            )
-          }
-          .sequenceFu
-          .void
+        modIds.map { modId =>
+          notifyApi.notifyOne(modId.value, lila.notify.KaladinDone(user.suspectId.value))
+        }
+        .sequenceFu
+        .void
       }
   }
 

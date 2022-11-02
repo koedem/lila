@@ -1,4 +1,4 @@
-import { Ctrl, NotifyOpts, NotifyData, UpdateBell, Redraw } from './interfaces';
+import { Ctrl, NotifyOpts, NotifyData, Redraw } from './interfaces';
 
 import * as xhr from 'common/xhr';
 
@@ -17,38 +17,43 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     }
   });
 
-  function updateBell(d: UpdateBell) {
-    console.log(d, 'update bell');
+  function bumpUnread() {
     if (opts.isVisible()) {
       loadPage(1);
       return;
     }
     data = undefined;
-    opts.setCount(d.unread);
-    opts.pulse();
+    opts.setCount('increment');
+    attention();
     redraw();
   }
 
   function updateNotes(d: NotifyData) {
-    console.log(d, 'update botes');
     data = d;
-    if (data.pager.currentPage === 1 && data.unread && opts.isVisible()) {
+    /*if (data.pager.currentPage === 1 && data.unread && opts.isVisible()) {
       opts.setNotified();
       data.unread = 0;
       readAllStorage.fire();
-    }
+    }*/
     initiating = false;
     scrolling = false;
-    opts.setCount(data.unread);
+    if (opts.setCount(data.unread) && data.unread) attention(data);
     redraw();
   }
+  
+  function attention(d?: NotifyData) {
+    const id = d?.pager.currentPageResults.find(n => !n.read)?.content.user?.id
+    if (!lichess.quietMode || id == 'lichess') lichess.sound.playOnce('newPM')
+    opts.pulse();
+  }
 
-  const loadPage = (page: number) =>
+  const loadPage = (page: number) => {
+    console.log(`fetching page ${page}`)
     xhr.json(xhr.url('/notify', { page: page || 1 })).then(
       d => updateNotes(d),
       _ => lichess.announce({ msg: 'Failed to load notifications' })
     );
-
+    }
   function nextPage() {
     if (!data || !data.pager.nextPage) return;
     scrolling = true;
@@ -64,7 +69,13 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
   }
 
   function setVisible() {
-    if (!data || data.pager.currentPage === 1) loadPage(1);
+    if (!data) loadPage(1);
+    else if (data.pager.currentPage == 1) {
+      console.log('doin the gogy')
+      opts.setNotified();
+      data.unread = 0;
+      readAllStorage.fire();
+    }
   }
 
   function setMsgRead(user: string) {
@@ -105,7 +116,7 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     data: () => data,
     initiating: () => initiating,
     scrolling: () => scrolling,
-    updateBell,
+    bumpUnread,
     updateNotes,
     nextPage,
     previousPage,

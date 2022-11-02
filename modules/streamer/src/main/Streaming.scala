@@ -4,11 +4,13 @@ import org.joda.time.DateTime
 import play.api.libs.json._
 import play.api.libs.ws.JsonBodyReadables._
 import play.api.libs.ws.StandaloneWSClient
+
 import scala.concurrent.duration._
 import scala.util.chaining._
-
 import lila.common.LilaScheduler
 import lila.common.config.Secret
+import lila.notify.StreamStart
+import lila.relation.SubscriptionRepo
 import lila.user.User
 
 final private class Streaming(
@@ -19,7 +21,8 @@ final private class Streaming(
     alwaysFeatured: () => lila.common.UserIds,
     googleApiKey: Secret,
     twitchApi: TwitchApi,
-    notifyApi: lila.notify.NotifyApi
+    notifyApi: lila.notify.NotifyApi,
+    subsRepo: SubscriptionRepo,
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
@@ -30,6 +33,13 @@ final private class Streaming(
 
   private var liveStreams = LiveStreams(Nil)
 
+  var fakeActives = scala.collection.mutable.Set[Streamer.Id]()
+  case class FakeStream(streamer: Streamer) extends Stream {
+    def serviceName = "fake"
+    val language = "en"
+    val status = "fake stream"
+  }
+
   def getLiveStreams = liveStreams
 
   LilaScheduler(_.Every(15 seconds), _.AtMost(10 seconds), _.Delay(20 seconds)) {
@@ -38,9 +48,9 @@ final private class Streaming(
       activeIds = streamerIds.filter { id =>
         liveStreams.has(id) || isOnline(id.value)
       }
-      streamers <- api byIds activeIds
-      (twitchStreams, youTubeStreams) <-
-        twitchApi.fetchStreams(streamers, 0, None) map {
+      streamers <- api byIds (activeIds.union(fakeActives))
+      ((twitchStreams, youTubeStreams), fakeStreams) <-
+        (twitchApi.fetchStreams(streamers, 0, None) map {
           _.collect { case Twitch.TwitchStream(name, title, _, language) =>
             streamers.find { s =>
               s.twitch.exists(_.userId.toLowerCase == name.toLowerCase) && {
@@ -49,10 +59,10 @@ final private class Streaming(
               }
             } map { Twitch.Stream(name, title, _, language) }
           }.flatten
-        } zip fetchYouTubeStreams(streamers)
+        } zip fetchYouTubeStreams(streamers)) zip {(api byIds fakeActives) map (_ map FakeStream)}
       streams = LiveStreams {
         lila.common.ThreadLocalRandom.shuffle {
-          (twitchStreams ::: youTubeStreams) pipe dedupStreamers
+          (twitchStreams ::: youTubeStreams ::: fakeStreams) pipe dedupStreamers
         }
       }
       _ <- api.setLiveNow(streamers.withFilter(streams.has).map(_.id))
@@ -67,9 +77,12 @@ final private class Streaming(
         liveStreams has s.streamer
       } foreach { s =>
         import s.streamer.userId
-        if (!streamStartMemo.get(userId)) {
+        // TODO - fixme debugging hack - uncomment //streamStartMemo below
+        if (true) {//!streamStartMemo.get(userId)) {
           streamStartMemo.put(userId)
-          notifyApi.notifyStreamStart(userId, s.streamer.name.value)
+          subsRepo.subscribersOnlineSince(userId, 7) map {
+            notifyApi.notifyMany(_, StreamStart(userId, s.streamer.name.value))
+          }
         }
       }
     }

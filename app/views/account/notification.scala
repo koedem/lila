@@ -11,14 +11,14 @@ object notification {
 
   def fieldSet(form: play.api.data.Form[_], inactive: Boolean)(implicit ctx: Context) =
     div(cls := List("none" -> inactive))(
-      table(cls := "allows-grid")(
+      table(cls := "allows")(
         thead(
           tr(th, th(notifyBell()), th(notifyPush()))
         ),
         tbody(
           makeRow(form, notifyStreamStart(), filterName = "streamStart"),
-          makeRow(form, notifyForumMention(), "forumMention"),
-          makeRow(form, notifyInboxMsg(), "inboxMsg"),
+          makeRow(form, notifyForumMention(), "mention"),
+          makeRow(form, notifyInboxMsg(), "privateMessage"),
           makeRow(form, notifyChallenge(), "challenge"),
           makeRow(form, notifyTournamentSoon(), filterName = "tournamentSoon"),
           makeRow(form, notifyGameEvent(), "gameEvent")
@@ -47,7 +47,7 @@ object notification {
               form3.hidden(name, "true"), // force form value
               filterName match {
                 case "challenge" => iconTag('\ue048')
-                case "inboxMsg"  => iconTag('\ue00f')
+                case "privateMessage"  => iconTag('\ue00f')
                 case _           => emptyFrag
               }
             )
@@ -56,7 +56,7 @@ object notification {
     )
 
   private def editable(name: String) = name match {
-    case "inboxMsg.bell"       => false
+    case "privateMessage.bell"       => false
     case "tournamentSoon.bell" => false
     case "gameEvent.bell"      => false
     case "challenge.bell"      => false

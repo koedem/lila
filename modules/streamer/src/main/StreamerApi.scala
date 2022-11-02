@@ -39,40 +39,11 @@ final class StreamerApi(
       coll.insert.one(s.streamer) inject s.some
     }
 
-  /*def withUser(s: Stream): Fu[Option[Streamer.WithUserAndStream]] =
-    userRepo named s.streamer.userId dmap {
-      _ map { user =>
-        Streamer.WithUserAndStream(s.streamer, user, s.some)
-      }
-    }
-   */
-  /*  def withUsers(live: LiveStreams, userId: Option[User.ID]): Fu[List[Streamer.WithUserAndStream]] = {
-    val uids = live.streams.map(_.streamer.userId)
-    for {
-      users <- userRepo.byIds(uids)
-      subs <- userId.fold(Map[User.ID,Boolean](), u => subsRepo.isSubscribed(u, uids))
-    }
-    yield live.streams.flatMap { x =>
-      users.find(_.id == x.streamer.userId) map {
-        u => Streamer.WithUserAndStream(x.streamer, u, x.some, ~subs.get(u.id))
-      }
-    }
-  }
-  db.user4.aggregate([
-  { $match: { _id: { $in: ['ana','yaroslava','angel','boris']}}},
-  { $project: { "user": "$$CURRENT" }},
-  { $lookup: {from: "relation_sub", as: "subs", localField: "_id", foreignField: "s"}},
-  { $project: {"subscribed": { $in: ['boris', "$subs.u"]}, "user": 1} }
-])
-
-   */
-  def withUsers(live: LiveStreams, userId: Option[User.ID]): Fu[List[Streamer.WithUserAndStream]] = {
-    val uids = live.streams.map(_.streamer.userId)
+  def withUsers(live: LiveStreams, userId: Option[User.ID]): Fu[List[Streamer.WithUserAndStream]] =
     userRepo.coll
       .aggregateList(100, readPreference = ReadPreference.secondaryPreferred) { framework =>
         import framework._
-        Match($inIds(uids)) -> List(
-          Project($doc("user" -> "$$CURRENT")),
+        Match($inIds(live.streams.map(_.streamer.userId))) -> List(
           PipelineOperator(
             $lookup.simple(
               from = subsRepo.coll,
@@ -81,20 +52,18 @@ final class StreamerApi(
               foreign = "s"
             )
           ),
-          Project(
-            $doc("subscribed" -> $doc("$in" -> List(~userId, "$subs.u")), "user" -> 1)
-          )
+          AddFields($doc("subscribed" -> $doc("$in" -> List(~userId, "$subs.u"))))
         )
       }
       .map { docs =>
         for {
           doc        <- docs
-          user       <- doc.getAsOpt[User]("user")
+          user       <- doc.asOpt[User]
           stream     <- live.streams.find(_.streamer.userId == user.id)
           subscribed <- doc.getAsOpt[Boolean]("subscribed")
         } yield Streamer.WithUserAndStream(stream.streamer, user, stream.some, subscribed)
       }
-  }
+
   def allListedIds: Fu[Set[Streamer.Id]] = cache.listedIds.getUnit
 
   def setSeenAt(user: User): Funit =
@@ -103,11 +72,21 @@ final class StreamerApi(
         coll.update.one($id(user.id), $set("seenAt" -> DateTime.now)).void
     }
 
-  def setLiveNow(ids: List[Streamer.Id]): Funit =
-    coll.update.one($doc("_id" $in ids), $set("liveAt" -> DateTime.now), multi = true) >>
+  def setOffline(id: Streamer.Id): Funit = {
+    coll.update.one($id(id), $unset("liveAt")) >> {
+      cache.candidateIds.getUnit.map { candidateIds =>
+        cache.candidateIds.invalidateUnit()
+      }
+    }
+  }
+
+  def setLiveNow(ids: List[Streamer.Id]): Funit = {
+    coll.update.one($doc("_id" $in ids), $set("liveAt" -> DateTime.now), multi = true) >> {
       cache.candidateIds.getUnit.map { candidateIds =>
         if (ids.exists(candidateIds.contains)) cache.candidateIds.invalidateUnit()
       }
+    }
+  }
 
   def update(prev: Streamer, data: StreamerForm.UserData, asMod: Boolean): Fu[Streamer.ModChange] = {
     val streamer = data(prev, asMod)
@@ -118,18 +97,14 @@ final class StreamerApi(
           tier = prev.approval.tier != streamer.approval.tier option streamer.approval.tier,
           decline = !streamer.approval.granted && !streamer.approval.requested && prev.approval.requested
         )
-        import lila.notify.Notification.Notifies
-        import lila.notify.Notification
         ~modChange.list ?? {
-          notifyApi.addNotification(
-            Notification.make(
-              Notifies(streamer.userId),
-              lila.notify.GenericLink(
-                url = "/streamer/edit",
-                title = "Listed on /streamer".some,
-                text = "Your streamer page is public".some,
-                icon = ""
-              )
+          notifyApi.notifyOne(
+            streamer.userId,
+            lila.notify.GenericLink(
+              url = "/streamer/edit",
+              title = "Listed on /streamer".some,
+              text = "Your streamer page is public".some,
+              icon = ""
             )
           ) >>- cache.candidateIds.invalidateUnit()
         }

@@ -74,6 +74,7 @@ export default function () {
 
     const load = (data?: any, incoming = false) => {
       if (booted) return;
+      console.log(`load: incoming = ${incoming}, `, data)
       booted = true;
       const $el = $('#notify-app').html(initiatingHtml);
       loadCssPath('notify');
@@ -82,8 +83,10 @@ export default function () {
           data,
           incoming,
           isVisible: () => isVisible(selector),
-          setCount(nb: number) {
-            $toggle.find('span').data('count', nb);
+          setCount(nb: number|'increment') {
+            const existing = $toggle.find('span').data('count') as number || 0;
+            $toggle.find('span').data('count', nb == 'increment' ? existing + 1 : nb);
+            return existing !== nb;
           },
           show() {
             if (!isVisible(selector)) $toggle.trigger('click');
@@ -108,6 +111,7 @@ export default function () {
       });
 
     pubsub.on('socket.in.notifications', data => {
+      console.log(data);
       if (!instance) load(data, true);
       else instance.update(data);
     });

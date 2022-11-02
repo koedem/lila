@@ -32,7 +32,7 @@ final class SubscriptionRepo(colls: Colls, userRepo: lila.user.UserRepo)(implici
           ),
           Match("user" $ne $arr()),
           Group(BSONNull)(
-            "ids" -> PushField("u1")
+            "ids" -> PushField("u")
           )
         )
       }
@@ -59,7 +59,7 @@ final class SubscriptionRepo(colls: Colls, userRepo: lila.user.UserRepo)(implici
         $inIds(streamerIds map (makeId(userId, _))),
         $doc("s" -> true, "_id" -> false).some
       )
-      .cursor()
+      .cursor[Bdoc]()
       .list()
       .dmap { x =>
         val subscribedTo = x flatMap (_ string "s")

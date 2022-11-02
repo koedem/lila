@@ -18,8 +18,6 @@ final class Env(
     cacheApi: lila.memo.CacheApi,
     prefApi: lila.pref.PrefApi,
     subsRepo: lila.relation.SubscriptionRepo
-    // timeline: lila.hub.actors.Timeline,
-    // postApi: lila.forum.PostApi
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     system: ActorSystem
@@ -27,23 +25,23 @@ final class Env(
 
   lazy val jsonHandlers = wire[JSONHandlers]
 
-  private lazy val repo = new NotificationRepo(coll = db(CollName("notify")))
+  private lazy val notifyColl = db(CollName("notify"))
 
   private val maxPerPage = MaxPerPage(7)
 
-  lazy val api = wire[NotifyApi]
+  private lazy val repo = wire[NotificationRepo]
 
-  private lazy val streamStarter = wire[StreamStartHelper]
+  lazy val api = wire[NotifyApi]
 
   // api actor
   Bus.subscribeFun("notify") {
     case lila.hub.actorApi.notify.NotifiedBatch(userIds) =>
-      api.markAllRead(userIds.map(Notification.Notifies.apply)).unit
+      api.markAllRead(userIds).unit
     case lila.game.actorApi.CorresAlarmEvent(pov) =>
       pov.player.userId ?? { userId =>
         lila.game.Namer.playerText(pov.opponent)(getLightUser) foreach { opponent =>
-          api addNotification Notification.make(
-            Notification.Notifies(userId),
+          api notifyOne(
+            userId,
             CorresAlarm(
               gameId = pov.gameId,
               opponent = opponent

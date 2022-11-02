@@ -1,17 +1,18 @@
 package lila.push
 
 import play.api.libs.json._
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import lila.challenge.Challenge
 import lila.common.String.shorten
-import lila.common.{ Future, LightUser }
-import lila.game.{ Game, Namer, Pov }
+import lila.common.{Future, LightUser}
+import lila.game.{Game, Namer, Pov}
 import lila.hub.actorApi.map.Tell
+import lila.hub.actorApi.notify.NotifyAllows
 import lila.hub.actorApi.push.TourSoon
-import lila.hub.actorApi.round.{ IsOnGame, MoveEvent }
-import lila.hub.actorApi.streamer.NotifiableFollower
+import lila.hub.actorApi.round.{IsOnGame, MoveEvent}
 import lila.pref.NotificationPref
+import lila.pref.NotificationPref.Allows
 import lila.user.User
 
 final private class PushApi(
@@ -193,21 +194,21 @@ final private class PushApi(
       "fullId" -> pov.fullId
     )
 
-  def newMsg(userId: String, senderId: String, senderName: String, text: String): Funit =
-    userRepo.isKid(userId) flatMap {
+  def privateMessage(to: NotifyAllows, senderId: String, senderName: String, text: String): Funit =
+    userRepo.isKid(to.userId) flatMap {
       !_ ?? {
-        maybePush(
-          userId,
+        filterPush(
+          to.userId,
           _.message,
-          NotificationPref.InboxMsg,
+          Allows(to.allows),
           PushApi.Data(
             title = senderName,
             body = text,
-            stacking = Stacking.NewMessage,
+            stacking = Stacking.PrivateMessage,
             payload = Json.obj(
-              "userId" -> userId,
+              "userId" -> to.userId,
               "userData" -> Json.obj(
-                "type"     -> "newMessage",
+                "type" -> "newMessage",
                 "threadId" -> senderId
               )
             )
@@ -291,21 +292,23 @@ final private class PushApi(
       )
     }
 
-  def forumMention(userId: User.ID, title: String, postId: String): Funit =
+  def forumMention(to: NotifyAllows, mentionedBy: String, topic: String, postId: String): Funit =
     postApi.getPost(postId) flatMap { post =>
-      userId.pp("forumMention")
-      maybePush(
-        userId,
+      to.userId.pp("forumMention")
+      filterPush(
+        to.userId,
         _.forumMention,
-        NotificationPref.ForumMention,
+        Allows(to.allows),
         PushApi.Data(
-          title = title,
-          body = post.fold(title)(p => shorten(p.text, 57 - 3, "...")),
+          title = topic,
+          body = post.fold(topic)(p => shorten(p.text, 57 - 3, "...")),
           stacking = Stacking.ForumMention,
           payload = Json.obj(
-            "userId" -> userId,
+            "userId" -> to.userId,
             "userData" -> Json.obj(
               "type"   -> "forumMention",
+              "mentionedBy" -> mentionedBy,
+              "topic" -> topic,
               "postId" -> postId
             )
           )
@@ -314,15 +317,20 @@ final private class PushApi(
     }
 
   import NotificationPref._
-  def streamStart(streamerId: User.ID, notifyList: List[NotifiableFollower]): Funit =
-    Future.applySequentially(notifyList) { target =>
+  def streamStart(streamerId: User.ID, streamerName: String, notifyList: List[NotifyAllows]): Funit = {
+    // TODO - for firebase, register topic membership for user devices in Controllers/Streamer.scala
+    // subscribe/unsubscribe methods and push a single message to "streamer.$streamerId" topic
+    // for web push, i guess we find the max # device subscriptions allowed per request and push
+    // them in batches.
+    // Commented out the code below - it will consume rate limit budget.
+    /*Future.applySequentially(notifyList) { target =>
       filterPush(
         target.userId,
         _.streamStart,
         Allows(target.allows),
         PushApi.Data(
-          title = target.streamerName,
-          body = target.text,
+          title = streamerName,
+          body = streamerName + " started streaming",
           stacking = Stacking.StreamStart,
           payload = Json.obj(
             "userId"   -> target.userId,
@@ -330,7 +338,8 @@ final private class PushApi(
           )
         )
       )
-    }
+    }*/ funit
+  }
 
   private type MonitorType = lila.mon.push.send.type => ((String, Boolean) => Unit)
 
