@@ -122,7 +122,8 @@ case class Pref(
 
   def is2d = !is3d
 
-  def agreementNeededSince: Option[DateTime] = agreement < Agreement.current option Agreement.changedAt
+  def agreementNeededSince: Option[DateTime] =
+    Agreement.showPrompt && agreement < Agreement.current option Agreement.changedAt
 
   def agree = copy(agreement = Agreement.current)
 
@@ -420,8 +421,9 @@ object Pref {
   }
 
   object Agreement {
-    val current   = 2
-    val changedAt = new DateTime(2021, 12, 28, 8, 0)
+    val current    = 2
+    val changedAt  = new DateTime(2021, 12, 28, 8, 0)
+    val showPrompt = changedAt.isAfter(DateTime.now minusMonths 6)
   }
 
   object Zen     extends BooleanPref {}
@@ -449,7 +451,7 @@ object Pref {
     soundSet = SoundSet.default.name,
     blindfold = Blindfold.NO,
     autoQueen = AutoQueen.PREMOVE,
-    autoThreefold = AutoThreefold.TIME,
+    autoThreefold = AutoThreefold.ALWAYS,
     takeback = Takeback.ALWAYS,
     moretime = Moretime.ALWAYS,
     clockBar = true,
