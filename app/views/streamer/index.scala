@@ -6,6 +6,7 @@ import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.paginator.Paginator
+import lila.i18n.LangList
 
 object index {
 
@@ -42,7 +43,7 @@ object index {
           )
         ),
         div(cls := "overview")(
-          h1(dataIcon := "")(titleTag(s.user.title), s.streamer.name),
+          bits.streamerTitle(s),
           s.streamer.headline.map(_.value).map { d =>
             p(
               cls := s"headline ${if (d.length < 60) "small" else if (d.length < 120) "medium" else "large"}"

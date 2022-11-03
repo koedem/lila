@@ -29,10 +29,7 @@ object header {
         )
       ),
       div(cls := "overview")(
-        h1(dataIcon := "")(
-          titleTag(s.user.title),
-          s.streamer.name
-        ),
+        bits.streamerTitle(s.withoutStream),
         s.streamer.headline.map(_.value).map { d =>
           p(cls := s"headline ${if (d.length < 60) "small" else if (d.length < 120) "medium" else "large"}")(
             d
