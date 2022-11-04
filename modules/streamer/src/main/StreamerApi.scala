@@ -82,19 +82,20 @@ final class StreamerApi(
   }
 
   def setLangLiveNow(streams: List[Stream]): Funit = {
-    streams
-      .map({ s => // one by one now due to lastLanguageUsed
-        coll.update
-          .one(
-            $id(s.streamer.id),
-            $set(
-              "liveAt"         -> DateTime.now,
-              "lastStreamLang" -> Lang.get(s.lang).map(_.code.substring(0, 2))
-            )
+    val update = coll.update(ordered = false)
+    for {
+      elements <- streams.map { s =>
+        update.element(
+          q = $id(s.streamer.id),
+          u = $set(
+            "liveAt"         -> DateTime.now,
+            "lastStreamLang" -> Lang.get(s.lang).map(_.language)
           )
-          .void
-      })
-      .sequenceFu >> cache.candidateIds.getUnit.map { candidateIds =>
+        )
+      }.sequenceFu
+      _            <- elements.nonEmpty ?? update.many(elements).void
+      candidateIds <- cache.candidateIds.getUnit
+    } yield {
       if (streams.map(_.streamer.id).exists(candidateIds.contains)) cache.candidateIds.invalidateUnit()
     }
   }
