@@ -9,84 +9,74 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
 
   const readAllStorage = lichess.storage.make('notify-read-all');
 
-  readAllStorage.listen(_ => {
-    if (data) {
-      data.unread = 0;
-      opts.setCount(0);
-      redraw();
-    }
-  });
+  readAllStorage.listen(_ => setAllRead(false));
 
-  function bumpUnread() {
-    if (opts.isVisible()) {
-      loadPage(1);
-      return;
-    }
-    data = undefined;
-    opts.setCount('increment');
-    attention();
-    redraw();
-  }
-
-  function updateNotes(d: NotifyData) {
+  function update(d: NotifyData) {
     data = d;
-    /*if (data.pager.currentPage === 1 && data.unread && opts.isVisible()) {
-      opts.setNotified();
-      data.unread = 0;
-      readAllStorage.fire();
-    }*/
+    if (opts.updateUnread(data.unread) && !scrolling) attention();
     initiating = false;
     scrolling = false;
-    if (opts.setCount(data.unread) && data.unread) attention(data);
-    redraw();
+    if (opts.isVisible() && data.pager.currentPage === 1) setAllRead();
+    else redraw();
+  }
+
+  function bumpUnread() {
+    data = undefined; // fetch when the dropdown is opened
+    opts.updateUnread('increment');
+    if (opts.isVisible()) loadPage(1);
+    else attention();
   }
   
-  function attention(d?: NotifyData) {
-    const id = d?.pager.currentPageResults.find(n => !n.read)?.content.user?.id
+  function attention() {
+    const id = data?.pager.currentPageResults.find(n => !n.read)?.content.user?.id
     if (!lichess.quietMode || id == 'lichess') lichess.sound.playOnce('newPM')
     opts.pulse();
   }
 
   const loadPage = (page: number) => {
-    console.log(`fetching page ${page}`)
     xhr.json(xhr.url('/notify', { page: page || 1 })).then(
-      d => updateNotes(d),
+      d => update(d),
       _ => lichess.announce({ msg: 'Failed to load notifications' })
     );
-    }
+  }
+
   function nextPage() {
-    if (!data || !data.pager.nextPage) return;
+    if (!data?.pager.nextPage) return;
     scrolling = true;
     loadPage(data.pager.nextPage);
     redraw();
   }
 
   function previousPage() {
-    if (!data || !data.pager.previousPage) return;
+    if (!data?.pager.previousPage) return;
     scrolling = true;
     loadPage(data.pager.previousPage);
     redraw();
   }
 
-  function setVisible() {
-    if (!data) loadPage(1);
-    else if (data.pager.currentPage == 1) {
-      console.log('doin the gogy')
-      opts.setNotified();
-      data.unread = 0;
+  function onShow() {
+    if (!data || data.pager.currentPage === 1) loadPage(1);
+  }
+
+  function setAllRead(notifyOthers = true) {
+    if (notifyOthers) {
       readAllStorage.fire();
+      opts.setNotified();
     }
+    if (data) data.unread = 0;
+    opts.updateUnread(0);
+    redraw();
   }
 
   function setMsgRead(user: string) {
-    if (data)
-      data.pager.currentPageResults.forEach(n => {
-        if (n.type == 'privateMessage' && n.content.user?.id == user && !n.read) {
-          n.read = true;
-          data!.unread = Math.max(0, data!.unread - 1);
-          opts.setCount(data!.unread);
-        }
-      });
+    data?.pager.currentPageResults.forEach(n => {
+      if (n.type == 'privateMessage' && n.content.user?.id == user && !n.read) {
+        n.read = true;
+        data!.unread = Math.max(0, data!.unread - 1);
+        opts.updateUnread(data!.unread);
+      }
+    });
+    // redraw here on count change if visible?
   }
 
   const emptyNotifyData = {
@@ -102,12 +92,9 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
   };
 
   function clear() {
-    xhr
-      .text('/notify/clear', {
-        method: 'post',
-      })
+    xhr.text('/notify/clear', { method: 'post' })
       .then(
-        _ => updateNotes(emptyNotifyData),
+        _ => update(emptyNotifyData),
         _ => lichess.announce({ msg: 'Failed to clear notifications' })
       );
   }
@@ -116,13 +103,14 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     data: () => data,
     initiating: () => initiating,
     scrolling: () => scrolling,
+    update,
     bumpUnread,
-    updateNotes,
     nextPage,
     previousPage,
     loadPage,
-    setVisible,
+    onShow,
     setMsgRead,
+    setAllRead,
     clear,
   };
 }

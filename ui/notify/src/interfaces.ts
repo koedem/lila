@@ -4,7 +4,7 @@ export interface NotifyOpts {
   data?: NotifyData;
   incoming: boolean;
   isVisible(): boolean;
-  setCount(nb: number|'increment'): boolean; // true if changed
+  updateUnread(nb: number|'increment'): boolean; // true if changed
   show(): void;
   setNotified(): void;
   pulse(): void;
@@ -42,13 +42,14 @@ export interface Ctrl {
   data(): NotifyData | undefined;
   initiating(): boolean;
   scrolling(): boolean;
+  update(data: NotifyData): void;
   bumpUnread(): void;
-  updateNotes(data: NotifyData): void;
   nextPage(): void;
   previousPage(): void;
   loadPage(page: number): void;
-  setVisible(): void;
+  onShow(): void;
   setMsgRead(user: string): void;
+  setAllRead(): void;
   clear(): void;
 }
 

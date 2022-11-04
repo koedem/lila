@@ -101,7 +101,7 @@ object bits {
       )
     )
 
-  def streamerTitle(s: lila.streamer.Streamer.WithUser)(implicit lang: Lang) =
+  def streamerTitle(s: lila.streamer.Streamer.With)(implicit lang: Lang) =
     span(cls := "streamer-title")(
       h1(dataIcon := "")(titleTag(s.user.title), s.streamer.name),
       p(cls := "streamer-lang") {

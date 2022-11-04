@@ -11,7 +11,7 @@ export default function makeRenderers(trans: Trans): Renderers {
           h('span', [h('strong', n.content.name), drawTime(n)]),
           h('span', n.content.text),
         ]),
-      text: n => trans('xStartedStreaming', n.content.streamerName), // streamStarts are pre-translated
+      text: n => trans('xStartedStreaming', n.content.streamerName),
     },
     genericLink: {
       html: n =>

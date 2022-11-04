@@ -8,23 +8,25 @@ const patch = init([classModule, attributesModule]);
 export default function LichessNotify(element: Element, opts: NotifyOpts) {
   const ctrl = makeCtrl(opts, redraw);
   let vnode = patch(element, view(ctrl));
-  
+
+  if (opts.data) update(opts.data);
+  else ctrl.loadPage(1);  
+
   function redraw() {
     vnode = patch(vnode, view(ctrl));
   }
+  
   function update(data: NotifyData|BumpUnread) {
     'pager' in data 
-    ? ctrl.updateNotes(data as NotifyData) 
+    ? ctrl.update(data as NotifyData) 
     : ctrl.bumpUnread()  
   }
 
-  if (opts.data) update(opts.data);
-  else ctrl.loadPage(1);
-
   return {
-    update: update,
-    setVisible: ctrl.setVisible,
+    update,
+    onShow: ctrl.onShow,
     setMsgRead: ctrl.setMsgRead,
+    setAllRead: ctrl.setAllRead,
     redraw,
   };
 }
