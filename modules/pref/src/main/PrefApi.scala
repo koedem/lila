@@ -127,8 +127,8 @@ final class PrefApi(
       for {
         doc <- docs
         userId <- doc string "_id"
-        allows <- doc child "notification" map (_ int eventClass)
-        allowCode = allows getOrElse NotificationPref.default.allows(eventClass).value
-      } yield NotifyAllows(userId, allowCode)
+        allowsOpt = doc child "notification" flatMap (_ int eventClass)
+        allowsCode = allowsOpt getOrElse NotificationPref.default.allows(eventClass).value
+      } yield NotifyAllows(userId, allowsCode)
     }
 }

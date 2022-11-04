@@ -97,9 +97,6 @@ object NotificationPref {
 
     def toForm(allows: Allows): Some[(Boolean, Boolean)] =
       Some((allows.bell, allows.push))
-
-    //def apply(value: Int) = new Allows(value)
-    //def unapply(allows: Allows): Int = allows.value
   }
 
   implicit val notificationDataJsonWriter: OWrites[NotificationPref] =

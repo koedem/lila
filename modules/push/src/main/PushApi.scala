@@ -317,19 +317,32 @@ final private class PushApi(
     }
 
   import NotificationPref._
-  def streamStart(streamerId: User.ID, streamerName: String, notifyList: List[NotifyAllows]): Funit = {
+  def streamStart(streamerId: User.ID, streamerName: String, recips: List[NotifyAllows]): Funit = {
     // TODO - for firebase, register topic membership for user devices in Controllers/Streamer.scala
     // subscribe/unsubscribe methods and push a single message to "streamer.$streamerId" topic
-    // for web push, i guess we find the max # device subscriptions allowed per request and push
-    // them in batches.
+    // for web push, just assemble a massive list of websubscriptions and let lila-push deal with it
     // Commented out the code below - it will consume rate limit budget.
+    /*val note = PushApi.Data(
+      title = streamerName + " started streaming",
+      body = streamerName + " started streaming",
+      stacking = Stacking.StreamStart,
+      payload = Json.obj(
+        "userId"   -> target.userId,
+        "userData" -> Json.obj("type" -> "streamStart", "streamerId" -> streamerId)
+      )
+    )
+    recips filter(x => Allows(x.allows).web) map { to =>
+      webPush.
+    }
+    */
+    funit
     /*Future.applySequentially(notifyList) { target =>
       filterPush(
         target.userId,
         _.streamStart,
         Allows(target.allows),
         PushApi.Data(
-          title = streamerName,
+          title = streamerName + " started streaming",
           body = streamerName + " started streaming",
           stacking = Stacking.StreamStart,
           payload = Json.obj(
@@ -338,7 +351,7 @@ final private class PushApi(
           )
         )
       )
-    }*/ funit
+    } funit*/
   }
 
   private type MonitorType = lila.mon.push.send.type => ((String, Boolean) => Unit)

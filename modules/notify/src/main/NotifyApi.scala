@@ -87,12 +87,14 @@ final class NotifyApi(
 
   def exists = repo.exists _
 
+  // notifyMany just informs clients that an update is availabe so they can bump their bell.  this avoids
+  // having to assemble full notification pages for many clients at once
   def notifyMany(userIds: Iterable[String], content: NotificationContent): Funit =
     prefApi.getNotifyAllows(userIds, content.key) flatMap { notifyAllows =>
       val bells = notifyAllows collect { case x if Allows(x.allows).bell => x.userId }
 
       // bells map unreadCountCache.update(_, _ + 1)
-      // maybe getIfPresent then update?  just invalidate
+      // or maybe update only if getIfPresent?  or just invalidate
 
       bells map unreadCountCache.invalidate
       repo.insertMany(bells map(x => Notification.make(x, content))) >>-
@@ -105,9 +107,6 @@ final class NotifyApi(
         "socketUsers"
       )
     }
-
-  private def invalidateCache(userIds: List[User.ID]) =
-    userIds map unreadCountCache.invalidate
 
   private def shouldSkip(note: Notification): Fu[Boolean] =
     note.content match {
@@ -169,7 +168,19 @@ final class NotifyApi(
   }
 
   private def pushMany(recips: List[NotifyAllows], note: NotificationContent) = {
-
+    note match {
+      case lila.notify.StreamStart(id, name) => {
+        Bus.publish(
+          StreamStart(
+            id,
+            name,
+            recips
+          ),
+          note.key
+        )
+      }
+      case _ => ()
+    }
   }
 
   private def getFilter(uid: String, tpe: String): Fu[Allows] = {

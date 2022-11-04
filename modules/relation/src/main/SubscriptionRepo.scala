@@ -66,5 +66,4 @@ final class SubscriptionRepo(colls: Colls, userRepo: lila.user.UserRepo)(implici
         streamerIds.map(s => (s, subscribedTo contains s)).toMap
       }
   }
-
 }
