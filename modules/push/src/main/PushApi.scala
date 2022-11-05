@@ -11,6 +11,7 @@ import lila.hub.actorApi.map.Tell
 import lila.hub.actorApi.notify.NotifyAllows
 import lila.hub.actorApi.push.TourSoon
 import lila.hub.actorApi.round.{IsOnGame, MoveEvent}
+import lila.notify._
 import lila.pref.NotificationPref
 import lila.pref.NotificationPref.Allows
 import lila.user.User
@@ -28,6 +29,19 @@ final private class PushApi(
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
 ) {
+  private[push] def pushNotify(to: Iterable[NotifyAllows], content: NotificationContent, params: Iterable[(String, String)]): Funit = {
+
+    content match {
+      case PrivateMessage(sender, text) =>
+        lightUser(sender) flatMap(_ ?? (lsender => privateMessage(to.head, sender, lsender.titleName, shorten(text, 57 - 3, "..."))))
+      case MentionedInThread(mentionedBy, topic, _, _, postId) =>
+        lightUser(mentionedBy) flatMap(_ ?? (lmentioner => forumMention(to.head, lmentioner.titleName, topic, postId)))
+      case StreamStart(streamerId, streamerName) =>
+        streamStart(streamerId,streamerName,to)
+      case _ => funit
+    }
+  }
+
   def finish(game: Game): Funit =
     if (!game.isCorrespondence || game.hasAi) funit
     else
@@ -317,7 +331,7 @@ final private class PushApi(
     }
 
   import NotificationPref._
-  def streamStart(streamerId: User.ID, streamerName: String, recips: List[NotifyAllows]): Funit = {
+  def streamStart(streamerId: User.ID, streamerName: String, recips: Iterable[NotifyAllows]): Funit = {
     // TODO - for firebase, register topic membership for user devices in Controllers/Streamer.scala
     // subscribe/unsubscribe methods and push a single message to "streamer.$streamerId" topic
     // for web push, just assemble a massive list of websubscriptions and let lila-push deal with it

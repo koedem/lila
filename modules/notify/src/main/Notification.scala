@@ -3,6 +3,7 @@ package lila.notify
 import lila.common.paginator.Paginator
 import lila.user.User
 import lila.game.Game
+import lila.hub.actorApi.notify.NotifyAllows
 import org.joda.time.DateTime
 
 sealed abstract class NotificationContent(val key: String)
@@ -79,6 +80,10 @@ case class GenericLink(
     text: Option[String],
     icon: String
 ) extends NotificationContent("genericLink")
+
+case class PushNotification(to: Iterable[NotifyAllows],
+                            content: NotificationContent,
+                            params: Iterable[(String, String)] = Nil)
 
 private[notify] case class Notification(
                                          _id: String,

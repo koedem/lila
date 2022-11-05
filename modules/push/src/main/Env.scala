@@ -1,17 +1,15 @@
 package lila.push
 
-import akka.actor._
+//import akka.actor._
 import com.google.auth.oauth2.{GoogleCredentials, ServiceAccountCredentials}
 import com.softwaremill.macwire._
 import io.methvin.play.autoconfig._
 import play.api.Configuration
 import play.api.libs.ws.StandaloneWSClient
-
 import java.nio.charset.StandardCharsets.UTF_8
 import scala.jdk.CollectionConverters._
 import lila.common.config._
 import FirebasePush.configLoader
-import lila.hub.actorApi.notify.NotifyAllows
 
 @Module
 final private class PushConfig(
@@ -71,16 +69,19 @@ final class Env(
     f logFailure logger
     ()
   }
+  import lila.notify._
+
   lila.common.Bus.subscribeFun(
     "finishGame",
     "moveEventCorres",
-    "privateMessage",
+    //"privateMessage",
     "challenge",
     "corresAlarm",
-    "streamStart",
-    "mention",
+    //"streamStart",
+    //"mention",
     "offerEventCorres",
-    "tourSoon"
+    "tourSoon",
+    "pushNotify"
   ) {
     case lila.game.actorApi.FinishGame(game, _, _) =>
       logUnit { pushApi finish game }
@@ -90,9 +91,9 @@ final class Env(
       logUnit { pushApi takebackOffer gameId }
     case lila.hub.actorApi.round.CorresDrawOfferEvent(gameId) =>
       logUnit { pushApi drawOffer gameId }
-    case lila.hub.actorApi.push
-          .InboxMsg(to: NotifyAllows, senderId: String, senderName: String, text: String) =>
-      logUnit { pushApi privateMessage (to, senderId, senderName, text) }
+    case lila.notify.PushNotification(to, content, params) =>
+      logUnit { pushApi pushNotify(to, content, params) }
+      //logUnit { pushApi privateMessage (to, senderId, senderName, text) }
     case lila.challenge.Event.Create(c) =>
       logUnit { pushApi challengeCreate c }
     case lila.challenge.Event.Accept(c, joinerId) =>
