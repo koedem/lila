@@ -10,6 +10,7 @@ import lila.app._
 import lila.common.{ HTTPRequest, Preload }
 import lila.game.{ PgnDump, Pov }
 import lila.round.JsonView.WithFlags
+import lila.oauth.AccessToken
 
 final class Analyse(
     env: Env,
@@ -72,23 +73,21 @@ final class Analyse(
                     puzzles = true
                   )
                 ) map { data =>
-                  EnableSharedArrayBuffer(
-                    Ok(
-                      html.analyse.replay(
-                        pov,
-                        data,
-                        initialFen,
-                        env.analyse.annotator(pgn, pov.game, analysis).toString,
-                        analysis,
-                        analysisInProgress,
-                        simul,
-                        crosstable,
-                        userTv,
-                        chat,
-                        bookmarked = bookmarked
-                      )
+                  Ok(
+                    html.analyse.replay(
+                      pov,
+                      data,
+                      initialFen,
+                      env.analyse.annotator(pgn, pov.game, analysis).toString,
+                      analysis,
+                      analysisInProgress,
+                      simul,
+                      crosstable,
+                      userTv,
+                      chat,
+                      bookmarked = bookmarked
                     )
-                  )
+                  ).enableSharedArrayBuffer
                 }
             }
         }
@@ -105,13 +104,13 @@ final class Analyse(
           render {
             case AcceptsPgn() => Ok(pgn)
             case _            => Ok(html.analyse.embed.lpv(pgn, chess.Color.fromName(color)))
-          }
+          }.enableSharedArrayBuffer
         case _ =>
           render {
             case AcceptsPgn() => NotFound("*")
             case _            => NotFound(html.analyse.embed.notFound)
           }
-      } dmap EnableSharedArrayBuffer
+      }
     }
 
   private def RedirectAtFen(pov: Pov, initialFen: Option[FEN])(or: => Fu[Result])(implicit ctx: Context) =
@@ -165,15 +164,18 @@ final class Analyse(
 
   def externalEngineCreate =
     ScopedBody(_.Engine.Write) { implicit req => me =>
-      lila.analyse.ExternalEngine.form
-        .bindFromRequest()
-        .fold(
-          err => newJsonFormError(err)(me.realLang | reqLang),
-          data =>
-            env.analyse.externalEngine.create(me, data) map { engine =>
-              Created(lila.analyse.ExternalEngine.jsonWrites.writes(engine))
-            }
-        )
+      HTTPRequest.bearer(req) ?? { bearer =>
+        val tokenId = AccessToken.Id from bearer
+        lila.analyse.ExternalEngine.form
+          .bindFromRequest()
+          .fold(
+            err => newJsonFormError(err)(me.realLang | reqLang),
+            data =>
+              env.analyse.externalEngine.create(me, data, tokenId.value) map { engine =>
+                Created(lila.analyse.ExternalEngine.jsonWrites.writes(engine))
+              }
+          )
+      }
     }
 
   def externalEngineUpdate(id: String) =

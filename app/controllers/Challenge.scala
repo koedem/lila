@@ -69,17 +69,19 @@ final class Challenge(
         else none
       val json = env.challenge.jsonView.show(c, version, direction)
       negotiate(
-        html =
+        html = {
+          val color = get("color") flatMap chess.Color.fromName
           if (mine) fuccess {
             error match {
-              case Some(e) => BadRequest(html.challenge.mine(c, json, e.some))
-              case None    => Ok(html.challenge.mine(c, json, none))
+              case Some(e) => BadRequest(html.challenge.mine(c, json, e.some, color))
+              case None    => Ok(html.challenge.mine(c, json, none, color))
             }
           }
           else
             (c.challengerUserId ?? env.user.repo.named) map { user =>
-              Ok(html.challenge.theirs(c, json, user, get("color") flatMap chess.Color.fromName))
-            },
+              Ok(html.challenge.theirs(c, json, user, color))
+            }
+        },
         api = _ => Ok(json).fuccess
       ) flatMap withChallengeAnonCookie(mine && c.challengerIsAnon, c, owner = true)
     } map env.lilaCookie.ensure(ctx.req)
@@ -436,8 +438,7 @@ final class Challenge(
                       "urlBlack" -> s"${env.net.baseUrl}/${challenge.id}?color=black"
                     )
                   )
-                case false =>
-                  BadRequest(jsonError("Challenge not created"))
+                case false => BadRequest(jsonError("Challenge not created"))
               }
             }(rateLimitedFu).dmap(_ as JSON)
         )
@@ -445,17 +446,18 @@ final class Challenge(
 
   def offerRematchForGame(gameId: String) =
     Auth { implicit ctx => me =>
-      OptionFuResult(env.game.gameRepo game gameId) { g =>
-        Pov.opponentOfUserId(g, me.id).flatMap(_.userId) ?? env.user.repo.byId flatMap {
-          _ ?? { opponent =>
-            env.challenge.granter.isDenied(me.some, opponent, g.perfType) flatMap {
-              case Some(d) =>
-                BadRequest { jsonError(lila.challenge.ChallengeDenied translated d) }.fuccess
-              case _ =>
-                api.offerRematchForGame(g, me) map {
-                  case true => jsonOkResult
-                  case _    => BadRequest(jsonError("Sorry, couldn't create the rematch."))
-                }
+      NoBot {
+        OptionFuResult(env.game.gameRepo game gameId) { g =>
+          Pov.opponentOfUserId(g, me.id).flatMap(_.userId) ?? env.user.repo.byId flatMap {
+            _ ?? { opponent =>
+              env.challenge.granter.isDenied(me.some, opponent, g.perfType) flatMap {
+                case Some(d) => BadRequest(jsonError(lila.challenge.ChallengeDenied translated d)).fuccess
+                case _ =>
+                  api.offerRematchForGame(g, me) map {
+                    case true => jsonOkResult
+                    case _    => BadRequest(jsonError("Sorry, couldn't create the rematch."))
+                  }
+              }
             }
           }
         }

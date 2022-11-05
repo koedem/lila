@@ -2,25 +2,25 @@ package lila.analyse
 
 import AnalyseBsonHandlers.externalEngineHandler
 import chess.variant.Variant
+import com.roundeights.hasher.Algo
 import play.api.data._
 import play.api.data.Forms._
 import play.api.libs.json.{ Json, OWrites }
 import scala.concurrent.ExecutionContext
-import com.roundeights.hasher.Algo
 
+import lila.common.Bearer
 import lila.common.Form._
 import lila.common.{ SecureRandom, ThreadLocalRandom }
 import lila.db.dsl._
-import lila.user.User
 import lila.memo.CacheApi
+import lila.user.User
 
 case class ExternalEngine(
     _id: String, // random
     name: String,
     maxThreads: Int,
     maxHash: Int,
-    shallowDepth: Int,
-    deepDepth: Int,
+    defaultDepth: Int,
     variants: List[String],
     officialStockfish: Boolean, // Admissible for cloud evals
     providerSelector: String, // Hash of random secret chosen by the provider, possibly shared between registrations
@@ -35,8 +35,7 @@ object ExternalEngine {
       name: String,
       maxThreads: Int,
       maxHash: Int,
-      shallowDepth: Int,
-      deepDepth: Int,
+      defaultDepth: Int,
       variants: Option[List[String]],
       officialStockfish: Option[Boolean],
       providerSecret: String,
@@ -47,8 +46,7 @@ object ExternalEngine {
       name = name,
       maxThreads = maxThreads,
       maxHash = maxHash,
-      shallowDepth = shallowDepth,
-      deepDepth = deepDepth,
+      defaultDepth = defaultDepth,
       variants = variants.filter(_.nonEmpty) | List(chess.variant.Standard.key),
       officialStockfish = ~officialStockfish,
       providerSelector = Algo.sha256("providerSecret:" + providerSecret).hex,
@@ -64,14 +62,11 @@ object ExternalEngine {
 
   val form = Form(
     mapping(
-      "name"         -> cleanNonEmptyText(3, 200),
-      "maxThreads"   -> number(1, 65_536),
-      "maxHash"      -> number(1, 1_048_576),
-      "shallowDepth" -> number(0, 246),
-      "deepDepth"    -> number(0, 246),
-      "variants" -> optional(list {
-        stringIn(chess.variant.Variant.all.filterNot(chess.variant.FromPosition ==).map(_.key).toSet)
-      }),
+      "name"              -> cleanNonEmptyText(3, 200),
+      "maxThreads"        -> number(1, 65_536),
+      "maxHash"           -> number(1, 1_048_576),
+      "defaultDepth"      -> number(0, 246),
+      "variants"          -> optional(list(stringIn(chess.variant.Variant.all.map(_.uciKey).toSet))),
       "officialStockfish" -> optional(boolean),
       "providerSecret"    -> nonEmptyText(16, 1024),
       "providerData"      -> optional(text(maxLength = 8192))
@@ -86,8 +81,7 @@ object ExternalEngine {
         "userId"       -> e.userId,
         "maxThreads"   -> e.maxThreads,
         "maxHash"      -> e.maxHash,
-        "shallowDepth" -> e.shallowDepth,
-        "deepDepth"    -> e.deepDepth,
+        "defaultDepth" -> e.defaultDepth,
         "variants"     -> e.variants,
         "providerData" -> e.providerData,
         "clientSecret" -> e.clientSecret
@@ -106,9 +100,12 @@ final class ExternalEngineApi(coll: Coll, cacheApi: CacheApi)(implicit ec: Execu
 
   def list(by: User): Fu[List[ExternalEngine]] = userCache get by.id
 
-  def create(by: User, data: ExternalEngine.FormData): Fu[ExternalEngine] = {
+  def create(by: User, data: ExternalEngine.FormData, oauthTokenId: String): Fu[ExternalEngine] = {
     val engine = data make by.id
-    coll.insert.one(engine) >>- reloadCache(by.id) inject engine
+    val bson = {
+      externalEngineHandler writeOpt engine err "external engine bson"
+    } ++ $doc("oauthToken" -> oauthTokenId)
+    coll.insert.one(bson) >>- reloadCache(by.id) inject engine
   }
 
   def find(by: User, id: String): Fu[Option[ExternalEngine]] =
@@ -123,5 +120,12 @@ final class ExternalEngineApi(coll: Coll, cacheApi: CacheApi)(implicit ec: Execu
     coll.delete.one($doc("userId" -> by.id) ++ $id(id)) map { result =>
       reloadCache(by.id)
       result.n > 0
+    }
+
+  private[analyse] def onTokenRevoke(id: String) =
+    coll.primitiveOne[User.ID]($doc("oauthToken" -> id), "userId") flatMap {
+      _ ?? { userId =>
+        coll.delete.one($doc("oauthToken" -> id)).void >>- reloadCache(userId)
+      }
     }
 }

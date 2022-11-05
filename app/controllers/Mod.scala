@@ -263,6 +263,11 @@ final class Mod(
       modApi.allMods map { html.mod.table(_) }
     }
 
+  def log =
+    Secure(_.GamifyView) { implicit ctx => me =>
+      env.mod.logApi.recentBy(me) map { html.mod.log(_) }
+    }
+
   private def communications(username: String, priv: Boolean) =
     Secure { perms =>
       if (priv) perms.ViewPrivateComms else perms.Shadowban
@@ -442,9 +447,12 @@ final class Mod(
     }
 
   def printBan(v: Boolean, fh: String) =
-    Secure(_.PrintBan) { _ => _ =>
-      env.security.printBan.toggle(FingerHash(fh), v) inject
-        Redirect(routes.Mod.print(fh))
+    Secure(_.PrintBan) { _ => me =>
+      val hash = FingerHash(fh)
+      env.security.printBan.toggle(hash, v) >>
+        env.security.api.recentUserIdsByFingerHash(hash) flatMap { userIds =>
+          env.irc.api.printBan(me, fh, v, userIds)
+        } inject Redirect(routes.Mod.print(fh))
     }
 
   def singleIp(ip: String) =
@@ -461,11 +469,16 @@ final class Mod(
     }
 
   def singleIpBan(v: Boolean, ip: String) =
-    Secure(_.IpBan) { ctx => _ =>
+    Secure(_.IpBan) { ctx => me =>
       val op =
         if (v) env.security.firewall.blockIps _
         else env.security.firewall.unblockIps _
-      op(IpAddress from ip) inject {
+      val ipAddr = IpAddress from ip
+      op(ipAddr) >> (ipAddr ?? {
+        env.security.api.recentUserIdsByIp(_) flatMap { userIds =>
+          env.irc.api.ipBan(me, ip, v, userIds)
+        }
+      }) inject {
         if (HTTPRequest isXhr ctx.req) jsonOkResult
         else Redirect(routes.Mod.singleIp(ip))
       }

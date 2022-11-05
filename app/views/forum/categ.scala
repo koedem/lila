@@ -23,14 +23,16 @@ object categ {
         .some
     ) {
       main(cls := "forum index box")(
-        div(cls := "box__top")(
+        boxTop(
           h1(dataIcon := "", cls := "text")("Lichess Forum"),
           bits.searchForm()
         ),
         showCategs(categs.filterNot(_.categ.isTeam)),
         if (categs.exists(_.categ.isTeam))
           frag(
-            h1("Your Team Boards"),
+            boxTop(
+              h1("Your Team Boards")
+            ),
             showCategs(categs.filter(_.categ.isTeam))
           )
       )
@@ -83,8 +85,7 @@ object categ {
         .some
     ) {
       main(cls := "forum forum-categ box")(
-        div(
-          cls := "box__top",
+        boxTop(
           h1(
             a(
               href     := categ.team.fold(routes.ForumCateg.index)(routes.Team.show(_)),

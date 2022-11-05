@@ -15,7 +15,7 @@ object chart {
       path = "chart"
     ) {
       div(cls := "tournament-stats")(
-        h1(cls := "box__pad")(userLink(u, withOnline = true), " tournament stats"),
+        boxTop(h1(userLink(u, withOnline = true), " tournament stats")),
         p(cls := "box__pad")(
           "The rank avg is a percentage of your ranking. Lower is better.",
           br,

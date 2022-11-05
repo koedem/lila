@@ -26,11 +26,13 @@ object indexPayPal {
       moreJs = frag(jsModule("plan"), embedJsUnsafeLoadThen("""plan.payPalStart()"""))
     ) {
       main(cls := "box box-pad plan")(
-        h1(
-          userLink(me),
-          " • ",
-          if (patron.isLifetime) strong(lifetimePatron())
-          else patronForMonths(me.plan.months)
+        boxTop(
+          h1(
+            userLink(me),
+            " • ",
+            if (patron.isLifetime) strong(lifetimePatron())
+            else patronForMonths(me.plan.months)
+          )
         ),
         table(cls := "all")(
           tbody(

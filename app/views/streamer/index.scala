@@ -6,6 +6,7 @@ import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.paginator.Paginator
+import lila.i18n.LangList
 
 object index {
 
@@ -29,7 +30,7 @@ object index {
         stream.isDefined option span(cls := "ribbon")(span(trans.streamer.live())),
         picture.thumbnail(s.streamer, s.user),
         div(cls := "overview")(
-          h1(dataIcon := "")(titleTag(s.user.title), s.streamer.name),
+          bits.streamerTitle(s),
           s.streamer.headline.map(_.value).map { d =>
             p(
               cls := s"headline ${if (d.length < 60) "small" else if (d.length < 120) "medium" else "large"}"
@@ -66,7 +67,7 @@ object index {
       main(cls                                                          := "page-menu")(
         bits.menu(if (requests) "requests" else "index", none)(ctx)(cls := " page-menu__menu"),
         div(cls := "page-menu__content box streamer-list")(
-          h1(dataIcon := "", cls := "text")(title),
+          boxTop(h1(dataIcon := "", cls := "text"))(title),
           !requests option div(cls := "list live")(
             live.map { s =>
               st.article(cls := "streamer")(widget(s.withoutStream, s.stream))

@@ -40,7 +40,7 @@ object perfStat {
       main(cls := s"page-menu")(
         st.aside(cls := "page-menu__menu")(show.side(user, ranks, perfType.some)),
         div(cls := s"page-menu__content box perf-stat ${perfType.key}")(
-          div(cls := "box__top")(
+          boxTop(
             div(cls := "box__top__title")(
               bits.perfTrophies(user, ranks.view.filterKeys(perfType.==).toMap),
               h1(
@@ -49,7 +49,7 @@ object perfStat {
               )
             ),
             div(cls := "box__top__actions")(
-              user.perfs(perfType).nb > 0 option a(
+              a(
                 cls      := "button button-empty text",
                 dataIcon := perfType.iconChar,
                 href     := s"${routes.User.games(user.username, "search")}?perf=${perfType.id}"

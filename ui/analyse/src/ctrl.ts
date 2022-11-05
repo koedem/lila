@@ -111,6 +111,7 @@ export default class AnalyseCtrl {
   gamePath?: Tree.Path;
 
   // misc
+  requestInitialPly?: number; // start ply from the URL location hash
   cgConfig: any; // latest chessground config (useful for revert)
   music?: any;
   nvui?: NvuiPlugin;
@@ -187,7 +188,7 @@ export default class AnalyseCtrl {
     this.ongoing = !this.synthetic && game.playable(data);
 
     const prevTree = merge && this.tree.root;
-    this.tree = makeTree(util.treeReconstruct(this.data.treeParts));
+    this.tree = makeTree(util.treeReconstruct(this.data.treeParts, this.data.sidelines));
     if (prevTree) this.tree.merge(prevTree);
 
     this.autoplay = new Autoplay(this);
@@ -208,10 +209,11 @@ export default class AnalyseCtrl {
 
     const loc = window.location,
       hashPly = loc.hash === '#last' ? this.tree.lastPly() : parseInt(loc.hash.slice(1)),
-      startPly = hashPly || (this.opts.inlinePgn && this.tree.lastPly());
-    if (startPly) {
+      startPly = hashPly >= 0 ? hashPly : this.opts.inlinePgn ? this.tree.lastPly() : undefined;
+    if (defined(startPly)) {
       // remove location hash - https://stackoverflow.com/questions/1397329/how-to-remove-the-hash-from-window-location-with-javascript-without-page-refresh/5298684#5298684
       window.history.replaceState(null, '', loc.pathname + loc.search);
+      this.requestInitialPly = startPly;
       const mainline = treeOps.mainlineNodeList(this.tree.root);
       return treeOps.takePathWhile(mainline, n => n.ply <= startPly);
     } else return treePath.root;

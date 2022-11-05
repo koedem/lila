@@ -48,18 +48,16 @@ final class Puzzle(env: Env, apiC: => Api) extends LilaController(env) {
   )(implicit ctx: Context) =
     renderJson(puzzle, angle, replay) zip
       ctx.me.??(u => env.puzzle.session.getSettings(u) dmap some) map { case (json, settings) =>
-        EnableSharedArrayBuffer(
-          Ok(
-            views.html.puzzle
-              .show(
-                puzzle,
-                json,
-                env.puzzle.jsonView.pref(ctx.pref),
-                settings | PuzzleSettings.default(color),
-                langPath
-              )
-          )
-        )
+        Ok(
+          views.html.puzzle
+            .show(
+              puzzle,
+              json,
+              env.puzzle.jsonView.pref(ctx.pref),
+              settings | PuzzleSettings.default(color),
+              langPath
+            )
+        ).enableSharedArrayBuffer
       }
 
   def daily =
@@ -69,7 +67,7 @@ final class Puzzle(env: Env, apiC: => Api) extends LilaController(env) {
           negotiate(
             html = renderShow(daily.puzzle, PuzzleAngle.mix),
             api = v => renderJson(daily.puzzle, PuzzleAngle.mix, apiVersion = v.some) dmap { Ok(_) }
-          ) map NoCache
+          ) dmap (_.noCache)
         }
       }
     }
@@ -77,8 +75,17 @@ final class Puzzle(env: Env, apiC: => Api) extends LilaController(env) {
   def apiDaily =
     Action.async { implicit req =>
       env.puzzle.daily.get flatMap {
-        _.fold(NotFound.fuccess) { daily =>
+        _.fold(notFoundJson()) { daily =>
           JsonOk(env.puzzle.jsonView(daily.puzzle, none, none, none)(reqLang))
+        }
+      }
+    }
+
+  def apiShow(id: String) =
+    Action.async { implicit req =>
+      env.puzzle.api.puzzle find Puz.Id(id) flatMap {
+        _.fold(notFoundJson()) { puzzle =>
+          JsonOk(env.puzzle.jsonView(puzzle, none, none, none)(reqLang))
         }
       }
     }
@@ -231,20 +238,16 @@ final class Puzzle(env: Env, apiC: => Api) extends LilaController(env) {
       _ ?? { case PuzzleStreak(ids, puzzle) =>
         env.puzzle.jsonView(puzzle = puzzle, PuzzleAngle.mix.some, none, user = ctx.me) map { preJson =>
           val json = preJson ++ Json.obj("streak" -> ids)
-          EnableSharedArrayBuffer {
-            NoCache {
-              Ok {
-                views.html.puzzle
-                  .show(
-                    puzzle,
-                    json,
-                    env.puzzle.jsonView.pref(ctx.pref),
-                    PuzzleSettings.default,
-                    langPath = LangPath(routes.Puzzle.streak).some
-                  )
-              }
-            }
-          }
+          Ok(
+            views.html.puzzle
+              .show(
+                puzzle,
+                json,
+                env.puzzle.jsonView.pref(ctx.pref),
+                PuzzleSettings.default,
+                langPath = LangPath(routes.Puzzle.streak).some
+              )
+          ).noCache.enableSharedArrayBuffer
         }
       }
     }

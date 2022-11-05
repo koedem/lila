@@ -21,7 +21,7 @@ object form {
       val fields = new TourFields(form, none)
       main(cls := "page-small")(
         div(cls := "tour__form box box-pad")(
-          h1(
+          h1(cls := "box__top")(
             if (fields.isTeamBattle) trans.arena.newTeamBattle()
             else trans.createANewTournament()
           ),
@@ -59,7 +59,7 @@ object form {
       val fields = new TourFields(form, tour.some)
       main(cls := "page-small")(
         div(cls := "tour__form box box-pad")(
-          h1("Edit ", tour.name()),
+          h1(cls := "box__top")("Edit ", tour.name()),
           postForm(cls := "form3", action := routes.Tournament.update(tour.id))(
             form3.split(fields.name, tour.isCreated option fields.startDate),
             form3.split(fields.rated, fields.variant),
@@ -153,10 +153,8 @@ object form {
       form3.split(
         form3.group(
           form("conditions.allowList"),
-          "Only allow pre-defined users to join",
-          help = raw(
-            "If this list is non-empty, then usernames absent from this list will be forbidden to join. One username per line."
-          ).some,
+          trans.swiss.predefinedUsers(),
+          help = trans.swiss.forbiddedUsers().some,
           half = true
         )(form3.textarea(_)(rows := 4))
       ),
