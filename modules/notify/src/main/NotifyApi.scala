@@ -77,72 +77,68 @@ final class NotifyApi(
     val note = Notification.make(to, content)
     !shouldSkip(note) ifThen {
       insertNotification(note) >> {
-        if (!Allows.canFilter(note.content.key)) publishOne(note)
+        if (!Allows.canFilter(note.content.key)) bellOne(note.to)
         else
-          getFilter(note.to, note.content.key) flatMap { x =>
-            x.bell ?? publishOne(note)
-            x.push ?? fuccess(pushOne(NotifyAllows(note.to, x), note.content))
+          prefApi.getNotificationPref(note.to) map (_ allows note.content.key) flatMap { allows =>
+            allows.bell ?? bellOne(note.to)
+            allows.push ?? fuccess(pushOne(NotifyAllows(note.to, allows), note.content))
           }
       }
     }
   }
 
-  // notifyMany just informs clients that an update is availabe so they can bump their bell.
-  // there's no need to assemble full notification pages for many clients at once
+  // notifyMany tells clients that an update is available to bump their bell. there's no need
+  // to assemble full notification pages for all clients at once, let them initiate
   def notifyMany(userIds: Iterable[String], content: NotificationContent): Funit =
-    prefApi.getNotifyAllows(userIds, content.key) flatMap { to =>
-      val bells = to filter (_.allows.bell) map (_.userId)
-
-      // bells map unreadCountCache.update(_, _ + 1)
-      // or maybe update only if getIfPresent?  or just invalidate
-
-      bells map unreadCountCache.invalidate
-      repo.insertMany(bells map (x => Notification.make(x, content))) >>- {
-        Bus.publish(
-          SendTos(
-            bells.toSet,
-            "notifications",
-            Json.obj("incrementUnread" -> true)
-          ),
-          "socketUsers"
-        )
-        pushMany(to filter (_.allows.push), content)
-      }
+    prefApi.getNotifyAllows(userIds, content.key) flatMap { recips =>
+      pushMany(recips filter (_.allows.push), content)
+      bellMany(recips, content)
     }
 
-  private def publishOne(note: Notification): Funit =
-    getNotifications(note.to, 1) zip unreadCount(note.to) dmap (AndUnread.apply _).tupled map { msg =>
+  private def bellOne(to: User.ID): Funit =
+    getNotifications(to, 1) zip unreadCount(to) dmap (AndUnread.apply _).tupled map { msg =>
       Bus.publish(
         SendTo.async(
-          note.to,
+          to,
           "notifications",
           () =>
-            userRepo langOf note.to map I18nLangPicker.byStrOrDefault map (implicit lang => jsonHandlers(msg))
+            (userRepo langOf to) map I18nLangPicker.byStrOrDefault map (implicit lang => jsonHandlers(msg))
         ),
         "socketUsers"
       )
     }
 
+  private def bellMany(recips: Iterable[NotifyAllows], content: NotificationContent) = {
+    val bells = recips filter (_.allows.bell) map (_.userId)
+    bells map unreadCountCache.invalidate // or maybe update only if getIfPresent?
+    repo.insertMany(bells map (to => Notification.make(to, content))) >>- {
+      Bus.publish(
+        SendTos(
+          bells.toSet,
+          "notifications",
+          Json.obj("incrementUnread" -> true)
+        ),
+        "socketUsers"
+      )
+    }
+  }
+
   private def pushOne(to: NotifyAllows, content: NotificationContent) =
     pushMany(Seq(to), content)
 
-  private def pushMany(to: Iterable[NotifyAllows], content: NotificationContent) =
-    Bus.publish(PushNotification(to, content), "notifyPush")
+  private def pushMany(recips: Iterable[NotifyAllows], content: NotificationContent) =
+    Bus.publish(PushNotification(recips, content), "notifyPush")
 
   private def shouldSkip(note: Notification): Fu[Boolean] =
     note.content match {
       case MentionedInThread(_, _, topicId, _, _) =>
         userRepo.isKid(note.to) >>|
-          repo.hasRecent(note, 3.days, "content.topicId" -> topicId)
+          repo.hasRecent(note, "content.topicId" -> topicId, 3.days)
       case InvitedToStudy(_, _, studyId) =>
         userRepo.isKid(note.to) >>|
-          repo.hasRecent(note, 3.days, "content.studyId" -> studyId)
+          repo.hasRecent(note, "content.studyId" -> studyId, 3.days)
       case PrivateMessage(sender, _) =>
         repo.hasRecentPrivateMessageFrom(note.to, sender)
       case _ => userRepo.isKid(note.to)
     }
-
-  private def getFilter(uid: String, tpe: String): Fu[Allows] = {
-    prefApi.getNotificationPref(uid) map (_ allows tpe)
-  }
 }

@@ -333,27 +333,21 @@ final private class PushApi(
       )
     }
 
-  def streamStart(recips: Iterable[NotifyAllows], streamerId: User.ID, streamerName: String): Funit =
-    // TODO - for firebase, register topic membership for user devices in Controllers/Streamer.scala
-    // subscribe/unsubscribe methods and push a single message to "streamer.$streamerId" topic
-    // for web push, just assemble a massive list of websubscriptions and let lila-push deal with it
-    // sequential for now
-    Future.applySequentially(recips.toList filter (_.web)) { to =>
-      filterPush(
-        to.userId,
-        _.streamStart,
-        to.allows,
-        PushApi.Data(
-          title = streamerName,
-          body = streamerName + " started streaming",
-          stacking = Stacking.StreamStart,
-          payload = Json.obj(
-            "userId"   -> to.userId,
-            "userData" -> Json.obj("type" -> "streamStart", "streamerId" -> streamerId)
-          )
-        )
-      )
+  def streamStart(recips: Iterable[NotifyAllows], streamerId: User.ID, streamerName: String): Funit = {
+    val pushData = PushApi.Data(
+      title = streamerName,
+      body = streamerName + " started streaming",
+      stacking = Stacking.StreamStart,
+      payload = Json.obj("userData" -> Json.obj("type" -> "streamStart", "streamerId" -> streamerId))
+    )
+    webPush(recips collect { case u if u.web => u.userId }, pushData) >>- {
+      // TODO - for device push, register topic membership for user devices from Controllers/Streamer.scala
+      // subscribe/unsubscribe methods and push a single message to "streamer.$streamerId" topic.  this will
+      // cause some complications dealing with prefs when a user unsubscribes from streamer push.  prefs do
+      // not currently have hooks to trigger anything when a setting changes.  sequential for now
+      recips collect { case u if u.device => u.userId } foreach(firebasePush(_, pushData))
     }
+  }
 
   private type MonitorType = lila.mon.push.send.type => ((String, Boolean) => Unit)
 

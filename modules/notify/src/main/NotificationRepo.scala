@@ -35,82 +35,23 @@ final private class NotificationRepo(
   def unreadNotificationsCount(userId: User.ID): Fu[Int] =
     coll.countSel(unreadOnlyQuery(userId))
 
-  /*private def hasOld =
-    $doc(
-      "read" -> false,
-      $or(
-        $doc("content.type" -> "streamStart", "createdAt" $gt DateTime.now.minusHours(2)),
-        $doc("content.type" -> $ne("streamStart"), "createdAt" $gt DateTime.now.minusDays(3))
-      )
-    )*/
+  def hasRecent(note: Notification, criteria: ElementProducer, unreadSince: Duration): Fu[Boolean] =
+    hasFresh(note.to, note.content.key, criteria, matchRecentOrUnreadSince(unreadSince))
 
-  private def hasSince(since: Duration) =
+  def hasRecentPrivateMessageFrom(to: User.ID, from: String): Fu[Boolean] =
+    hasFresh(to, tpe = "privateMessage", criteria = "content.user" -> from, matchUnreadSince(3.days))
+
+  private def matchSince(since: Duration) =
     $doc("createdAt" $gt DateTime.now.minus(since.toMillis))
 
-  private def hasUnreadSince(unreadSince: Duration) =
+  private def matchUnreadSince(unreadSince: Duration) =
     $doc("read" -> false, "createdAt" $gt DateTime.now.minus(unreadSince.toMillis))
 
-  private def hasRecentOrUnreadSince(since: Duration) = $or(hasUnreadSince(since), hasSince(10.minutes))
+  private def matchRecentOrUnreadSince(since: Duration) =
+    $or(matchSince(10.minutes), matchUnreadSince(since))
 
-  // private def hasRecentOrUnread = hasRecentOrUnreadSince(3.days)
-  // private def hasOldOrUnread =
-  //  $doc("$or" -> List(hasOld, hasUnread))
-
-  /*def hasRecentStudyInvitation(userId: User.ID, studyId: String): Fu[Boolean] =
-    coll.exists(
-      $doc(
-        "notifies"        -> userId,
-        "content.type"    -> "invitedStudy",
-        "content.studyId" -> studyId
-      ) ++ hasRecentOrUnread
-    )
-
-  // returns a list of users grouped by the same unread count. it's a bit more complex than
-  // a 'RingBell' notification that just bumps the badge number by 1 at the client...
-  // but need to be certain their view of the count is always correct to do that.
-  def bulkUnreadCount(userIds: Iterable[User.ID]): Fu[List[(String, Int)]] = {
-    coll.aggregateList(-1, ReadPreference.secondaryPreferred) { f =>
-      f.Match($doc("notifies" $in userIds) ++ hasOld) ->
-        List(f.GroupField("notifies")("nb" -> f.SumAll))
-    } map { docs =>
-      for {
-        doc   <- docs
-        user  <- doc.pp("just making sure this is lite") string "_id"
-        count <- doc int "nb"
-      } yield (user, count)
-    }
-  }*/
-
-  /*def hasRecentNotificationsInThread(
-      userId: User.ID,
-      topicId: String
-  ): Fu[Boolean] =
-    coll.exists(
-      $doc(
-        "notifies"        -> userId,
-        "content.type"    -> "mention",
-        "content.topicId" -> topicId
-      ) ++ hasUnread
-    )*/
-  def hasRecent(note: Notification, unreadSince: Duration, e: ElementProducer): Fu[Boolean] =
-    coll.exists(
-      $doc(
-        "notifies"     -> note.notifies,
-        "content.type" -> note.content.key,
-        e
-      ) ++ hasRecentOrUnreadSince(unreadSince)
-    )
-  def hasRecentPrivateMessageFrom(
-      userId: User.ID,
-      sender: String
-  ): Fu[Boolean] =
-    coll.exists(
-      $doc(
-        "notifies"     -> userId,
-        "content.type" -> "privateMessage",
-        "content.user" -> sender
-      ) ++ hasUnreadSince(3.days)
-    )
+  private def hasFresh(to: User.ID, tpe: String, criteria: ElementProducer, freshnessSelector: Bdoc): Fu[Boolean] =
+    coll.exists($doc("notifies" -> to, "content.type" -> tpe, criteria) ++ freshnessSelector)
 
   def exists(notifies: User.ID, selector: Bdoc): Fu[Boolean] =
     coll.exists(userNotificationsQuery(notifies) ++ selector)
@@ -125,60 +66,4 @@ final private class NotificationRepo(
   private def unreadOnlyQuery(userId: User.ID) = $doc("notifies" -> userId, "read" -> false)
   private def unreadOnlyQuery(userIds: Iterable[User.ID]) =
     $doc("notifies" $in userIds, "read" -> false)
-
-  /*private def lookupNotifiable( eventClass: String,
-                                userIds: List[User.ID]
-                              ): Fu[List[NotifyAllows]] = {
-    prefApi.coll
-      .aggregateList(-1, ReadPreference.secondaryPreferred) { framework =>
-        import framework._
-        Match($inIds(userIds) ++ $doc(s"notification.$eventClass" -> $doc("$gt" -> 0))) ->
-          List(Project($doc(s"notification.$eventClass" -> true)))
-      }
-      .map { docs =>
-        for {
-          doc     <- docs
-          id      <- doc string "_id"
-          filter  <- doc child "notification" map (_ int eventClass)
-        } yield NotifyAllows(id, ~filter)
-      }
-  }
-  case class NotifiableUser(userId: User.ID, allows: Allows, recentlyOnline: Boolean)
-
-  private def lookupNotifiable( eventClass: String,
-                                userIds: List[User.ID]
-                              ): Fu[List[NotifiableUser]] = {
-    prefApi.coll
-      .aggregateList(-1, ReadPreference.secondaryPreferred) { framework =>
-        import framework._
-        Match($inIds(userIds) ++ $doc(s"notification.$eventClass" -> $doc("$gt" -> 0))) ->
-          List(
-            Project($doc(s"notification.$eventClass" -> true)),
-            PipelineOperator(
-              $lookup.pipeline(
-                from = userRepo.coll,
-                as = "u",
-                local = "_id",
-                foreign = "_id",
-                pipe = List(
-                  $doc("$match"   -> $doc("enabled" -> true)),
-                  $doc("$project" -> $doc("seenAt" -> true, "_id" -> false))
-                )
-              )
-            ),
-            Unwind("u"),
-            Sort(Descending("u.seenAt"))
-          )
-      }
-      .map { docs =>
-        for {
-          doc     <- docs
-          id      <- doc string "_id"
-          filter  <- doc child "notification" map (_ int eventClass)
-          seenAt  <- doc child "u" map (_.getAsOpt[DateTime]("seenAt"))
-
-          recentlyOnline = seenAt.fold(false)(_.compareTo(DateTime.now().minusMinutes(15)) > 0)
-        } yield NotifiableUser(id, Allows(~filter), recentlyOnline)
-      }
-  }*/
 }
