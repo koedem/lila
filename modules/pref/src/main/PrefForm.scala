@@ -56,14 +56,14 @@ object PrefForm {
         "moretime" -> checkedNumber(Pref.Moretime.choices)
       )(ClockData.apply)(ClockData.unapply),
       "notification" -> mapping(
-        "privateMessage"            -> allowsMapping,
+        "privateMessage"      -> allowsMapping,
         "challenge"           -> allowsMapping,
-        "mention"        -> allowsMapping,
+        "mention"             -> allowsMapping,
         "streamStart"         -> allowsMapping,
         "tournamentSoon"      -> allowsMapping,
         "gameEvent"           -> allowsMapping,
-        "inviteStudy" -> allowsMapping,
-        "titledTourney" -> allowsMapping,
+        "inviteStudy"         -> allowsMapping,
+        "titledTourney"       -> allowsMapping,
         "correspondenceEmail" -> booleanNumber
       )(NotificationPref.apply)(NotificationPref.unapply),
       "follow"       -> booleanNumber,

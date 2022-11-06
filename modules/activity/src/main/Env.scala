@@ -21,7 +21,8 @@ final class Env(
     getTeamName: lila.team.GetTeamName,
     teamRepo: lila.team.TeamRepo,
     swissApi: lila.swiss.SwissApi,
-    lightUserApi: lila.user.LightUserApi
+    lightUserApi: lila.user.LightUserApi,
+    notifyApi: lila.notify.NotifyApi
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
@@ -63,7 +64,7 @@ final class Env(
     "plan",
     "relation",
     "startStudy",
-    "streamStart",
+    "notifyPush",
     "swissFinish"
   ) {
     case lila.forum.actorApi.CreatePost(post)             => write.forumPost(post).unit
@@ -76,9 +77,9 @@ final class Env(
     case lila.study.actorApi.StartStudy(id)               =>
       // wait some time in case the study turns private
       scheduler.scheduleOnce(5 minutes) { write.study(id).unit }.unit
-    case lila.hub.actorApi.team.CreateTeam(id, _, userId)  => write.team(id, userId).unit
-    case lila.hub.actorApi.team.JoinTeam(id, userId)       => write.team(id, userId).unit
-    case lila.hub.actorApi.push.StreamStart(userId, _, _) => write.streamStart(userId).unit
-    case lila.swiss.SwissFinish(swissId, ranking)          => write.swiss(swissId, ranking).unit
+    case lila.hub.actorApi.team.CreateTeam(id, _, userId) => write.team(id, userId).unit
+    case lila.hub.actorApi.team.JoinTeam(id, userId)      => write.team(id, userId).unit
+    case lila.notify.StreamStart(userId, _)               => write.streamStart(userId).unit
+    case lila.swiss.SwissFinish(swissId, ranking)         => write.swiss(swissId, ranking).unit
   }
 }

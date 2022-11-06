@@ -26,10 +26,10 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
     if (opts.isVisible()) loadPage(1);
     else attention();
   }
-  
+
   function attention() {
-    const id = data?.pager.currentPageResults.find(n => !n.read)?.content.user?.id
-    if (!lichess.quietMode || id == 'lichess') lichess.sound.playOnce('newPM')
+    const id = data?.pager.currentPageResults.find(n => !n.read)?.content.user?.id;
+    if (!lichess.quietMode || id == 'lichess') lichess.sound.playOnce('newPM');
     opts.pulse();
   }
 
@@ -38,7 +38,7 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
       d => update(d),
       _ => lichess.announce({ msg: 'Failed to load notifications' })
     );
-  }
+  };
 
   function nextPage() {
     if (!data?.pager.nextPage) return;
@@ -92,11 +92,10 @@ export default function makeCtrl(opts: NotifyOpts, redraw: Redraw): Ctrl {
   };
 
   function clear() {
-    xhr.text('/notify/clear', { method: 'post' })
-      .then(
-        _ => update(emptyNotifyData),
-        _ => lichess.announce({ msg: 'Failed to clear notifications' })
-      );
+    xhr.text('/notify/clear', { method: 'post' }).then(
+      _ => update(emptyNotifyData),
+      _ => lichess.announce({ msg: 'Failed to clear notifications' })
+    );
   }
 
   return {

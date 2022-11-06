@@ -22,7 +22,7 @@ final private class Streaming(
     googleApiKey: Secret,
     twitchApi: TwitchApi,
     notifyApi: lila.notify.NotifyApi,
-    subsRepo: SubscriptionRepo,
+    subsRepo: SubscriptionRepo
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
@@ -36,8 +36,8 @@ final private class Streaming(
   var fakeActives = scala.collection.mutable.Set[Streamer.Id]()
   case class FakeStream(streamer: Streamer) extends Stream {
     def serviceName = "fake"
-    val language = "en"
-    val status = "fake stream"
+    val language    = "en"
+    val status      = "fake stream"
   }
 
   def getLiveStreams = liveStreams
@@ -59,7 +59,7 @@ final private class Streaming(
               }
             } map { Twitch.Stream(name, title, _, language) }
           }.flatten
-        } zip fetchYouTubeStreams(streamers)) zip {(api byIds fakeActives) map (_ map FakeStream)}
+        } zip fetchYouTubeStreams(streamers)) zip { (api byIds fakeActives) map (_ map FakeStream) }
       streams = LiveStreams {
         lila.common.ThreadLocalRandom.shuffle {
           (twitchStreams ::: youTubeStreams ::: fakeStreams) pipe dedupStreamers
@@ -78,7 +78,7 @@ final private class Streaming(
       } foreach { s =>
         import s.streamer.userId
         // TODO - fixme debugging hack - uncomment //streamStartMemo below
-        if (true) {//!streamStartMemo.get(userId)) {
+        if (true) { // !streamStartMemo.get(userId)) {
           streamStartMemo.put(userId)
           subsRepo.subscribersOnlineSince(userId, 7) map {
             notifyApi.notifyMany(_, StreamStart(userId, s.streamer.name.value))

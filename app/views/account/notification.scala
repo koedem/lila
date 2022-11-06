@@ -46,9 +46,9 @@ object notification {
               cls := "always-on",
               form3.hidden(name, "true"), // force form value
               filterName match {
-                case "challenge" => iconTag('\ue048')
-                case "privateMessage"  => iconTag('\ue00f')
-                case _           => emptyFrag
+                case "challenge"      => iconTag('\ue048')
+                case "privateMessage" => iconTag('\ue00f')
+                case _                => emptyFrag
               }
             )
         )
@@ -56,7 +56,7 @@ object notification {
     )
 
   private def editable(name: String) = name match {
-    case "privateMessage.bell"       => false
+    case "privateMessage.bell" => false
     case "tournamentSoon.bell" => false
     case "gameEvent.bell"      => false
     case "challenge.bell"      => false

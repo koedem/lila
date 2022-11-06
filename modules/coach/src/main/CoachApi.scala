@@ -126,7 +126,7 @@ final class CoachApi(
         else {
           reviewColl.update.one($id(id), review, upsert = true) >>
             notifyApi.notifyOne(coach.id.value, lila.notify.CoachReview) >>
-             refreshCoachNbReviews(coach.id) inject review
+            refreshCoachNbReviews(coach.id) inject review
         }
       }
 

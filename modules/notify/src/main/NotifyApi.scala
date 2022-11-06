@@ -1,7 +1,7 @@
 package lila.notify
 
 //import scala.collection.immutable.Iterable
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.Future
 import lila.common.Bus
 import lila.common.config.MaxPerPage
@@ -9,12 +9,11 @@ import lila.common.paginator.Paginator
 import lila.common.String.shorten
 import lila.db.dsl._
 import lila.db.paginator.Adapter
-import lila.hub.actorApi.notify.NotifyAllows
 import lila.hub.actorApi.push._
-import lila.hub.actorApi.socket.{SendTo, SendTos}
+import lila.hub.actorApi.socket.{ SendTo, SendTos }
 import lila.memo.CacheApi._
-import lila.pref.NotificationPref.Allows
-import lila.user.{User, UserRepo}
+import lila.pref.{ Allows, NotifyAllows }
+import lila.user.{ User, UserRepo }
 import lila.i18n._
 import Notification._
 import play.api.libs.json.Json
@@ -30,6 +29,11 @@ final class NotifyApi(
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   import BSONHandlers._
+
+  private val unreadCountCache = cacheApi[User.ID, Int](32768, "notify.unreadCountCache") {
+    _.expireAfterAccess(15 minutes)
+      .buildAsyncFuture(repo.unreadNotificationsCount)
+  }
 
   def getNotifications(userId: User.ID, page: Int): Fu[Paginator[Notification]] =
     Paginator(
@@ -54,26 +58,8 @@ final class NotifyApi(
       unreadCountCache.put(_, fuccess(0))
     }
 
-  private val unreadCountCache = cacheApi[User.ID, Int](32768, "notify.unreadCountCache") {
-    _.expireAfterAccess(15 minutes)
-      .buildAsyncFuture(repo.unreadNotificationsCount)
-  }
-
   def unreadCount(userId: User.ID): Fu[Int] =
     unreadCountCache get userId
-
-  def notifyOne(to: User.ID, content: NotificationContent): Funit = {
-    val note = Notification.make(to, content)
-    !shouldSkip(note) ifThen {
-      insertNotification(note) >> {
-        if (!Allows.canFilter(note.content.key)) publishOne(note)
-        else getFilter(note.to, note.content.key) flatMap { x =>
-          x.bell ?? publishOne(note)
-          x.push ?? pushOne(note, x)
-        }
-      }
-    }
-  }
 
   def insertNotification(notification: Notification): Funit =
     repo.insert(notification) >>- unreadCountCache.update(notification.to, _ + 1)
@@ -87,26 +73,61 @@ final class NotifyApi(
 
   def exists = repo.exists _
 
-  // notifyMany just informs clients that an update is availabe so they can bump their bell.  this avoids
-  // having to assemble full notification pages for many clients at once
+  def notifyOne(to: User.ID, content: NotificationContent): Funit = {
+    val note = Notification.make(to, content)
+    !shouldSkip(note) ifThen {
+      insertNotification(note) >> {
+        if (!Allows.canFilter(note.content.key)) publishOne(note)
+        else
+          getFilter(note.to, note.content.key) flatMap { x =>
+            x.bell ?? publishOne(note)
+            x.push ?? fuccess(pushOne(NotifyAllows(note.to, x), note.content))
+          }
+      }
+    }
+  }
+
+  // notifyMany just informs clients that an update is availabe so they can bump their bell.
+  // there's no need to assemble full notification pages for many clients at once
   def notifyMany(userIds: Iterable[String], content: NotificationContent): Funit =
-    prefApi.getNotifyAllows(userIds, content.key) flatMap { notifyAllows =>
-      val bells = notifyAllows collect { case x if Allows(x.allows).bell => x.userId }
+    prefApi.getNotifyAllows(userIds, content.key) flatMap { to =>
+      val bells = to filter (_.allows.bell) map (_.userId)
 
       // bells map unreadCountCache.update(_, _ + 1)
       // or maybe update only if getIfPresent?  or just invalidate
 
       bells map unreadCountCache.invalidate
-      repo.insertMany(bells map(x => Notification.make(x, content))) >>-
+      repo.insertMany(bells map (x => Notification.make(x, content))) >>- {
+        Bus.publish(
+          SendTos(
+            bells.toSet,
+            "notifications",
+            Json.obj("incrementUnread" -> true)
+          ),
+          "socketUsers"
+        )
+        pushMany(to filter (_.allows.push), content)
+      }
+    }
+
+  private def publishOne(note: Notification): Funit =
+    getNotifications(note.to, 1) zip unreadCount(note.to) dmap (AndUnread.apply _).tupled map { msg =>
       Bus.publish(
-        SendTos(
-          bells.toSet,
+        SendTo.async(
+          note.to,
           "notifications",
-          Json.obj("incrementUnread" -> true)
+          () =>
+            userRepo langOf note.to map I18nLangPicker.byStrOrDefault map (implicit lang => jsonHandlers(msg))
         ),
         "socketUsers"
       )
     }
+
+  private def pushOne(to: NotifyAllows, content: NotificationContent) =
+    pushMany(Seq(to), content)
+
+  private def pushMany(to: Iterable[NotifyAllows], content: NotificationContent) =
+    Bus.publish(PushNotification(to, content), "notifyPush")
 
   private def shouldSkip(note: Notification): Fu[Boolean] =
     note.content match {
@@ -121,69 +142,7 @@ final class NotifyApi(
       case _ => userRepo.isKid(note.to)
     }
 
-  private def publishOne(note: Notification): Funit =
-    getNotifications(note.to, 1) zip unreadCount(note.to) dmap (AndUnread.apply _).tupled map { msg =>
-      Bus.publish(
-        SendTo.async(
-          note.to,
-          "notifications",
-          () =>
-            userRepo langOf note.to map I18nLangPicker.byStrOrDefault map (implicit lang =>
-              jsonHandlers(msg)
-            )
-        ),
-        "socketUsers"
-      )
-    }
-
-  private def pushOne(note: Notification, allows: Allows): Funit = {
-    note.content match {
-      case PrivateMessage(sender: User.ID, text: String) =>
-        getLightUser(sender) collect {
-          case Some(luser) =>
-            Bus.publish(
-              InboxMsg(
-                NotifyAllows(note.to, allows.value),
-                luser.id,
-                luser.titleName,
-                shorten(text, 57 - 3, "...")
-              ),
-              "privateMessage"
-            )
-        }
-      case MentionedInThread(mentionedBy, topic, _, _, postId) =>
-        fuccess(
-          Bus.publish(
-            ForumMention(
-              NotifyAllows(note.to, allows.value),
-              mentionedBy,
-              topic,
-              postId
-            ),
-            "mention"
-          )
-        )
-      case _ => funit
-    }
-  }
-
-  private def pushMany(recips: List[NotifyAllows], note: NotificationContent) = {
-    note match {
-      case lila.notify.StreamStart(id, name) => {
-        Bus.publish(
-          StreamStart(
-            id,
-            name,
-            recips
-          ),
-          note.key
-        )
-      }
-      case _ => ()
-    }
-  }
-
   private def getFilter(uid: String, tpe: String): Fu[Allows] = {
-    prefApi.getNotificationPref(uid) map(_ allows tpe)
+    prefApi.getNotificationPref(uid) map (_ allows tpe)
   }
 }

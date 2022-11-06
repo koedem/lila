@@ -3,33 +3,33 @@ package lila.notify
 import chess.Color
 import reactivemongo.api.bson._
 
-import lila.db.{BSON, dsl}
+import lila.db.{ dsl, BSON }
 import lila.db.dsl._
-import lila.db.BSON.{Reader, Writer}
+import lila.db.BSON.{ Reader, Writer }
 
 private object BSONHandlers {
-  implicit val PrivateMessageHandler = Macros.handler[PrivateMessage]
-  implicit val MentionHandler = Macros.handler[MentionedInThread]
-  implicit val InvitedToStudyHandler = Macros.handler[InvitedToStudy]
-  implicit val TeamJoinedHandler = Macros.handler[TeamJoined]
-  implicit val GameEndHandler    = Macros.handler[GameEnd]
+  implicit val PrivateMessageHandler             = Macros.handler[PrivateMessage]
+  implicit val MentionHandler                    = Macros.handler[MentionedInThread]
+  implicit val InvitedToStudyHandler             = Macros.handler[InvitedToStudy]
+  implicit val TeamJoinedHandler                 = Macros.handler[TeamJoined]
+  implicit val GameEndHandler                    = Macros.handler[GameEnd]
   implicit val TitledTournamentInvitationHandler = Macros.handler[TitledTournamentInvitation]
-  implicit val PlanStartHandler  = Macros.handler[PlanStart]
-  implicit val PlanExpireHandler = Macros.handler[PlanExpire]
-  implicit val RatingRefundHandler    = Macros.handler[RatingRefund]
-  implicit val CorresAlarmHandler     = Macros.handler[CorresAlarm]
-  implicit val IrwinDoneHandler       = Macros.handler[IrwinDone]
-  implicit val KaladinDoneHandler     = Macros.handler[KaladinDone]
-  implicit val GenericLinkHandler     = Macros.handler[GenericLink]
-  implicit val StreamStartHandler = Macros.handler[StreamStart]
+  implicit val PlanStartHandler                  = Macros.handler[PlanStart]
+  implicit val PlanExpireHandler                 = Macros.handler[PlanExpire]
+  implicit val RatingRefundHandler               = Macros.handler[RatingRefund]
+  implicit val CorresAlarmHandler                = Macros.handler[CorresAlarm]
+  implicit val IrwinDoneHandler                  = Macros.handler[IrwinDone]
+  implicit val KaladinDoneHandler                = Macros.handler[KaladinDone]
+  implicit val GenericLinkHandler                = Macros.handler[GenericLink]
+  implicit val StreamStartHandler                = Macros.handler[StreamStart]
 
   implicit val ColorBSONHandler = BSONBooleanHandler.as[Color](Color.fromWhite, _.white)
   implicit val NotificationContentHandler = new BSON[NotificationContent] {
 
     private def writeNotificationContent(notificationContent: NotificationContent) = {
       notificationContent match {
-        case x: MentionedInThread => MentionHandler.writeTry(x).get
-        case x: InvitedToStudy => InvitedToStudyHandler.writeTry(x).get
+        case x: MentionedInThread          => MentionHandler.writeTry(x).get
+        case x: InvitedToStudy             => InvitedToStudyHandler.writeTry(x).get
         case x: PrivateMessage             => PrivateMessageHandler.writeTry(x).get
         case x: TeamJoined                 => TeamJoinedHandler.writeTry(x).get
         case x: TitledTournamentInvitation => TitledTournamentInvitationHandler.writeTry(x).get
@@ -43,7 +43,7 @@ private object BSONHandlers {
         case x: IrwinDone                  => IrwinDoneHandler.writeTry(x).get
         case x: KaladinDone                => KaladinDoneHandler.writeTry(x).get
         case x: GenericLink                => GenericLinkHandler.writeTry(x).get
-        case x: StreamStart            => StreamStartHandler.writeTry(x).get
+        case x: StreamStart                => StreamStartHandler.writeTry(x).get
       }
     } ++ $doc("type" -> notificationContent.key)
 

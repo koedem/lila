@@ -5,14 +5,13 @@ import play.api.libs.json._
 import scala.concurrent.duration._
 import lila.challenge.Challenge
 import lila.common.String.shorten
-import lila.common.{Future, LightUser}
-import lila.game.{Game, Namer, Pov}
+import lila.common.{ Future, LightUser }
+import lila.game.{ Game, Namer, Pov }
 import lila.hub.actorApi.map.Tell
-import lila.hub.actorApi.notify.NotifyAllows
 import lila.hub.actorApi.push.TourSoon
-import lila.hub.actorApi.round.{IsOnGame, MoveEvent}
-import lila.pref.NotificationPref
-import lila.pref.NotificationPref.Allows
+import lila.hub.actorApi.round.{ IsOnGame, MoveEvent }
+import lila.notify._
+import lila.pref.{ Allows, NotificationPref, NotifyAllows }
 import lila.user.User
 
 final private class PushApi(
@@ -28,6 +27,24 @@ final private class PushApi(
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
 ) {
+  private[push] def notifyPush(
+      to: Iterable[NotifyAllows],
+      content: NotificationContent,
+      params: Iterable[(String, String)]
+  ): Funit = content match {
+    case PrivateMessage(sender, text) =>
+      lightUser(sender) flatMap (_ ?? (lsender =>
+        privateMessage(to.head, sender, lsender.titleName, shorten(text, 57 - 3, "..."))
+      ))
+    case MentionedInThread(mentioner, topic, _, _, postId) =>
+      lightUser(mentioner) flatMap (_ ?? (lmentioner =>
+        forumMention(to.head, lmentioner.titleName, topic, postId)
+      ))
+    case StreamStart(streamerId, streamerName) =>
+      streamStart(to, streamerId, streamerName)
+    case _ => funit
+  }
+
   def finish(game: Game): Funit =
     if (!game.isCorrespondence || game.hasAi) funit
     else
@@ -200,7 +217,7 @@ final private class PushApi(
         filterPush(
           to.userId,
           _.message,
-          Allows(to.allows),
+          to.allows,
           PushApi.Data(
             title = senderName,
             body = text,
@@ -208,7 +225,7 @@ final private class PushApi(
             payload = Json.obj(
               "userId" -> to.userId,
               "userData" -> Json.obj(
-                "type" -> "newMessage",
+                "type"     -> "newMessage",
                 "threadId" -> senderId
               )
             )
@@ -298,7 +315,7 @@ final private class PushApi(
       filterPush(
         to.userId,
         _.forumMention,
-        Allows(to.allows),
+        to.allows,
         PushApi.Data(
           title = topic,
           body = post.fold(topic)(p => shorten(p.text, 57 - 3, "...")),
@@ -306,60 +323,44 @@ final private class PushApi(
           payload = Json.obj(
             "userId" -> to.userId,
             "userData" -> Json.obj(
-              "type"   -> "forumMention",
+              "type"        -> "forumMention",
               "mentionedBy" -> mentionedBy,
-              "topic" -> topic,
-              "postId" -> postId
+              "topic"       -> topic,
+              "postId"      -> postId
             )
           )
         )
       )
     }
 
-  import NotificationPref._
-  def streamStart(streamerId: User.ID, streamerName: String, recips: List[NotifyAllows]): Funit = {
+  def streamStart(recips: Iterable[NotifyAllows], streamerId: User.ID, streamerName: String): Funit =
     // TODO - for firebase, register topic membership for user devices in Controllers/Streamer.scala
     // subscribe/unsubscribe methods and push a single message to "streamer.$streamerId" topic
     // for web push, just assemble a massive list of websubscriptions and let lila-push deal with it
-    // Commented out the code below - it will consume rate limit budget.
-    /*val note = PushApi.Data(
-      title = streamerName + " started streaming",
-      body = streamerName + " started streaming",
-      stacking = Stacking.StreamStart,
-      payload = Json.obj(
-        "userId"   -> target.userId,
-        "userData" -> Json.obj("type" -> "streamStart", "streamerId" -> streamerId)
-      )
-    )
-    recips filter(x => Allows(x.allows).web) map { to =>
-      webPush.
-    }
-    */
-    funit
-    /*Future.applySequentially(notifyList) { target =>
+    // sequential for now
+    Future.applySequentially(recips.toList filter (_.web)) { to =>
       filterPush(
-        target.userId,
+        to.userId,
         _.streamStart,
-        Allows(target.allows),
+        to.allows,
         PushApi.Data(
-          title = streamerName + " started streaming",
+          title = streamerName,
           body = streamerName + " started streaming",
           stacking = Stacking.StreamStart,
           payload = Json.obj(
-            "userId"   -> target.userId,
+            "userId"   -> to.userId,
             "userData" -> Json.obj("type" -> "streamStart", "streamerId" -> streamerId)
           )
         )
       )
-    } funit*/
-  }
+    }
 
   private type MonitorType = lila.mon.push.send.type => ((String, Boolean) => Unit)
 
   private def maybePush(
       userId: User.ID,
       monitor: MonitorType,
-      event: Event,
+      event: NotificationPref.Event,
       data: PushApi.Data
   ): Funit =
     prefApi.getNotificationPref(userId) flatMap { x => filterPush(userId, monitor, x.allows(event), data) }

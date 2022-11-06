@@ -40,7 +40,7 @@ final class Env(
     case lila.game.actorApi.CorresAlarmEvent(pov) =>
       pov.player.userId ?? { userId =>
         lila.game.Namer.playerText(pov.opponent)(getLightUser) foreach { opponent =>
-          api notifyOne(
+          api notifyOne (
             userId,
             CorresAlarm(
               gameId = pov.gameId,

@@ -10,16 +10,14 @@ export default function LichessNotify(element: Element, opts: NotifyOpts) {
   let vnode = patch(element, view(ctrl));
 
   if (opts.data) update(opts.data);
-  else ctrl.loadPage(1);  
+  else ctrl.loadPage(1);
 
   function redraw() {
     vnode = patch(vnode, view(ctrl));
   }
-  
-  function update(data: NotifyData|BumpUnread) {
-    'pager' in data 
-    ? ctrl.update(data as NotifyData) 
-    : ctrl.bumpUnread()  
+
+  function update(data: NotifyData | BumpUnread) {
+    'pager' in data ? ctrl.update(data as NotifyData) : ctrl.bumpUnread();
   }
 
   return {

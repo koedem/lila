@@ -5,7 +5,6 @@ import reactivemongo.api.bson._
 
 import scala.concurrent.duration._
 import lila.db.dsl._
-import lila.hub.actorApi.notify.NotifyAllows
 import lila.memo.CacheApi._
 import lila.user.User
 
@@ -121,14 +120,16 @@ final class PrefApi(
       }
     }
 
-  def getNotifyAllows(userIds: Iterable[User.ID], eventClass: String): Fu[List[NotifyAllows]] =
-    coll.find($inIds(userIds), $doc(s"notification.$eventClass" -> true).some)
-      .cursor[Bdoc]().list() dmap { docs =>
+  def getNotifyAllows(userIds: Iterable[User.ID], event: String): Fu[List[NotifyAllows]] =
+    coll
+      .find($inIds(userIds), $doc(s"notification.$event" -> true).some)
+      .cursor[Bdoc]()
+      .list() dmap { docs =>
       for {
-        doc <- docs
+        doc    <- docs
         userId <- doc string "_id"
-        allowsOpt = doc child "notification" flatMap (_ int eventClass)
-        allowsCode = allowsOpt getOrElse NotificationPref.default.allows(eventClass).value
-      } yield NotifyAllows(userId, allowsCode)
+        allowsOpt = doc child "notification" flatMap (_ int event) map Allows.fromCode
+        allows    = allowsOpt getOrElse NotificationPref.default.allows(event)
+      } yield NotifyAllows(userId, allows)
     }
 }

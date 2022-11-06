@@ -1,16 +1,16 @@
 package lila.notify
 
 import org.joda.time.DateTime
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.{ Duration, DurationInt }
 import lila.db.dsl._
 import lila.user.User
 import reactivemongo.api.bson.ElementProducer
 
 final private class NotificationRepo(
-                                      val coll: Coll,
-                                      val userRepo: lila.user.UserRepo,
-                                      val prefApi: lila.pref.PrefApi
-                                    )(implicit ec: scala.concurrent.ExecutionContext) {
+    val coll: Coll,
+    val userRepo: lila.user.UserRepo,
+    val prefApi: lila.pref.PrefApi
+)(implicit ec: scala.concurrent.ExecutionContext) {
 
   import BSONHandlers._
 
@@ -52,8 +52,8 @@ final private class NotificationRepo(
 
   private def hasRecentOrUnreadSince(since: Duration) = $or(hasUnreadSince(since), hasSince(10.minutes))
 
-  //private def hasRecentOrUnread = hasRecentOrUnreadSince(3.days)
-  //private def hasOldOrUnread =
+  // private def hasRecentOrUnread = hasRecentOrUnreadSince(3.days)
+  // private def hasOldOrUnread =
   //  $doc("$or" -> List(hasOld, hasUnread))
 
   /*def hasRecentStudyInvitation(userId: User.ID, studyId: String): Fu[Boolean] =
@@ -92,10 +92,10 @@ final private class NotificationRepo(
         "content.topicId" -> topicId
       ) ++ hasUnread
     )*/
-  def hasRecent( note: Notification, unreadSince: Duration, e: ElementProducer) : Fu[Boolean] =
+  def hasRecent(note: Notification, unreadSince: Duration, e: ElementProducer): Fu[Boolean] =
     coll.exists(
       $doc(
-        "notifies" -> note.notifies,
+        "notifies"     -> note.notifies,
         "content.type" -> note.content.key,
         e
       ) ++ hasRecentOrUnreadSince(unreadSince)

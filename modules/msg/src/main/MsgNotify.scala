@@ -70,7 +70,7 @@ final private class MsgNotify(
         val msg  = thread.lastMsg
         val dest = thread other msg.user
         !thread.delBy(dest) ?? {
-          notifyApi notifyOne(dest, PrivateMessage(user = msg.user, text = shorten(msg.text, 40)))
+          notifyApi notifyOne (dest, PrivateMessage(user = msg.user, text = shorten(msg.text, 40)))
         }
       }
     } void

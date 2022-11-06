@@ -66,8 +66,8 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
       OptionFuResult(api find username) { s =>
         WithVisibleStreamer(s) {
           for {
-            sws        <- env.streamer.liveStreamApi of s
-            activity   <- env.activity.read.recentAndPreload(sws.user)
+            sws      <- env.streamer.liveStreamApi of s
+            activity <- env.activity.read.recentAndPreload(sws.user)
           } yield Ok(html.streamer.show(sws, activity))
         }
       }

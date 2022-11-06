@@ -81,8 +81,8 @@ export default function () {
         instance = window.LichessNotify($el.empty()[0], {
           data,
           isVisible: () => isVisible(selector),
-          updateUnread(nb: number|'increment') {
-            const existing = $toggle.find('span').data('count') as number || 0;
+          updateUnread(nb: number | 'increment') {
+            const existing = ($toggle.find('span').data('count') as number) || 0;
             if (nb == 'increment') nb = existing + 1;
             $toggle.find('span').data('count', this.isVisible() ? 0 : nb);
             return nb && nb != existing;

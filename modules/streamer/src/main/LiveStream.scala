@@ -85,10 +85,9 @@ final class LiveStreamApi(
 
   def toggleFakeOnline(idGar: String) = {
     val id = Streamer.Id(idGar)
-    if (streaming.fakeActives contains(id)) {
+    if (streaming.fakeActives contains (id)) {
       streaming.fakeActives remove id
-    }
-    else {
+    } else {
       streaming.fakeActives add id
     }
   }

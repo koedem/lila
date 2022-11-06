@@ -1,17 +1,15 @@
 package lila.push
 
-import akka.actor._
-import com.google.auth.oauth2.{GoogleCredentials, ServiceAccountCredentials}
+import com.google.auth.oauth2.{ GoogleCredentials, ServiceAccountCredentials }
 import com.softwaremill.macwire._
 import io.methvin.play.autoconfig._
 import play.api.Configuration
 import play.api.libs.ws.StandaloneWSClient
-
 import java.nio.charset.StandardCharsets.UTF_8
 import scala.jdk.CollectionConverters._
+
 import lila.common.config._
-import FirebasePush.configLoader
-import lila.hub.actorApi.notify.NotifyAllows
+import lila.pref.NotifyAllows
 
 @Module
 final private class PushConfig(
@@ -80,7 +78,8 @@ final class Env(
     "streamStart",
     "mention",
     "offerEventCorres",
-    "tourSoon"
+    "tourSoon",
+    "notifyPush"
   ) {
     case lila.game.actorApi.FinishGame(game, _, _) =>
       logUnit { pushApi finish game }
@@ -90,19 +89,14 @@ final class Env(
       logUnit { pushApi takebackOffer gameId }
     case lila.hub.actorApi.round.CorresDrawOfferEvent(gameId) =>
       logUnit { pushApi drawOffer gameId }
-    case lila.hub.actorApi.push
-          .InboxMsg(to: NotifyAllows, senderId: String, senderName: String, text: String) =>
-      logUnit { pushApi privateMessage (to, senderId, senderName, text) }
     case lila.challenge.Event.Create(c) =>
       logUnit { pushApi challengeCreate c }
     case lila.challenge.Event.Accept(c, joinerId) =>
       logUnit { pushApi.challengeAccept(c, joinerId) }
     case lila.game.actorApi.CorresAlarmEvent(pov) =>
       logUnit { pushApi corresAlarm pov }
-    case lila.hub.actorApi.push.StreamStart(streamerId, streamerName, notifyList) =>
-      logUnit { pushApi streamStart (streamerId, streamerName, notifyList) }
-    case lila.hub.actorApi.push.ForumMention(to, commenter, title, postId) =>
-      logUnit { pushApi forumMention (to, commenter, title, postId) }
+    case lila.notify.PushNotification(to, content, params) =>
+      logUnit { pushApi notifyPush (to, content, params) }
     case t: lila.hub.actorApi.push.TourSoon =>
       logUnit { pushApi tourSoon t }
   }

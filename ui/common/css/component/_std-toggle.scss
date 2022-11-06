@@ -63,7 +63,7 @@
   @extend %focus-shadow;
 }
 
-.std-toggle:hover:not(:disabled) { 
+.std-toggle:hover:not(:disabled) {
   @extend %focus-shadow;
   @include transition(background);
 

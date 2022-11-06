@@ -4,7 +4,7 @@ export interface NotifyOpts {
   data?: NotifyData;
   incoming: boolean;
   isVisible(): boolean;
-  updateUnread(nb: number|'increment'): boolean; // true if changed
+  updateUnread(nb: number | 'increment'): boolean; // true if changed
   show(): void;
   setNotified(): void;
   pulse(): void;
@@ -16,8 +16,7 @@ export interface NotifyData {
   i18n: I18nDict;
 }
 
-export interface BumpUnread {
-}
+export interface BumpUnread {}
 
 interface NotificationUser {
   id: string;

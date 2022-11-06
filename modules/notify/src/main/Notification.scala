@@ -1,8 +1,9 @@
 package lila.notify
 
 import lila.common.paginator.Paginator
-import lila.user.User
 import lila.game.Game
+import lila.pref.NotifyAllows
+import lila.user.User
 import org.joda.time.DateTime
 
 sealed abstract class NotificationContent(val key: String)
@@ -20,9 +21,7 @@ case class StreamStart(
     streamerName: String
 ) extends NotificationContent("streamStart")
 
-case class PrivateMessage( user: User.ID,
-                           text: String
-                         ) extends NotificationContent("privateMessage")
+case class PrivateMessage(user: User.ID, text: String) extends NotificationContent("privateMessage")
 
 case class InvitedToStudy(
     invitedBy: User.ID,
@@ -56,7 +55,7 @@ case class RatingRefund(perf: String, points: Int) extends NotificationContent("
 
 case object CoachReview extends NotificationContent("coachReview")
 
-case class PlanStart(userId: User.ID)  extends NotificationContent("planStart")  // BC
+case class PlanStart(userId: User.ID) extends NotificationContent("planStart") // BC
 
 case class PlanExpire(userId: User.ID) extends NotificationContent("planExpire") // BC
 
@@ -80,13 +79,19 @@ case class GenericLink(
     icon: String
 ) extends NotificationContent("genericLink")
 
+case class PushNotification(
+    to: Iterable[NotifyAllows],
+    content: NotificationContent,
+    params: Iterable[(String, String)] = Nil
+)
+
 private[notify] case class Notification(
-                                         _id: String,
-                                         notifies: User.ID,
-                                         content: NotificationContent,
-                                         read: Boolean,
-                                         createdAt: DateTime
-                                       ) {
+    _id: String,
+    notifies: User.ID,
+    content: NotificationContent,
+    read: Boolean,
+    createdAt: DateTime
+) {
   def to = notifies
 }
 

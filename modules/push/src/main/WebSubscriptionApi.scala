@@ -39,8 +39,8 @@ final class WebSubscriptionApi(coll: Coll)(implicit ec: scala.concurrent.Executi
       .sort($doc("seenAt" -> -1))
       .cursor[Bdoc](ReadPreference.secondaryPreferred)
       .list(max)
-      .map(_ flatMap(bsonToWebSub))
-/*
+      .map(_ flatMap (bsonToWebSub))
+  /*
   private[push] def getSubscriptions(userIds: Iterable[User.ID]): Fu[List[WebSubscription]] =
     coll
       .aggregateList(-1, ReadPreference.secondaryPreferred) { framework =>
@@ -52,8 +52,8 @@ final class WebSubscriptionApi(coll: Coll)(implicit ec: scala.concurrent.Executi
     .cursor[Bdoc](ReadPreference.secondaryPreferred)
     .list(max)
     .map(_ flatMap(bsonToWebSub))
-*/
-  private def bsonToWebSub( doc: Bdoc) =
+   */
+  private def bsonToWebSub(doc: Bdoc) =
     for {
       endpoint <- doc.string("endpoint")
       auth     <- doc.string("auth")

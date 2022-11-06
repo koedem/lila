@@ -218,7 +218,6 @@ package tv {
 
 package notify {
   case class NotifiedBatch(userIds: Iterable[String])
-  case class NotifyAllows(userId: String, allows: Int) // NotificationPref.Allows
 }
 
 package team {
@@ -324,9 +323,9 @@ package plan {
 
 package push {
   case class TourSoon(tourId: String, tourName: String, userIds: Iterable[String], swiss: Boolean)
-  case class ForumMention(to: notify.NotifyAllows, mentionedBy: String, topic: String, postId: String)
-  case class InboxMsg(to: notify.NotifyAllows, senderId: String, senderName: String, text: String)
-  case class StreamStart(streamerId: String, streamerName: String, pushTo: List[notify.NotifyAllows])
+  // case class ForumMention(to: notify.NotifyAllows, mentionedBy: String, topic: String, postId: String)
+  // case class InboxMsg(to: notify.NotifyAllows, senderId: String, senderName: String, text: String)
+  // case class StreamStart(streamerId: String, streamerName: String, pushTo: List[notify.NotifyAllows])
 }
 
 package oauth {

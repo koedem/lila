@@ -229,7 +229,7 @@ lazy val pool = module("pool",
 )
 
 lazy val activity = module("activity",
-  Seq(common, game, analyse, user, forum, study, pool, puzzle, tournament, simul, swiss, practice, team, ublog),
+  Seq(common, game, analyse, user, forum, study, pool, puzzle, tournament, simul, swiss, practice, team, ublog, notifyModule),
   reactivemongo.bundle
 )
 
@@ -344,7 +344,7 @@ lazy val playban = module("playban",
 )
 
 lazy val push = module("push",
-  Seq(common, db, user, game, challenge, msg, pref, forum),
+  Seq(common, db, user, game, challenge, msg, pref, forum, notifyModule),
   Seq(googleOAuth) ++ reactivemongo.bundle
 )
 

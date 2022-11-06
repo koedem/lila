@@ -10,13 +10,13 @@ object header {
 
   import trans.streamer._
 
-  def apply(s: lila.streamer.Streamer.WithUserAndStream)(implicit
+  def apply(s: lila.streamer.Streamer.WithUserAndStream, modView: Boolean = false)(implicit
       ctx: Context
   ) =
     div(cls := "streamer-header")(
       div(cls := "picture")(
         picture.thumbnail(s.streamer, s.user),
-        ctx.me.nonEmpty option span(cls := "subscribe-ribbon-top-right")(
+        (ctx.me.nonEmpty && !modView) option span(cls := "subscribe-ribbon-top-right")(
           span(
             input(
               cls        := "std-toggle subscribe-switch",

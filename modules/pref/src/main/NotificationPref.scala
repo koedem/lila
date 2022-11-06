@@ -4,6 +4,45 @@ import play.api.libs.json.{ Json, OWrites }
 import reactivemongo.api.bson.Macros
 import NotificationPref._
 
+case class Allows(value: Int) extends AnyVal with IntValue {
+  def push: Boolean   = (value & NotificationPref.PUSH) != 0
+  def web: Boolean    = (value & NotificationPref.WEB) != 0
+  def device: Boolean = (value & NotificationPref.DEVICE) != 0
+  def bell: Boolean   = (value & NotificationPref.BELL) != 0
+  def any: Boolean    = value != 0
+}
+
+object Allows {
+
+  def canFilter(tpe: String): Boolean = tpe match {
+    case "privateMessage" => true
+    case "challenge"      => true
+    case "mention"        => true
+    case "streamStart"    => true
+    case "tournamentSoon" => true
+    case "gameEvent"      => true
+    case "titledTourney"  => false // for now
+    case "inviteStudy"    => false // for now
+    case _                => false
+  }
+
+  def fromForm(bell: Boolean, push: Boolean): Allows =
+    Allows((bell ?? BELL) | (push ?? PUSH))
+
+  def toForm(allows: Allows): Some[(Boolean, Boolean)] =
+    Some((allows.bell, allows.push))
+
+  def fromCode(code: Int) = Allows(code)
+}
+
+case class NotifyAllows(userId: lila.user.User.ID, allows: Allows) {
+  def push   = allows push
+  def web    = allows web
+  def device = allows device
+  def bell   = allows bell
+  def any    = allows any
+}
+
 // take care with NotificationPref field names - they map directly to db and ws channels
 
 case class NotificationPref(
@@ -36,14 +75,6 @@ object NotificationPref {
   val DEVICE = 4
   val PUSH   = WEB | DEVICE
 
-  case class Allows(value: Int) extends AnyVal with IntValue {
-    def push: Boolean   = (value & PUSH) != 0
-    def web: Boolean    = (value & WEB) != 0
-    def device: Boolean = (value & DEVICE) != 0
-    def bell: Boolean   = (value & BELL) != 0
-    def any: Boolean    = value != 0
-  }
-
   sealed trait Event {
     override def toString: String = { // for matching db fields, channels
       val typeName = getClass.getSimpleName
@@ -51,11 +82,11 @@ object NotificationPref {
     }
   }
 
-  case object PrivateMessage       extends Event
+  case object PrivateMessage extends Event
   case object Challenge      extends Event
-  case object Mention   extends Event
-  case object InviteStudy extends Event
-  case object TitledTourney extends Event
+  case object Mention        extends Event
+  case object InviteStudy    extends Event
+  case object TitledTourney  extends Event
   case object StreamStart    extends Event
   case object TournamentSoon extends Event
   case object GameEvent      extends Event
@@ -65,8 +96,8 @@ object NotificationPref {
     challenge = Allows(BELL | PUSH),
     titledTourney = Allows(BELL | PUSH),
     inviteStudy = Allows(BELL),
-    mention = Allows(BELL),
-    streamStart = Allows(BELL),
+    mention = Allows(BELL | PUSH),
+    streamStart = Allows(BELL | PUSH),
     tournamentSoon = Allows(PUSH),
     gameEvent = Allows(PUSH),
     correspondenceEmail = 0
@@ -78,32 +109,11 @@ object NotificationPref {
   implicit val NotificationPrefBSONHandler =
     Macros.handler[NotificationPref]
 
-  object Allows {
-
-    def canFilter(tpe: String): Boolean = tpe match {
-      case "privateMessage" => true
-      case "challenge" => true
-      case "mention" => true
-      case "streamStart" => true
-      case "tournamentSoon" => true
-      case "gameEvent" => true
-      case "titledTourney" => false // for now
-      case "inviteStudy" => false // for now
-      case _ => false
-    }
-
-    def fromForm(bell: Boolean, push: Boolean): Allows =
-      Allows((bell ?? BELL) | (push ?? PUSH))
-
-    def toForm(allows: Allows): Some[(Boolean, Boolean)] =
-      Some((allows.bell, allows.push))
-  }
-
   implicit val notificationDataJsonWriter: OWrites[NotificationPref] =
     OWrites[NotificationPref] { data =>
       Json.obj(
-        "privateMessage"            -> allowsToJson(data.privateMessage),
-        "mention"        -> allowsToJson(data.mention),
+        "privateMessage"      -> allowsToJson(data.privateMessage),
+        "mention"             -> allowsToJson(data.mention),
         "streamStart"         -> allowsToJson(data.streamStart),
         "challenge"           -> allowsToJson(data.challenge),
         "tournamentSoon"      -> allowsToJson(data.tournamentSoon),

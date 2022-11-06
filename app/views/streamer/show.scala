@@ -13,7 +13,7 @@ object show {
 
   def apply(
       s: lila.streamer.Streamer.WithUserAndStream,
-      activities: Vector[lila.activity.ActivityView],
+      activities: Vector[lila.activity.ActivityView]
   )(implicit ctx: Context) = {
     val streamerId = s.streamer.userId
     views.html.base.layout(

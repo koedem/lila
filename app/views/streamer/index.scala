@@ -25,10 +25,9 @@ object index {
     def widget(s: lila.streamer.Streamer.With, stream: Option[lila.streamer.Stream]) =
       frag(
         if (requests) a(href := s"${routes.Streamer.edit}?u=${s.user.username}", cls := "overlay")
-        else
-          bits.redirectLink(s.user.username, stream.isDefined.some)(cls := "overlay"),
+        else bits.redirectLink(s.user.username, stream.isDefined.some)(cls := "overlay"),
         stream.isDefined option span(cls := "live-ribbon")(span(trans.streamer.live())),
-        div(cls:="picture")(
+        div(cls := "picture")(
           picture.thumbnail(s.streamer, s.user),
           !requests && ctx.me.nonEmpty option span(cls := "subscribe-ribbon-bottom-left")(
             span(
@@ -50,10 +49,10 @@ object index {
             )(d)
           },
           button(
-            cls := "test-xhr button button-metal",
-            style := "z-index: 4; align-self: flex-start;",
-            formaction := routes.Streamer.testLiveToggle(s.streamer.userId))("toggle online/offline"
-          ),
+            cls        := "test-xhr button button-metal",
+            style      := "z-index: 4; align-self: flex-start;",
+            formaction := routes.Streamer.testLiveToggle(s.streamer.userId)
+          )("toggle online/offline"),
           div(cls := "services")(
             s.streamer.twitch.map { twitch =>
               div(cls := "service twitch")(twitch.minUrl)
@@ -74,7 +73,7 @@ object index {
                   p(cls := "at")(lastStream(momentFromNow(liveAt)))
                 }
               )
-            ),
+            )
           )
         )
       )

@@ -23,7 +23,7 @@ final private class WebPush(
     webSubscriptionApi.getSubscriptions(userIds) flatMap { subs =>
       subs.toNel ?? send(data)
     }
-*/
+   */
   private def send(data: => PushApi.Data)(subscriptions: NonEmptyList[WebSubscription]): Funit = {
     ws.url(config.url)
       .withHttpHeaders("ContentType" -> "application/json")

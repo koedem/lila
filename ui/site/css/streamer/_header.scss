@@ -120,8 +120,9 @@ div.picture {
   }
 }
 
-.subscribe-ribbon-top-right, .subscribe-ribbon-bottom-left {
-  @extend  %streamer-ribbon;
+.subscribe-ribbon-top-right,
+.subscribe-ribbon-bottom-left {
+  @extend %streamer-ribbon;
 
   .std-toggle {
     margin-#{$end-direction}: 5px;
@@ -136,7 +137,6 @@ div.picture {
     transform: rotate(45deg);
     background-color: #777b;
   }
-
 }
 
 .subscribe-ribbon-top-right {
