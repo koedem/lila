@@ -41,30 +41,20 @@ final class WebSubscriptionApi(coll: Coll)(implicit ec: scala.concurrent.Executi
       .list(max)
       .map(_ flatMap bsonToWebSub)
 
-  /*
-  [
-    {$match:{}},
-    {$sort:{seenAt:-1}},
-    {$group:{_id:{userId:'$userId'},subs:{$addToSet:'$$ROOT'}}},
-    {$project:{dog:{$slice:['$subs',1]}, _id:0}}
-    {$replaceRoot:{newRoot:'$subs'}}
-  ]
-
-  */
-    private[push] def getSubscriptions(userIds: Iterable[User.ID], maxPerUser: Int): Fu[List[WebSubscription]] =
-      coll
-        .aggregateList(-1, ReadPreference.secondaryPreferred) { framework =>
-          import framework._
-          Match($doc($inIds(userIds))) -> List(
-            Sort(Descending("seenAt")),
-            Group($id("userId" -> "$userId"))("subs" -> AddToSet(BSONString("$$ROOT"))),
-            Project($doc("subs" -> Slice(BSONArray("$subs"), BSONInteger(maxPerUser)), "_id" -> false)),
-            Unwind("subs"),
-            ReplaceRoot($doc("newRoot" -> "$subs"))
-          )
-        }.map(_ flatMap bsonToWebSub)
-
-  private def bsonToWebSub(doc: Bdoc) =
+  private[push] def getSubscriptions(userIds: Iterable[User.ID], maxPerUser: Int): Fu[List[WebSubscription]] =
+    coll
+      .aggregateList(100000, ReadPreference.secondaryPreferred) { framework =>
+        import framework._
+        Match($doc("userId" -> $doc("$in" -> userIds))) -> List(
+          Sort(Descending("seenAt")),
+          Group($id("userId" -> "$userId"))("subs" -> AddToSet(BSONString("$$ROOT"))),
+          Project($doc("subs" -> Slice(BSONString("$subs"), BSONInteger(maxPerUser)), "_id" -> false)),
+          Unwind("subs"),
+          ReplaceRootField("subs")
+        )
+      }.map(_ flatMap bsonToWebSub)
+      
+  private def bsonToWebSub(doc: Bdoc) = 
     for {
       endpoint <- doc.string("endpoint")
       auth     <- doc.string("auth")
