@@ -62,8 +62,7 @@ object PrefForm {
         "streamStart"         -> allowsMapping,
         "tournamentSoon"      -> allowsMapping,
         "gameEvent"           -> allowsMapping,
-        "inviteStudy"         -> allowsMapping,
-        "titledTourney"       -> allowsMapping,
+        "invitedStudy"        -> allowsMapping,
         "correspondenceEmail" -> booleanNumber
       )(NotificationPref.apply)(NotificationPref.unapply),
       "follow"       -> booleanNumber,

@@ -1698,6 +1698,7 @@ val `yourPreferencesHaveBeenSaved` = new I18nKey("preferences:yourPreferencesHav
 val `scrollOnTheBoardToReplayMoves` = new I18nKey("preferences:scrollOnTheBoardToReplayMoves")
 val `correspondenceEmailNotification` = new I18nKey("preferences:correspondenceEmailNotification")
 val `notifyStreamStart` = new I18nKey("preferences:notifyStreamStart")
+val `notifyInvitedStudy` = new I18nKey("preferences:notifyInvitedStudy")
 val `notifyInboxMsg` = new I18nKey("preferences:notifyInboxMsg")
 val `notifyForumMention` = new I18nKey("preferences:notifyForumMention")
 val `notifyGameEvent` = new I18nKey("preferences:notifyGameEvent")

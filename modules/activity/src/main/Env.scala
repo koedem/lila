@@ -21,8 +21,7 @@ final class Env(
     getTeamName: lila.team.GetTeamName,
     teamRepo: lila.team.TeamRepo,
     swissApi: lila.swiss.SwissApi,
-    lightUserApi: lila.user.LightUserApi,
-    notifyApi: lila.notify.NotifyApi
+    lightUserApi: lila.user.LightUserApi
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
@@ -64,7 +63,7 @@ final class Env(
     "plan",
     "relation",
     "startStudy",
-    "notifyPush",
+    "streamStart",
     "swissFinish"
   ) {
     case lila.forum.actorApi.CreatePost(post)             => write.forumPost(post).unit
@@ -79,7 +78,7 @@ final class Env(
       scheduler.scheduleOnce(5 minutes) { write.study(id).unit }.unit
     case lila.hub.actorApi.team.CreateTeam(id, _, userId) => write.team(id, userId).unit
     case lila.hub.actorApi.team.JoinTeam(id, userId)      => write.team(id, userId).unit
-    case lila.notify.StreamStart(userId, _)               => write.streamStart(userId).unit
+    case lila.hub.actorApi.streamer.StreamStart(userId)   => write.streamStart(userId).unit
     case lila.swiss.SwissFinish(swissId, ranking)         => write.swiss(swissId, ranking).unit
   }
 }

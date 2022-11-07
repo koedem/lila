@@ -7,7 +7,7 @@ import play.api.libs.ws.StandaloneWSClient
 
 import scala.concurrent.duration._
 import scala.util.chaining._
-import lila.common.LilaScheduler
+import lila.common.{Bus, LilaScheduler}
 import lila.common.config.Secret
 import lila.notify.StreamStart
 import lila.relation.SubscriptionRepo
@@ -80,6 +80,10 @@ final private class Streaming(
         // TODO - fixme debugging hack - uncomment //streamStartMemo below
         if (true) { // !streamStartMemo.get(userId)) {
           streamStartMemo.put(userId)
+          Bus.publish(
+            lila.hub.actorApi.streamer.StreamStart(userId),
+            "streamStart"
+          )
           subsRepo.subscribersOnlineSince(userId, 7) map {
             notifyApi.notifyMany(_, StreamStart(userId, s.streamer.name.value))
           }

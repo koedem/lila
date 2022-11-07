@@ -21,8 +21,7 @@ object Allows {
     case "streamStart"    => true
     case "tournamentSoon" => true
     case "gameEvent"      => true
-    case "titledTourney"  => false // for now
-    case "inviteStudy"    => false // for now
+    case "invitedStudy"   => true
     case _                => false
   }
 
@@ -52,8 +51,7 @@ case class NotificationPref(
     streamStart: Allows,
     tournamentSoon: Allows,
     gameEvent: Allows,
-    inviteStudy: Allows,
-    titledTourney: Allows,
+    invitedStudy: Allows,
     correspondenceEmail: Int
 ) {
 
@@ -85,8 +83,7 @@ object NotificationPref {
   case object PrivateMessage extends Event
   case object Challenge      extends Event
   case object Mention        extends Event
-  case object InviteStudy    extends Event
-  case object TitledTourney  extends Event
+  case object InvitedStudy   extends Event
   case object StreamStart    extends Event
   case object TournamentSoon extends Event
   case object GameEvent      extends Event
@@ -94,8 +91,7 @@ object NotificationPref {
   lazy val default: NotificationPref = NotificationPref(
     privateMessage = Allows(BELL | PUSH),
     challenge = Allows(BELL | PUSH),
-    titledTourney = Allows(BELL | PUSH),
-    inviteStudy = Allows(BELL),
+    invitedStudy = Allows(BELL | PUSH),
     mention = Allows(BELL | PUSH),
     streamStart = Allows(BELL | PUSH),
     tournamentSoon = Allows(PUSH),
@@ -118,8 +114,7 @@ object NotificationPref {
         "challenge"           -> allowsToJson(data.challenge),
         "tournamentSoon"      -> allowsToJson(data.tournamentSoon),
         "gameEvent"           -> allowsToJson(data.gameEvent),
-        "inviteStudy"         -> allowsToJson(data.inviteStudy),
-        "titledTourney"       -> allowsToJson(data.titledTourney),
+        "invitedStudy"        -> allowsToJson(data.invitedStudy),
         "correspondenceEmail" -> (data.correspondenceEmail != 0)
       )
     }

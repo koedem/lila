@@ -16,11 +16,12 @@ object notification {
           tr(th, th(notifyBell()), th(notifyPush()))
         ),
         tbody(
-          makeRow(form, notifyStreamStart(), filterName = "streamStart"),
+          makeRow(form, notifyStreamStart(), "streamStart"),
           makeRow(form, notifyForumMention(), "mention"),
+          makeRow(form, notifyInvitedStudy(), "invitedStudy"),
           makeRow(form, notifyInboxMsg(), "privateMessage"),
           makeRow(form, notifyChallenge(), "challenge"),
-          makeRow(form, notifyTournamentSoon(), filterName = "tournamentSoon"),
+          makeRow(form, notifyTournamentSoon(), "tournamentSoon"),
           makeRow(form, notifyGameEvent(), "gameEvent")
         )
       ),
@@ -44,7 +45,7 @@ object notification {
           else
             div(
               cls := "always-on",
-              form3.hidden(name, "true"), // force form value
+              form3.hidden(name, "true"),
               filterName match {
                 case "challenge"      => iconTag('\ue048')
                 case "privateMessage" => iconTag('\ue00f')

@@ -9,6 +9,10 @@ import scala.concurrent.Promise
 // announce something to all clients
 case class Announce(msg: String, date: DateTime, json: JsObject)
 
+package streamer {
+  case class StreamStart(userId: String)
+}
+
 package map {
   case class Tell(id: String, msg: Any)
   case class TellIfExists(id: String, msg: Any)
@@ -323,9 +327,6 @@ package plan {
 
 package push {
   case class TourSoon(tourId: String, tourName: String, userIds: Iterable[String], swiss: Boolean)
-  // case class ForumMention(to: notify.NotifyAllows, mentionedBy: String, topic: String, postId: String)
-  // case class InboxMsg(to: notify.NotifyAllows, senderId: String, senderName: String, text: String)
-  // case class StreamStart(streamerId: String, streamerName: String, pushTo: List[notify.NotifyAllows])
 }
 
 package oauth {
