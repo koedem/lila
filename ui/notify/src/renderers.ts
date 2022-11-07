@@ -7,9 +7,9 @@ export default function makeRenderers(trans: Trans): Renderers {
   return {
     streamStart: {
       html: n =>
-        generic(n, `/streamer/${n.content.sid}/redirect`, '\ue006', [
+        generic(n, `/streamer/${n.content.sid}/redirect`, '', [
           h('span', [h('strong', n.content.name), drawTime(n)]),
-          h('span', n.content.text),
+          h('span', trans('startedStreaming')),
         ]),
       text: n => trans('xStartedStreaming', n.content.streamerName),
     },

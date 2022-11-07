@@ -99,6 +99,7 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
   private val i18nKeys: List[lila.i18n.MessageKey] = List(
     trans.mentionedYouInX,
     trans.xMentionedYouInY,
+    trans.startedStreaming,
     trans.xStartedStreaming,
     trans.invitedYouToX,
     trans.xInvitedYouToY,
