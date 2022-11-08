@@ -52,9 +52,10 @@ final class WebSubscriptionApi(coll: Coll)(implicit ec: scala.concurrent.Executi
           Unwind("subs"),
           ReplaceRootField("subs")
         )
-      }.map(_ flatMap bsonToWebSub)
-      
-  private def bsonToWebSub(doc: Bdoc) = 
+      }
+      .map(_ flatMap bsonToWebSub)
+
+  private def bsonToWebSub(doc: Bdoc) =
     for {
       endpoint <- doc.string("endpoint")
       auth     <- doc.string("auth")

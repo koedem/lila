@@ -50,7 +50,12 @@ final private class NotificationRepo(
   private def matchRecentOrUnreadSince(since: Duration) =
     $or(matchSince(10.minutes), matchUnreadSince(since))
 
-  private def hasFresh(to: User.ID, tpe: String, criteria: ElementProducer, freshnessSelector: Bdoc): Fu[Boolean] =
+  private def hasFresh(
+      to: User.ID,
+      tpe: String,
+      criteria: ElementProducer,
+      freshnessSelector: Bdoc
+  ): Fu[Boolean] =
     coll.exists($doc("notifies" -> to, "content.type" -> tpe, criteria) ++ freshnessSelector)
 
   def exists(notifies: User.ID, selector: Bdoc): Fu[Boolean] =

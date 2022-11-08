@@ -33,13 +33,17 @@ final private class PushApi(
       params: Iterable[(String, String)]
   ): Funit = content match {
     case PrivateMessage(sender, text) =>
-      lightUser(sender) flatMap (_ ?? (luser => privateMessage(to.head, sender, luser.titleName, shorten(text, 57 - 3, "..."))))
+      lightUser(sender) flatMap (_ ?? (luser =>
+        privateMessage(to.head, sender, luser.titleName, shorten(text, 57 - 3, "..."))
+      ))
     case MentionedInThread(mentioner, topic, _, _, postId) =>
       lightUser(mentioner) flatMap (_ ?? (luser => forumMention(to.head, luser.titleName, topic, postId)))
     case StreamStart(streamerId, streamerName) =>
       streamStart(to, streamerId, streamerName)
     case InvitedToStudy(invitedBy, studyName, studyId) =>
-      lightUser(invitedBy) flatMap (_ ?? (luser => invitedToStudy(to.head, luser.titleName, studyName, studyId)))
+      lightUser(invitedBy) flatMap (_ ?? (luser =>
+        invitedToStudy(to.head, luser.titleName, studyName, studyId)
+      ))
     case _ => funit
   }
 
@@ -233,7 +237,8 @@ final private class PushApi(
 
   def invitedToStudy(to: NotifyAllows, invitedBy: String, studyName: String, studyId: String): Funit =
     filterPush(
-      to, _.message,
+      to,
+      _.message,
       PushApi.Data(
         title = studyName,
         body = s"$invitedBy invited you to $studyName",
@@ -241,15 +246,15 @@ final private class PushApi(
         payload = Json.obj(
           "userId" -> to.userId,
           "userData" -> Json.obj(
-            "type" -> "invitedStudy",
+            "type"      -> "invitedStudy",
             "invitedBy" -> invitedBy,
             "studyName" -> studyName,
-            "studyId" -> studyId
+            "studyId"   -> studyId
           )
         )
       )
     )
-    
+
   def challengeCreate(c: Challenge): Funit =
     c.destUser ?? { dest =>
       c.challengerUser.ifFalse(c.hasClock) ?? { challenger =>
@@ -362,7 +367,7 @@ final private class PushApi(
       // cause some complications dealing with prefs when a user turns off streamer device push in preferences.
       // prefs do not currently have hooks to trigger anything when a setting changes.  we'll just do this
       // sequential for now, at least until the first bill from google arrives
-      recips collect { case u if u.device => u.userId } foreach(firebasePush(_, pushData))
+      recips collect { case u if u.device => u.userId } foreach (firebasePush(_, pushData))
     }
   }
 
@@ -374,11 +379,15 @@ final private class PushApi(
       event: NotificationPref.Event,
       data: PushApi.Data
   ): Funit =
-    prefApi.getNotificationPref(userId) flatMap(x => filterPush(NotifyAllows(userId, x.allows(event)), monitor, data))
+    prefApi.getNotificationPref(userId) flatMap (x =>
+      filterPush(NotifyAllows(userId, x.allows(event)), monitor, data)
+    )
 
   private def filterPush(to: NotifyAllows, monitor: MonitorType, data: PushApi.Data): Funit = {
     to.web ?? webPush(to.userId, data).addEffects(res => monitor(lila.mon.push.send)("web", res.isSuccess))
-    to.device ?? firebasePush(to.userId, data).addEffects(res => monitor(lila.mon.push.send)("firebase", res.isSuccess))
+    to.device ?? firebasePush(to.userId, data).addEffects(res =>
+      monitor(lila.mon.push.send)("firebase", res.isSuccess)
+    )
   }
 
   private def describeChallenge(c: Challenge) = {

@@ -13,8 +13,8 @@ private object Stacking {
   case object ChallengeCreate extends Stacking("challengeCreate", "You have $[notif_count] new challenges")
   case object ChallengeAccept
       extends Stacking("challengeAccept", "$[notif_count] players accepted your challenges")
-  case object TourSoon extends Stacking("tourSoon", "$[notif_count] tournaments are starting")
-  case object ForumMention    extends Stacking("forumMention", "You have been mentioned $[notif_count] times")
-  case object StreamStart     extends Stacking("streamStart", "$[notif_count] streamers streaming")
+  case object TourSoon     extends Stacking("tourSoon", "$[notif_count] tournaments are starting")
+  case object ForumMention extends Stacking("forumMention", "You have been mentioned $[notif_count] times")
+  case object StreamStart  extends Stacking("streamStart", "$[notif_count] streamers streaming")
   case object InvitedStudy extends Stacking("invitedStudy", "You have $[notif_count] study invites")
 }

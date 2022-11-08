@@ -247,7 +247,10 @@ object layout {
           viewport,
           metaCsp(csp),
           metaThemeColor,
-          st.headTitle(fullTitle | s"$title • $siteName"),
+          st.headTitle(
+            if (netConfig.isProd) fullTitle | s"$title • lichess.org"
+            else s"${ctx.me.fold("anon")(_.username)} ${fullTitle | s"$title • lichess.dev"}"
+          ),
           cssTag("site"),
           ctx.pref.is3d option cssTag("board-3d"),
           ctx.pageData.inquiry.isDefined option cssTagNoTheme("mod.inquiry"),
@@ -302,7 +305,7 @@ object layout {
             )
           },
           dataDev,
-          dataVapid    := ctx.isAuth option vapidPublicKey,
+          dataVapid    := vapidPublicKey,
           dataUser     := ctx.userId,
           dataSoundSet := ctx.currentSoundSet.toString,
           dataSocketDomains,

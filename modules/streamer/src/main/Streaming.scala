@@ -7,7 +7,7 @@ import play.api.libs.ws.StandaloneWSClient
 
 import scala.concurrent.duration._
 import scala.util.chaining._
-import lila.common.{Bus, LilaScheduler}
+import lila.common.{ Bus, LilaScheduler }
 import lila.common.config.Secret
 import lila.notify.StreamStart
 import lila.relation.SubscriptionRepo

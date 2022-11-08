@@ -108,7 +108,7 @@ private object PrefHandlers {
         "notification",
         default.copy(
           correspondenceEmail = r.getD("corresEmailNotif", false) ?? 1,
-          mention = Allows(r.getD("mention", true) ?? BELL|PUSH)
+          mention = Allows(r.getD("mention", true) ?? BELL | PUSH)
         )
       )
   }
