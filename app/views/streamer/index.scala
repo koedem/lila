@@ -48,6 +48,11 @@ object index:
               cls := s"headline ${if (d.length < 60) "small" else if (d.length < 120) "medium" else "large"}"
             )(d)
           },
+          button(
+            cls := "test-xhr button button-metal",
+            style := "z-index: 4; align-self: flex-start;",
+            formaction := routes.Streamer.testLiveToggle(s.streamer.userId))("toggle online/offline"
+          ),
           div(cls := "services")(
             s.streamer.twitch.map { twitch =>
               div(cls := "service twitch")(twitch.minUrl)

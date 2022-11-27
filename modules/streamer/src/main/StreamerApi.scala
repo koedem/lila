@@ -89,6 +89,14 @@ final class StreamerApi(
       candidateIds <- cache.candidateIds.getUnit
     } yield if (streams.map(_.streamer.id).exists(candidateIds.contains)) cache.candidateIds.invalidateUnit()
 
+  def setOffline(id: Streamer.Id): Funit = {
+    coll.update.one($id(id), $unset("liveAt")) >> {
+      cache.candidateIds.getUnit.map { candidateIds =>
+        cache.candidateIds.invalidateUnit()
+      }
+    }
+  }
+
   def update(prev: Streamer, data: StreamerForm.UserData, asMod: Boolean): Fu[Streamer.ModChange] =
     val streamer = data(prev, asMod)
     coll.update.one($id(streamer.id), streamer) >>-

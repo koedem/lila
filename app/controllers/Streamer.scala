@@ -194,6 +194,13 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env):
       fuccess(Ok)
     }
 
+  def testLiveToggle(streamerId: String) = {
+    OpenBody { implicit ctx =>
+      env.streamer.liveStreamApi.toggleFakeOnline(streamerId)
+      fuccess(Ok)
+    }
+  }
+
   private def AsStreamer(f: StreamerModel.With => Fu[Result])(implicit ctx: Context) =
     ctx.me.fold(notFound) { me =>
       if (StreamerModel.canApply(me) || isGranted(_.Streamers))

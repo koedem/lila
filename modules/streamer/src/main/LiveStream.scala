@@ -79,6 +79,16 @@ final class LiveStreamApi(
       }
   }
   private var userIdsCache = Set.empty[User.ID]
+  
+  def toggleFakeOnline(idGar: String) = {
+    val id = Streamer.Id(idGar)
+    if (streaming.fakeActives contains(id)) {
+      streaming.fakeActives remove id
+    }
+    else {
+      streaming.fakeActives add id
+    }
+  }
 
   def all: Fu[LiveStreams] = cache.getUnit
   // import org.joda.time.DateTime

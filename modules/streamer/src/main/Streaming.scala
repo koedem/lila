@@ -34,6 +34,14 @@ final private class Streaming(
 
   private var liveStreams = LiveStreams(Nil)
 
+  var fakeActives = scala.collection.mutable.Set[Streamer.Id]()
+  case class FakeStream(streamer: Streamer) extends Stream {
+    def serviceName = "fake"
+    val language = "en"
+    val status = "fake stream"
+  }
+
+
   def getLiveStreams: LiveStreams = liveStreams
 
   LilaScheduler(_.Every(15 seconds), _.AtMost(10 seconds), _.Delay(20 seconds)) {
@@ -42,9 +50,9 @@ final private class Streaming(
       activeIds = streamerIds.filter { id =>
         liveStreams.has(id) || isOnline.value(id.value)
       }
-      streamers <- api byIds activeIds
-      (twitchStreams, youTubeStreams) <-
-        twitchApi.fetchStreams(streamers, 0, None) map {
+      streamers <- api byIds (activeIds.union(fakeActives))
+      ((twitchStreams, youTubeStreams), fakeStreams) <-
+        (twitchApi.fetchStreams(streamers, 0, None) map {
           _.collect { case Twitch.TwitchStream(name, title, _, language) =>
             streamers.find { s =>
               s.twitch.exists(_.userId.toLowerCase == name.toLowerCase) && {
@@ -53,10 +61,10 @@ final private class Streaming(
               }
             } map { Twitch.Stream(name, title, _, language) }
           }.flatten
-        } zip fetchYouTubeStreams(streamers)
+        } zip fetchYouTubeStreams(streamers)) zip {(api byIds fakeActives) map (_ map FakeStream.apply)}
       streams = LiveStreams {
         lila.common.ThreadLocalRandom.shuffle {
-          (twitchStreams ::: youTubeStreams) pipe dedupStreamers
+          (twitchStreams ::: youTubeStreams ::: fakeStreams) pipe dedupStreamers
         }
       }
       _ <- api.setLangLiveNow(streams.streams)
@@ -71,7 +79,7 @@ final private class Streaming(
         liveStreams has s.streamer
       } foreach { s =>
         import s.streamer.userId
-        if (!streamStartMemo.get(UserId(userId)))
+        if (true)//!streamStartMemo.get(UserId(userId)))
           streamStartMemo.put(UserId(userId))
           Bus.publish(
             lila.hub.actorApi.streamer.StreamStart(userId),
