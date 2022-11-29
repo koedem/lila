@@ -1,15 +1,16 @@
 package controllers
 
-import play.api.libs.json._
-import play.api.mvc._
-import scala.concurrent.duration._
-import views._
+import play.api.libs.json.*
+import play.api.mvc.*
+import scala.concurrent.duration.*
+import views.*
 
 import lila.api.Context
-import lila.app._
-import lila.streamer.{ Streamer => StreamerModel, StreamerForm }
+import lila.app.{ given, * }
+import lila.streamer.{ Streamer as StreamerModel, StreamerForm }
+import lila.common.Json.given
 
-final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
+final class Streamer(env: Env, apiC: => Api) extends LilaController(env):
 
   private def api = env.streamer.api
 
@@ -61,7 +62,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
     }
   }
 
-  def show(username: String) =
+  def show(username: UserStr) =
     Open { implicit ctx =>
       OptionFuResult(api find username) { s =>
         WithVisibleStreamer(s) {
@@ -73,12 +74,12 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
       }
     }
 
-  def redirect(username: String) =
+  def redirect(username: UserStr) =
     Open { implicit ctx =>
       OptionFuResult(api find username) { s =>
         WithVisibleStreamer(s) {
           env.streamer.liveStreamApi of s map { sws =>
-            Redirect(sws.redirectToLiveUrl | routes.Streamer.show(username).url)
+            Redirect(sws.redirectToLiveUrl | routes.Streamer.show(username.value).url)
           }
         }
       }
@@ -90,7 +91,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
         NoLameOrBot {
           api find me flatMap {
             case None => api.create(me) inject Redirect(routes.Streamer.edit)
-            case _    => Redirect(routes.Streamer.edit).fuccess
+            case _    => Redirect(routes.Streamer.edit).toFuccess
           }
         }
       }
@@ -119,7 +120,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
     AuthBody { implicit ctx => me =>
       AsStreamer { s =>
         env.streamer.liveStreamApi of s flatMap { sws =>
-          implicit val req = ctx.body
+          given play.api.mvc.Request[?] = ctx.body
           StreamerForm
             .userForm(sws.streamer)
             .bindFromRequest()
@@ -143,7 +144,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
                     }
                   else {
                     val next = if (sws.streamer is me) "" else s"?u=${sws.user.id}"
-                    Redirect(s"${routes.Streamer.edit.url}$next").fuccess
+                    Redirect(s"${routes.Streamer.edit.url}$next").toFuccess
                   }
                 }
             )
@@ -161,7 +162,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
   def picture =
     Auth { implicit ctx => _ =>
       AsStreamer { s =>
-        Ok(html.streamer.picture(s)).noCache.fuccess
+        Ok(html.streamer.picture(s)).noCache.toFuccess
       }
     }
 
@@ -175,35 +176,33 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env) {
   def pictureApply =
     AuthBody(parse.multipartFormData) { implicit ctx => me =>
       AsStreamer { s =>
-        ctx.body.body.file("picture") match {
+        ctx.body.body.file("picture") match
           case Some(pic) =>
             ImageRateLimitPerIp(ctx.ip) {
               api.uploadPicture(s.streamer, pic, me) recover { case e: Exception =>
                 BadRequest(html.streamer.picture(s, e.getMessage.some))
               } inject Redirect(routes.Streamer.edit)
             }(rateLimitedFu)
-          case None => Redirect(routes.Streamer.edit).flashFailure.fuccess
-        }
+          case None => Redirect(routes.Streamer.edit).flashFailure.toFuccess
       }
     }
 
   private def AsStreamer(f: StreamerModel.WithUser => Fu[Result])(implicit ctx: Context) =
     ctx.me.fold(notFound) { me =>
       if (StreamerModel.canApply(me) || isGranted(_.Streamers))
-        api.find(get("u").ifTrue(isGranted(_.Streamers)) | me.id) flatMap {
-          _.fold(Ok(html.streamer.bits.create).fuccess)(f)
+        api.find(getUserStr("u").ifTrue(isGranted(_.Streamers)).map(_.id) | me.id) flatMap {
+          _.fold(Ok(html.streamer.bits.create).toFuccess)(f)
         }
       else
         Ok(
           html.site.message("Too soon")(
             scalatags.Text.all.raw("You are not yet allowed to create a streamer profile.")
           )
-        ).fuccess
+        ).toFuccess
     }
 
   private def WithVisibleStreamer(s: StreamerModel.WithUser)(f: Fu[Result])(implicit ctx: Context) =
     ctx.noKid ?? {
-      if (s.streamer.isListed || ctx.me.??(s.streamer.is) || isGranted(_.Admin)) f
+      if (s.streamer.isListed || ctx.me.exists(_ is s.streamer) || isGranted(_.Admin)) f
       else notFound
     }
-}

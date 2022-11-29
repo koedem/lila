@@ -1,11 +1,11 @@
 package lila.ublog
 
 import com.github.blemale.scaffeine.AsyncLoadingCache
-import com.softwaremill.macwire._
-import com.softwaremill.tagging._
-import scala.concurrent.duration._
+import com.softwaremill.macwire.*
+import com.softwaremill.tagging.*
+import scala.concurrent.duration.*
 
-import lila.common.config._
+import lila.common.config.*
 import lila.db.dsl.Coll
 
 @Module
@@ -21,14 +21,14 @@ final class Env(
     settingStore: lila.memo.SettingStore.Builder,
     net: NetConfig,
     askApi: lila.ask.AskApi
-)(implicit
+)(using
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler,
     mat: akka.stream.Materializer,
     mode: play.api.Mode
-) {
+):
 
-  import net.{ assetBaseUrl, baseUrl, domain }
+  export net.{ assetBaseUrl, baseUrl, domain }
 
   private val colls = new UblogColls(db(CollName("ublog_blog")), db(CollName("ublog_post")))
 
@@ -56,6 +56,5 @@ final class Env(
       rank.recomputeRankOfAllPostsOfBlog(UblogBlog.Id.User(userId))
     ()
   }
-}
 
 final private class UblogColls(val blog: Coll, val post: Coll)

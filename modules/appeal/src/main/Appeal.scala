@@ -5,7 +5,7 @@ import org.joda.time.DateTime
 import lila.user.User
 
 case class Appeal(
-    _id: User.ID,
+    _id: UserId,
     msgs: Vector[AppealMsg],
     status: Appeal.Status, // from the moderators POV
     createdAt: DateTime,
@@ -13,15 +13,15 @@ case class Appeal(
     // date of first player message without a mod reply
     // https://github.com/lichess-org/lila/issues/7564
     firstUnrepliedAt: DateTime
-) {
+):
   def id       = _id
   def isRead   = status == Appeal.Status.Read
   def isMuted  = status == Appeal.Status.Muted
   def isUnread = status == Appeal.Status.Unread
 
-  def isAbout(userId: User.ID) = _id == userId
+  def isAbout(userId: UserId) = _id == userId
 
-  def post(text: String, by: User) = {
+  def post(text: String, by: User) =
     val msg = AppealMsg(
       by = by.id,
       text = text,
@@ -38,9 +38,8 @@ case class Appeal(
         if (isByMod(msg) || msgs.lastOption.exists(isByMod) || isRead) DateTime.now
         else firstUnrepliedAt
     )
-  }
 
-  def canAddMsg: Boolean = {
+  def canAddMsg: Boolean =
     val recentWithoutMod = msgs.foldLeft(Vector.empty[AppealMsg]) {
       case (_, msg) if isByMod(msg)                                => Vector.empty
       case (acc, msg) if msg.at isAfter DateTime.now.minusWeeks(1) => acc :+ msg
@@ -48,35 +47,29 @@ case class Appeal(
     }
     val recentSize = recentWithoutMod.foldLeft(0)(_ + _.text.size)
     recentSize < Appeal.maxLength
-  }
 
   def unread     = copy(status = Appeal.Status.Unread)
   def read       = copy(status = Appeal.Status.Read)
   def toggleMute = if (isMuted) read else copy(status = Appeal.Status.Muted)
 
   def isByMod(msg: AppealMsg) = msg.by != id
-}
 
-object Appeal {
+object Appeal:
 
-  sealed trait Status {
-    val key = toString.toLowerCase
-  }
-  object Status {
-    case object Unread extends Status
-    case object Read   extends Status
-    case object Muted  extends Status
+  enum Status:
+    val key = Status.this.toString.toLowerCase
+    case Unread, Read, Muted
+  object Status:
     val all                = List[Status](Unread, Read, Muted)
     def apply(key: String) = all.find(_.key == key)
-  }
 
   case class WithUser(appeal: Appeal, user: User)
 
   val maxLength       = 1100
   val maxLengthClient = 1000
 
-  import play.api.data._
-  import play.api.data.Forms._
+  import play.api.data.*
+  import play.api.data.Forms.*
 
   val form =
     Form[String](
@@ -88,11 +81,11 @@ object Appeal {
       single("text" -> lila.common.Form.cleanNonEmptyText)
     )
 
-  private[appeal] case class SnoozeKey(snoozerId: User.ID, appealId: User.ID) extends lila.memo.Snooze.Key
-}
+  private[appeal] case class SnoozeKey(snoozerId: UserId, appealId: UserId)
+  private[appeal] given UserIdOf[SnoozeKey] = _.snoozerId
 
 case class AppealMsg(
-    by: User.ID,
+    by: UserId,
     text: String,
     at: DateTime
 )

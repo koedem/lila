@@ -2,15 +2,15 @@ package views.html.streamer
 
 import controllers.routes
 import play.api.i18n.Lang
-import lila.api.Context
-import lila.app.templating.Environment._
-import lila.app.ui.ScalatagsTemplate._
+import lila.api.{ Context, given }
+import lila.app.templating.Environment.{ given, * }
+import lila.app.ui.ScalatagsTemplate.{ *, given }
 import lila.i18n.LangList
 import lila.user.User
 
-object bits {
+object bits:
 
-  import trans.streamer._
+  import trans.streamer.*
 
   def create(implicit ctx: Context) =
     views.html.site.message(
@@ -55,20 +55,14 @@ object bits {
       a(href := "/about")(downloadKit())
     )
 
-  def redirectLink(username: String, isStreaming: Option[Boolean] = None) =
-    isStreaming match {
-      case Some(false) => a(href := routes.Streamer.show(username))
-      case _ =>
-        a(
-          href := routes.Streamer.redirect(username),
-          targetBlank,
-          noFollow
-        )
-    }
+  def redirectLink(username: UserStr, isStreaming: Option[Boolean] = None) =
+    isStreaming match
+      case Some(false) => a(href := routes.Streamer.show(username.value))
+      case _           => a(href := routes.Streamer.redirect(username.value), targetBlank, noFollow)
 
   def liveStreams(l: lila.streamer.LiveStreams.WithTitles): Frag =
     l.live.streams.map { s =>
-      redirectLink(s.streamer.id.value)(
+      redirectLink(s.streamer.id into UserStr)(
         cls   := "stream highlight",
         title := s.status
       )(
@@ -78,7 +72,7 @@ object bits {
       )
     }
 
-  def contextual(userId: User.ID)(implicit lang: Lang): Frag =
+  def contextual(userId: UserId)(implicit lang: Lang): Frag =
     redirectLink(userId)(cls := "context-streamer text", dataIcon := "")(
       xIsStreaming(titleNameOrId(userId))
     )
@@ -108,4 +102,3 @@ object bits {
         span(cls := "streamer-lang")(LangList nameByStr language)
       }
     )
-}

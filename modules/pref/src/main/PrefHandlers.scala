@@ -1,17 +1,17 @@
 package lila.pref
 
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 
 import lila.db.BSON
-import lila.db.dsl._
+import lila.db.dsl.{ given, * }
 
-private object PrefHandlers {
+private object PrefHandlers:
 
-  implicit val prefBSONHandler = new BSON[Pref] {
+  given BSONDocumentHandler[Pref] = new BSON[Pref]:
 
     def reads(r: BSON.Reader): Pref =
       Pref(
-        _id = r str "_id",
+        _id = r.get[UserId]("_id"),
         bg = r.getD("bg", Pref.default.bg),
         bgImg = r.strO("bgImg"),
         is3d = r.getD("is3d", Pref.default.is3d),
@@ -100,5 +100,3 @@ private object PrefHandlers {
         "agreement"        -> o.agreement,
         "tags"             -> o.tags
       )
-  }
-}

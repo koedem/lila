@@ -1,32 +1,30 @@
 package lila.user
 
-import lila.db.dsl._
+import lila.db.dsl.{ *, given }
 import org.joda.time.DateTime
 
 case class Note(
     _id: String,
-    from: User.ID,
-    to: User.ID,
+    from: UserId,
+    to: UserId,
     text: String,
     mod: Boolean,
     dox: Boolean,
     date: DateTime
-) {
+):
   def userIds            = List(from, to)
   def isFrom(user: User) = user.id == from
-}
 
 final class NoteApi(
     userRepo: UserRepo,
     coll: Coll
-)(implicit
+)(using
     ec: scala.concurrent.ExecutionContext,
     ws: play.api.libs.ws.StandaloneWSClient
-) {
+):
 
-  import reactivemongo.api.bson._
-  import lila.db.BSON.jodaDateTimeHandler
-  implicit private val noteBSONHandler = Macros.handler[Note]
+  import reactivemongo.api.bson.*
+  private given BSONDocumentHandler[Note] = Macros.handler[Note]
 
   def get(user: User, me: User, isMod: Boolean): Fu[List[Note]] =
     coll
@@ -45,14 +43,14 @@ final class NoteApi(
       .cursor[Note]()
       .list(20)
 
-  def byUserForMod(id: User.ID): Fu[List[Note]] =
+  def byUserForMod(id: UserId): Fu[List[Note]] =
     coll
       .find($doc("to" -> id, "mod" -> true))
       .sort($sort desc "date")
       .cursor[Note]()
       .list(50)
 
-  def byUsersForMod(ids: List[User.ID]): Fu[List[Note]] =
+  def byUsersForMod(ids: List[UserId]): Fu[List[Note]] =
     coll
       .find($doc("to" $in ids, "mod" -> true))
       .sort($sort desc "date")
@@ -97,4 +95,3 @@ final class NoteApi(
   def byId(id: String): Fu[Option[Note]] = coll.byId[Note](id)
 
   def delete(id: String) = coll.delete.one($id(id))
-}

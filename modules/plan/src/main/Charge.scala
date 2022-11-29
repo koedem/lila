@@ -1,23 +1,23 @@
 package lila.plan
 
 import org.joda.time.DateTime
-import cats.implicits._
+import cats.implicits.*
 
 import lila.user.User
 
 case class Charge(
     _id: String, // random
-    userId: Option[User.ID],
-    giftTo: Option[User.ID] = none,
+    userId: Option[UserId],
+    giftTo: Option[UserId] = none,
     stripe: Option[Charge.Stripe] = none,
     payPal: Option[Charge.PayPalLegacy] = none,
     payPalCheckout: Option[Charge.PayPalCheckout] = none,
     money: Money,
     usd: Usd,
     date: DateTime
-) {
+):
 
-  def id = _id
+  inline def id = _id
 
   def isPayPalLegacy   = payPal.nonEmpty
   def isPayPalCheckout = payPalCheckout.nonEmpty
@@ -30,13 +30,12 @@ case class Charge(
     else "???"
 
   def toGift = (userId, giftTo) mapN { Charge.Gift(_, _, date) }
-}
 
-object Charge {
+object Charge:
 
   def make(
-      userId: Option[User.ID],
-      giftTo: Option[User.ID],
+      userId: Option[UserId],
+      giftTo: Option[UserId],
       stripe: Option[Charge.Stripe] = none,
       payPal: Option[Charge.PayPalLegacy] = none,
       payPalCheckout: Option[Charge.PayPalCheckout] = none,
@@ -63,9 +62,9 @@ object Charge {
   case class PayPalLegacy(
       ip: Option[String],
       name: Option[String],
-      email: Option[String],
+      email: Option[Patron.PayPalLegacy.Email],
       txnId: Option[String],
-      subId: Option[String]
+      subId: Option[Patron.PayPalLegacy.SubId]
   )
 
   case class PayPalCheckout(
@@ -74,5 +73,4 @@ object Charge {
       subscriptionId: Option[PayPalSubscriptionId]
   )
 
-  case class Gift(from: User.ID, to: User.ID, date: DateTime)
-}
+  case class Gift(from: UserId, to: UserId, date: DateTime)

@@ -1,40 +1,36 @@
 package lila.msg
 
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 
 import lila.user.User
-import lila.db.dsl._
+import lila.db.dsl.{ *, given }
 import lila.db.BSON
 
-private object BsonHandlers {
+private object BsonHandlers:
 
   import Msg.Last
-  implicit val msgContentHandler = Macros.handler[Last]
+  given BSONDocumentHandler[Last] = Macros.handler
 
-  implicit val threadIdHandler = stringAnyValHandler[MsgThread.Id](_.value, MsgThread.Id.apply)
-
-  implicit val threadHandler = new BSON[MsgThread] {
+  given threadHandler: BSON[MsgThread] with
     def reads(r: BSON.Reader) =
-      r.strsD("users") match {
+      r.strsD("users") match
         case List(u1, u2) =>
           MsgThread(
             id = r.get[MsgThread.Id]("_id"),
-            user1 = u1,
-            user2 = u2,
+            user1 = UserId(u1),
+            user2 = UserId(u2),
             lastMsg = r.get[Last]("lastMsg")
           )
         case x => sys error s"Invalid MsgThread users: $x"
-      }
     def writes(w: BSON.Writer, t: MsgThread) =
       $doc(
         "_id"     -> t.id,
-        "users"   -> t.users.sorted,
+        "users"   -> t.users.sorted(using stringOrdering),
         "lastMsg" -> t.lastMsg
       )
-  }
 
-  implicit val msgIdHandler = stringAnyValHandler[Msg.Id](_.value, Msg.Id.apply)
-  implicit val msgHandler   = Macros.handler[Msg]
+  // given BSONHandler[Msg.Id]                  = stringAnyValHandler[Msg.Id](_.value, Msg.Id.apply)
+  given msgHandler: BSONDocumentHandler[Msg] = Macros.handler
 
   def writeMsg(msg: Msg, threadId: MsgThread.Id): Bdoc =
     msgHandler.writeTry(msg).get ++ $doc(
@@ -42,6 +38,5 @@ private object BsonHandlers {
       "tid" -> threadId
     )
 
-  def writeThread(thread: MsgThread, delBy: List[User.ID]): Bdoc =
+  def writeThread(thread: MsgThread, delBy: List[UserId]): Bdoc =
     threadHandler.writeTry(thread).get ++ $doc("del" -> delBy)
-}

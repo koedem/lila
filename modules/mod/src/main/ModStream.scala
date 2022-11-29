@@ -1,12 +1,13 @@
 package lila.mod
 
-import akka.stream.scaladsl._
-import play.api.libs.json._
+import akka.stream.scaladsl.*
+import play.api.libs.json.*
 
 import lila.common.{ Bus, HTTPRequest }
+import lila.common.Json.given
 import lila.security.UserSignup
 
-final class ModStream {
+final class ModStream:
 
   private val classifier = "userSignup"
 
@@ -28,7 +29,7 @@ final class ModStream {
         s"${Json.stringify(js)}\n"
       }
 
-  def apply(): Source[String, _] =
+  def apply(): Source[String, ?] =
     blueprint mapMaterializedValue { queue =>
       val sub = Bus.subscribeFun(classifier) { case signup: UserSignup =>
         queue.offer(signup).unit
@@ -38,4 +39,3 @@ final class ModStream {
         Bus.unsubscribe(sub, classifier)
       }
     }
-}

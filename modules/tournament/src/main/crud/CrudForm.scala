@@ -2,22 +2,22 @@ package lila.tournament
 package crud
 
 import org.joda.time.DateTime
-import play.api.data._
-import play.api.data.Forms._
+import play.api.data.*
+import play.api.data.Forms.*
 
 import chess.variant.Variant
-import lila.common.Form._
+import lila.common.Form.*
 import chess.format.FEN
 
-final class CrudForm(repo: TournamentRepo) {
+final class CrudForm(repo: TournamentRepo):
 
-  import CrudForm._
-  import TournamentForm._
-  import lila.common.Form.UTCDate._
+  import CrudForm.*
+  import TournamentForm.*
+  import lila.common.Form.UTCDate.*
 
   def apply(tour: Option[Tournament]) = Form(
     mapping(
-      "id"             -> id(8, tour.map(_.id))(repo.exists),
+      "id"             -> id[TourId](8, tour.map(_.id))(repo.exists),
       "name"           -> text(minLength = 3, maxLength = 40),
       "homepageHours"  -> number(min = 0, max = maxHomepageHours),
       "clockTime"      -> numberInDouble(clockTimeChoices),
@@ -34,7 +34,7 @@ final class CrudForm(repo: TournamentRepo) {
       "streakable"     -> boolean,
       "teamBattle"     -> boolean,
       "hasChat"        -> boolean
-    )(Data.apply)(Data.unapply)
+    )(Data.apply)(unapply)
       .verifying("Invalid clock", _.validClock)
       .verifying("Increase tournament duration, or decrease game clock", _.validTiming)
   ) fill Data(
@@ -56,14 +56,13 @@ final class CrudForm(repo: TournamentRepo) {
     teamBattle = false,
     hasChat = true
   )
-}
 
-object CrudForm {
+object CrudForm:
 
   val maxHomepageHours = 24
 
   case class Data(
-      id: String,
+      id: TourId,
       name: String,
       homepageHours: Int,
       clockTime: Double,
@@ -80,7 +79,7 @@ object CrudForm {
       streakable: Boolean,
       teamBattle: Boolean,
       hasChat: Boolean
-  ) {
+  ):
 
     def realVariant = Variant orDefault variant
 
@@ -91,11 +90,9 @@ object CrudForm {
     def validTiming = (minutes * 60) >= (3 * estimatedGameDuration)
 
     private def estimatedGameDuration = 60 * clockTime + 30 * clockIncrement
-  }
 
   val imageChoices = List(
     ""                    -> "Lichess",
     "offerspill.logo.png" -> "Offerspill"
   )
   val imageDefault = ""
-}

@@ -1,42 +1,41 @@
 package lila.swiss
 
-import akka.stream.scaladsl._
-import BsonHandlers._
-import com.softwaremill.tagging._
+import akka.stream.scaladsl.*
+import BsonHandlers.given
 import org.joda.time.DateTime
 import reactivemongo.akkastream.cursorProducer
 import reactivemongo.api.ReadPreference
 
-import lila.db.dsl._
+import lila.db.dsl.{ *, given }
 
-private case class SwissSheet(outcomes: List[SwissSheet.Outcome]) {
-  import SwissSheet._
+private case class SwissSheet(outcomes: List[SwissSheet.Outcome]):
+  import SwissSheet.*
 
-  def points =
-    Swiss.Points {
-      outcomes.foldLeft(0) { case (acc, out) => acc + pointsFor(out) }
-    }
-}
+  def points = SwissPoints fromDouble {
+    outcomes.foldLeft(0) { case (acc, out) => acc + pointsFor(out).doubled }
+  }
 
-private object SwissSheet {
+private object SwissSheet:
 
-  sealed trait Outcome
-  case object Bye         extends Outcome
-  case object Late        extends Outcome // missed the first round
-  case object Absent      extends Outcome
-  case object Ongoing     extends Outcome
-  case object Win         extends Outcome
-  case object Loss        extends Outcome
-  case object Draw        extends Outcome
-  case object ForfeitLoss extends Outcome
-  case object ForfeitWin  extends Outcome
+  enum Outcome:
+    case Bye
+    case Late // missed the first round
+    case Absent
+    case Ongoing
+    case Win
+    case Loss
+    case Draw
+    case ForfeitLoss
+    case ForfeitWin
 
-  def pointsFor(outcome: Outcome) =
-    outcome match {
+  import Outcome.*
+
+  def pointsFor(outcome: Outcome) = SwissPoints fromDouble {
+    outcome match
       case Win | Bye | ForfeitWin => 2
       case Late | Draw            => 1
       case _                      => 0
-    }
+  }
 
   def many(
       swiss: Swiss,
@@ -49,51 +48,47 @@ private object SwissSheet {
 
   def one(
       swiss: Swiss,
-      pairingMap: Map[SwissRound.Number, SwissPairing],
+      pairingMap: Map[SwissRoundNumber, SwissPairing],
       player: SwissPlayer
   ): SwissSheet =
     SwissSheet {
       swiss.allRounds.map { round =>
-        pairingMap get round match {
+        pairingMap get round match
           case Some(pairing) =>
-            pairing.status match {
+            pairing.status match
               case Left(_)     => Ongoing
               case Right(None) => Draw
               case Right(Some(color)) if pairing.isForfeit =>
                 if (pairing(color) == player.userId) ForfeitWin else ForfeitLoss
               case Right(Some(color)) => if (pairing(color) == player.userId) Win else Loss
-            }
           case None if player.byes(round) => Bye
           case None if round.value == 1   => Late
           case None                       => Absent
-        }
       }
     }
 
-}
-
-final private class SwissSheetApi(playerColl: Coll @@ PlayerColl, pairingColl: Coll @@ PairingColl)(implicit
+final private class SwissSheetApi(mongo: SwissMongo)(using
     ec: scala.concurrent.ExecutionContext,
     mat: akka.stream.Materializer
-) {
+):
 
   def source(
       swiss: Swiss,
       sort: Bdoc
-  ): Source[(SwissPlayer, Map[SwissRound.Number, SwissPairing], SwissSheet), _] = {
+  ): Source[(SwissPlayer, Map[SwissRoundNumber, SwissPairing], SwissSheet), ?] =
     val readPreference =
       if (swiss.finishedAt.exists(_ isBefore DateTime.now.minusSeconds(10)))
-        ReadPreference.secondaryPreferred
+        temporarilyPrimary
       else ReadPreference.primary
     SwissPlayer
       .fields { f =>
-        playerColl.find($doc(f.swissId -> swiss.id)).sort(sort)
+        mongo.player.find($doc(f.swissId -> swiss.id)).sort(sort)
       }
       .cursor[SwissPlayer](readPreference)
       .documentSource()
       .mapAsync(4) { player =>
         SwissPairing.fields { f =>
-          pairingColl.list[SwissPairing](
+          mongo.pairing.list[SwissPairing](
             $doc(f.swissId -> swiss.id, f.players -> player.userId),
             readPreference
           ) dmap { player -> _ }
@@ -105,5 +100,3 @@ final private class SwissSheetApi(playerColl: Coll @@ PlayerColl, pairingColl: C
         }.toMap
         (player, pairingMap, SwissSheet.one(swiss, pairingMap, player))
       }
-  }
-}
