@@ -9,7 +9,7 @@ case class Ask(
     question: String,
     choices: Ask.Choices,
     tags: Ask.Tags,
-    creator: User.ID,
+    creator: UserId,
     createdAt: DateTime,
     answer: Option[String],
     footer: Option[String], // reveal text for quizzes or optional text prompt for feedbacks
@@ -34,7 +34,7 @@ case class Ask(
       else dbAsk.copy(tags = tags)
     else copy(url = dbAsk.url) // discard votes & feedback
 
-  def participants: Seq[User.ID] =
+  def participants: Seq[UserId] =
     picks match {
       case Some(p) => p.keys.toSeq
       case None    => Nil
@@ -49,26 +49,26 @@ case class Ask(
   def isStretch: Boolean   = tags.exists(_ startsWith "stretch")
   def isFeedback: Boolean  = tags contains "feedback"
 
-  def hasPickFor(uid: User.ID): Boolean = picks exists (_ contains uid)
-  def firstPickFor(uid: User.ID): Option[Int] =
+  def hasPickFor(uid: UserId): Boolean = picks exists (_ contains uid)
+  def firstPickFor(uid: UserId): Option[Int] =
     picks flatMap (_ get uid flatMap (_ headOption))
 
-  def rankingFor(uid: User.ID): Option[IndexedSeq[Int]] =
+  def rankingFor(uid: UserId): Option[IndexedSeq[Int]] =
     picks flatMap (_ get uid)
 
-  def hasFeedbackFor(uid: User.ID): Boolean     = feedback exists (_ contains uid)
-  def feedbackFor(uid: User.ID): Option[String] = feedback flatMap (_ get uid)
+  def hasFeedbackFor(uid: UserId): Boolean     = feedback exists (_ contains uid)
+  def feedbackFor(uid: UserId): Option[String] = feedback flatMap (_ get uid)
 
   def count(choice: Int): Int    = picks.fold(0)(_.values.count(_.headOption contains choice))
   def count(choice: String): Int = count(choices indexOf choice)
 
-  def whoPicked(choice: String): List[User.ID] = whoPicked(choices indexOf choice)
-  def whoPicked(choice: Int): List[User.ID] =
+  def whoPicked(choice: String): List[UserId] = whoPicked(choices indexOf choice)
+  def whoPicked(choice: Int): List[UserId] =
     picks getOrElse (Nil) collect {
       case (uid, ls) if ls.headOption contains choice => uid
     } toList
 
-  def whoPickedAt(choice: Int, rank: Int): List[User.ID] =
+  def whoPickedAt(choice: Int, rank: Int): List[UserId] =
     picks getOrElse (Nil) collect {
       case (uid, ls) if ls.indexOf(choice) == rank => uid
     } toList
@@ -117,15 +117,15 @@ object Ask {
   type ID       = String
   type Tags     = Set[String]
   type Choices  = Vector[String]
-  type Picks    = Map[User.ID, Vector[Int]] // ranked list of indices into Choices
-  type Feedback = Map[User.ID, String]
+  type Picks    = Map[UserId, Vector[Int]] // ranked list of indices into Choices
+  type Feedback = Map[UserId, String]
 
   def make(
       _id: Option[String],
       question: String,
       choices: Choices,
       tags: Tags,
-      creator: User.ID,
+      creator: UserId,
       answer: Option[String],
       footer: Option[String]
   ) =

@@ -3,7 +3,7 @@ package lila.ask
 import scala.collection.mutable
 
 import reactivemongo.api.bson._
-import lila.db.dsl._
+import lila.db.dsl.{ *, given }
 import lila.hub.actorApi.timeline.{ AskConcluded, Propagate }
 import lila.user.User
 
@@ -21,30 +21,32 @@ final class AskApi(
     //picksDb: lila.db.AsyncColl,
     //feedbackDb: lila.db.AsyncColl,
     timeline: lila.hub.actors.Timeline
-)(implicit ec: scala.concurrent.ExecutionContext) {
+)(using ec: scala.concurrent.ExecutionContext) {
 
   import AskApi._
 
-  implicit val AskBSONHandler: BSONDocumentHandler[Ask] = Macros.handler[Ask]
+  given AskBSONHandler: BSONDocumentHandler[Ask] = Macros.handler[Ask]
 
   def get(id: Ask.ID): Fu[Option[Ask]] = askDb { coll =>
     coll.byId[Ask](id)
   }
 
-  def setPicks(id: Ask.ID, uid: User.ID, ranking: Option[List[Int]]): Fu[Option[Ask]] =
+  def setPicks(id: Ask.ID, uid: UserId, ranking: Option[List[Int]]): Fu[Option[Ask]] =
     update(id, ranking.fold($unset(s"picks.$uid"))(r => $set(s"picks.$uid" -> r)))
 
-  def unset(id: Ask.ID, uid: User.ID): Fu[Option[Ask]] =
+  def unset(id: Ask.ID, uid: UserId): Fu[Option[Ask]] =
     update(id, $unset(s"feedback.$uid", s"picks.$uid"))
 
-  def setFeedback(id: Ask.ID, uid: User.ID, feedback: Option[String]): Fu[Option[Ask]] =
+  def setFeedback(id: Ask.ID, uid: UserId, feedback: Option[String]): Fu[Option[Ask]] =
     update(id, feedback.fold($unset(s"feedback.$uid"))(f => $set(s"feedback.$uid" -> f)))
 
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
   def conclude(id: Ask.ID): Fu[Option[Ask]] =
-    askDb { coll =>
-      coll.ext.findAndUpdate[Ask]($id(id), $addToSet("tags" -> "concluded"), fetchNewObject = true) collect {
+    askDb { coll => 
+      coll.findAndUpdate($id(id), $addToSet("tags" -> "concluded"), fetchNewObject = true) map {
+        _.value flatMap implicitly[BSONDocumentReader[Ask]].readOpt
+      } collect {
         case Some(ask) =>
           timeline ! Propagate(AskConcluded(ask.creator, ask.question, ~ask.url))
             .toUsers(ask.participants.toList)
@@ -57,11 +59,13 @@ final class AskApi(
 
   def reset(id: Ask.ID): Fu[Option[Ask]] = 
     askDb { coll =>
-      coll.ext.findAndUpdate[Ask]($id(id), $doc($unset("picks"), $pull("tags"->"concluded")), fetchNewObject = true)
+      coll.findAndUpdate($id(id), $doc($unset("picks"), $pull("tags"->"concluded")), fetchNewObject = true) map {
+        _.value flatMap implicitly[BSONDocumentReader[Ask]].readOpt
+      }
     }
 
 
-  def byUser(uid: User.ID): Fu[List[Ask]] = askDb { coll =>
+  def byUser(uid: UserId): Fu[List[Ask]] = askDb { coll =>
     coll.find($doc("creator" -> uid)).sort($sort desc "createdAt").cursor[Ask]().list(1000)
   }
 
@@ -145,11 +149,13 @@ final class AskApi(
       update: BSONDocument
   ): Fu[Option[Ask]] =
     askDb { coll =>
-      coll.ext.findAndUpdate[Ask](
+      coll.findAndUpdate(
         selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
         update = update,
         fetchNewObject = true
-      ) flatMap {
+      )  map {
+        _.value flatMap implicitly[BSONDocumentReader[Ask]].readOpt
+      } flatMap {
         case None => get(id) // in case it's concluded, look it up for the xhr response
         case ask  => fuccess(ask)
       }
