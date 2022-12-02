@@ -47,16 +47,16 @@ case class LiveStreams(streams: List[Stream]):
         .toMap
     )
 
-  def excludeUsers(userIds: List[User.ID]) =
+  def excludeUsers(userIds: List[UserId]) =
     copy(
       streams = streams.filterNot(s => userIds contains s.streamer.userId)
     )
 
 object LiveStreams:
 
-  case class WithTitles(live: LiveStreams, titles: Map[User.ID, UserTitle]):
+  case class WithTitles(live: LiveStreams, titles: Map[UserId, UserTitle]):
     def titleName(s: Stream) = s"${titles.get(s.streamer.userId).fold("")(_.value + " ")}${s.streamer.name}"
-    def excludeUsers(userIds: List[User.ID]) =
+    def excludeUsers(userIds: List[UserId]) =
       copy(
         live = live excludeUsers userIds
       )
@@ -78,10 +78,10 @@ final class LiveStreamApi(
         }
       }
   }
-  private var userIdsCache = Set.empty[User.ID]
+  private var userIdsCache = Set.empty[UserId]
   
-  def toggleFakeOnline(idGar: String) = {
-    val id = Streamer.Id(idGar)
+  def toggleFakeOnline(idGar: UserId) = {
+    val id = Streamer.Id(idGar.value)
     if (streaming.fakeActives contains(id)) {
       streaming.fakeActives remove id
     }
@@ -126,11 +126,11 @@ final class LiveStreamApi(
   //     )
   //   )
 
-  def of(s: Streamer.With): Fu[Streamer.WithUserAndStream] =
+  def of(s: Streamer.Context): Fu[Streamer.WithUserAndStream] =
     all.map { live =>
       Streamer.WithUserAndStream(s.streamer, s.user, live get s.streamer)
     }
-  def userIds                                       = userIdsCache
-  def isStreaming(userId: User.ID)                  = userIdsCache contains userId
-  def one(userId: User.ID): Fu[Option[Stream]]      = all.map(_.streams.find(_ is userId))
-  def many(userIds: Seq[User.ID]): Fu[List[Stream]] = all.map(_.streams.filter(s => userIds.exists(s.is)))
+  def userIds                                      = userIdsCache
+  def isStreaming(userId: UserId)                  = userIdsCache contains userId
+  def one(userId: UserId): Fu[Option[Stream]]      = all.map(_.streams.find(_ is userId))
+  def many(userIds: Seq[UserId]): Fu[List[Stream]] = all.map(_.streams.filter(s => userIds.exists(s.is)))

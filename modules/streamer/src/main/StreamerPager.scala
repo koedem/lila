@@ -18,9 +18,9 @@ final class StreamerPager(
   def get(
       page: Int,
       live: LiveStreams,
-      forUser: Option[User.ID],
+      forUser: Option[UserId],
       requests: Boolean
-  ): Fu[Paginator[Streamer.With]] = Paginator(
+  ): Fu[Paginator[Streamer.Context]] = Paginator(
     currentPage = page,
     maxPerPage = maxPerPage,
     adapter = if (requests) approval else notLive(live, forUser)
@@ -32,12 +32,12 @@ final class StreamerPager(
     "_id"
   )
 
-  private def notLive(live: LiveStreams, forUser: Option[User.ID]): AdapterLike[Streamer.With] =
-    new AdapterLike[Streamer.With]:
+  private def notLive(live: LiveStreams, forUser: Option[UserId]): AdapterLike[Streamer.Context] =
+    new AdapterLike[Streamer.Context]:
 
       def nbResults: Fu[Int] = fuccess(1000)
 
-      def slice(offset: Int, length: Int): Fu[Seq[Streamer.With]] =
+      def slice(offset: Int, length: Int): Fu[Seq[Streamer.Context]] =
         coll
           .aggregateList(length, readPreference = ReadPreference.secondaryPreferred) { framework =>
             import framework._
@@ -68,7 +68,7 @@ final class StreamerPager(
                   foreign = "s"
                 )
               ),
-              AddFields($doc("subscribed" -> $doc("$in" -> List(~forUser, "$subs.u"))))
+              AddFields($doc("subscribed" -> $doc("$in" -> List(forUser.??(_.toString), "$subs.u"))))
             )
           }
           .map { docs =>
@@ -80,13 +80,13 @@ final class StreamerPager(
             } yield Streamer.WithUser(streamer, user, subscribed)
           }
 
-  private def approval: AdapterLike[Streamer.With] = new AdapterLike[Streamer.With]:
+  private def approval: AdapterLike[Streamer.Context] = new AdapterLike[Streamer.Context]:
 
     private def selector = $doc("approval.requested" -> true, "approval.ignored" -> false)
 
     def nbResults: Fu[Int] = coll.countSel(selector)
 
-    def slice(offset: Int, length: Int): Fu[Seq[Streamer.With]] =
+    def slice(offset: Int, length: Int): Fu[Seq[Streamer.Context]] =
       coll
         .aggregateList(length, ReadPreference.secondaryPreferred) { framework =>
           import framework._

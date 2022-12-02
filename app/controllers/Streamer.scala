@@ -62,7 +62,7 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env):
     }
   }
 
-  def show(username: String) =
+  def show(username: UserStr) =
     Open { implicit ctx =>
       OptionFuResult(api find username) { s =>
         WithVisibleStreamer(s) {
@@ -74,12 +74,12 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env):
       }
     }
 
-  def redirect(username: String) =
+  def redirect(username: UserStr) =
     Open { implicit ctx =>
       OptionFuResult(api find username) { s =>
         WithVisibleStreamer(s) {
           env.streamer.liveStreamApi of s map { sws =>
-            Redirect(sws.redirectToLiveUrl | routes.Streamer.show(username).url)
+            Redirect(sws.redirectToLiveUrl | routes.Streamer.show(username.value).url)
           }
         }
       }
@@ -187,24 +187,24 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env):
       }
     }
 
-  def subscribe(streamerId: String, set: Boolean) =
+  def subscribe(streamer: UserStr, set: Boolean) =
     AuthBody { implicit ctx => me =>
-      if (set) env.relation.subs.subscribe(me.id, streamerId)
-      else env.relation.subs.unsubscribe(me.id, streamerId)
+      if (set) env.relation.subs.subscribe(me.id, streamer.id)
+      else env.relation.subs.unsubscribe(me.id, streamer.id)
       fuccess(Ok)
     }
 
-  def testLiveToggle(streamerId: String) = {
+  def testLiveToggle(streamerId: UserStr) = {
     OpenBody { implicit ctx =>
-      env.streamer.liveStreamApi.toggleFakeOnline(streamerId)
+      env.streamer.liveStreamApi.toggleFakeOnline(streamerId.id)
       fuccess(Ok)
     }
   }
 
-  private def AsStreamer(f: StreamerModel.With => Fu[Result])(implicit ctx: Context) =
+  private def AsStreamer(f: StreamerModel.Context => Fu[Result])(implicit ctx: Context) =
     ctx.me.fold(notFound) { me =>
       if (StreamerModel.canApply(me) || isGranted(_.Streamers))
-        api.find(get("u").ifTrue(isGranted(_.Streamers)) | me.id) flatMap {
+        api.find(getUserStr("u").ifTrue(isGranted(_.Streamers)).map(_.id) | me.id) flatMap {
           _.fold(Ok(html.streamer.bits.create).toFuccess)(f)
         }
       else
@@ -215,8 +215,8 @@ final class Streamer(env: Env, apiC: => Api) extends LilaController(env):
         ).toFuccess
     }
 
-  private def WithVisibleStreamer(s: StreamerModel.With)(f: Fu[Result])(implicit ctx: Context) =
+  private def WithVisibleStreamer(s: StreamerModel.Context)(f: Fu[Result])(implicit ctx: Context) =
     ctx.noKid ?? {
-      if (s.streamer.isListed || ctx.me.??(s.streamer.is) || isGranted(_.Admin)) f
+      if (s.streamer.isListed || ctx.me.exists(_ is s.streamer) || isGranted(_.Admin)) f
       else notFound
     }

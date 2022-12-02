@@ -13,7 +13,7 @@ import scalatags.Text.Frag
 import lila.api.{ BodyContext, Context, HeaderContext, PageData }
 import lila.app.{ *, given }
 import lila.common.{ ApiVersion, HTTPRequest, Nonce }
-import lila.i18n.I18nLangPicker
+import lila.i18n.{ I18nKey, I18nLangPicker }
 import lila.oauth.{ OAuthScope, OAuthServer }
 import lila.security.{ AppealUser, FingerPrintedUser, Granter, Permission }
 import lila.user.{ Holder, User as UserModel, UserContext }
@@ -344,7 +344,7 @@ abstract private[controllers] class LilaController(val env: Env)
         )
       }
     }
-  protected def NoPlayban(userId: Option[UserModel.ID])(a: => Fu[Result]): Fu[Result] =
+  protected def NoPlayban(userId: Option[UserId])(a: => Fu[Result]): Fu[Result] =
     userId.??(env.playban.api.currentBan) flatMap {
       _.fold(a)(playbanJsonError)
     }
@@ -549,7 +549,7 @@ abstract private[controllers] class LilaController(val env: Env)
           val enabledId = me.enabled option me.id
           enabledId.??(env.team.api.nbRequests) zip
             enabledId.??(env.challenge.api.countInFor.get) zip
-            enabledId.??(id => env.notifyM.api.unreadCount(UserId(id))) zip
+            enabledId.??(env.notifyM.api.unreadCount) zip
             env.mod.inquiryApi.forMod(me)
         else
           fuccess {
@@ -645,7 +645,7 @@ abstract private[controllers] class LilaController(val env: Env)
         .mapValues { errors =>
           JsArray {
             errors.map { e =>
-              JsString(lila.i18n.Translator.txt.literal(e.message, e.args, lang))
+              JsString(lila.i18n.Translator.txt.literal(I18nKey(e.message), e.args, lang))
             }
           }
         }
@@ -689,12 +689,13 @@ abstract private[controllers] class LilaController(val env: Env)
     Open { ctx =>
       if (ctx.isAuth) redirectWithQueryString(path)(ctx.req).toFuccess
       else
+        import I18nLangPicker.ByHref
         I18nLangPicker.byHref(langCode, ctx.req) match
-          case I18nLangPicker.NotFound => notFound(ctx)
-          case I18nLangPicker.Redir(code) =>
+          case ByHref.NotFound => notFound(ctx)
+          case ByHref.Redir(code) =>
             redirectWithQueryString(s"/$code${~path.some.filter("/" !=)}")(ctx.req).toFuccess
-          case I18nLangPicker.Refused(_) => redirectWithQueryString(path)(ctx.req).toFuccess
-          case I18nLangPicker.Found(lang) =>
+          case ByHref.Refused(_) => redirectWithQueryString(path)(ctx.req).toFuccess
+          case ByHref.Found(lang) =>
             val langCtx = ctx withLang lang
             pageHit(langCtx)
             f(langCtx)

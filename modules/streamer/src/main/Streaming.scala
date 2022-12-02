@@ -7,6 +7,7 @@ import play.api.libs.ws.DefaultBodyReadables.*
 import play.api.libs.ws.StandaloneWSClient
 import scala.concurrent.duration.*
 import scala.util.chaining.*
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.common.{ Bus, LilaScheduler }
 import lila.common.config.Secret
@@ -48,7 +49,7 @@ final private class Streaming(
     for {
       streamerIds <- api.allListedIds
       activeIds = streamerIds.filter { id =>
-        liveStreams.has(id) || isOnline.value(id.value)
+        liveStreams.has(id) || isOnline.value(id.userId)
       }
       streamers <- api byIds (activeIds.union(fakeActives))
       ((twitchStreams, youTubeStreams), fakeStreams) <-
@@ -63,7 +64,7 @@ final private class Streaming(
           }.flatten
         } zip fetchYouTubeStreams(streamers)) zip {(api byIds fakeActives) map (_ map FakeStream.apply)}
       streams = LiveStreams {
-        lila.common.ThreadLocalRandom.shuffle {
+        ThreadLocalRandom.shuffle {
           (twitchStreams ::: youTubeStreams ::: fakeStreams) pipe dedupStreamers
         }
       }
@@ -80,13 +81,13 @@ final private class Streaming(
       } foreach { s =>
         import s.streamer.userId
         if (true)//!streamStartMemo.get(UserId(userId)))
-          streamStartMemo.put(UserId(userId))
+          streamStartMemo.put(userId)
           Bus.publish(
             lila.hub.actorApi.streamer.StreamStart(userId),
             "streamStart"
           )
           subsRepo.subscribersOnlineSince(userId, 7) map { subs =>
-            notifyApi.notifyMany(subs map(UserId(_)), StreamStart(UserId(userId), s.streamer.name.value))
+            notifyApi.notifyMany(subs, StreamStart(userId, s.streamer.name.value))
           }
       }
     liveStreams = newStreams
