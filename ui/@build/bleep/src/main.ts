@@ -23,9 +23,9 @@ export function main() {
 }
 
 export interface BleepOpts {
-  sass?: boolean; // use dart-sass rather than gulp for scss, default = true
-  esbuild?: boolean; // use esbuild rather than rollup, default = true
-  tsc?: boolean; // use tsc for type checking, default = true
+  sass?: boolean; // compile css, default = true
+  esbuild?: boolean; // bundle, default = true
+  tsc?: boolean; // do type checking, default = true
   log?: {
     heap?: boolean; // show node rss in log statements, default = false
     time?: boolean; // show time in log statements, default = true
@@ -36,9 +36,9 @@ export interface BleepOpts {
 
 export interface LichessModule {
   root: string; // absolute path to package.json parentdir (module root)
-  name: string; // dirname of module root - usually the module import name
-  moduleAlias?: string; // import name (if different from root name as with analysisBoard)
-  pkg: any; // the entire package.json object
+  name: string; // dirname of module root
+  moduleAlias?: string; // import name (if different from module root name)
+  pkg: any; // the package.json object
   pre: string[][]; // pre-bundle build steps from package.json
   post: string[][]; // post-bundle build steps from package.json
   hasTsconfig?: boolean; // fileExists('tsconfig.json')
@@ -210,23 +210,24 @@ export const codes: any = {
   warn: '33;43',
 };
 
+export const errorMark = colors.red('✘ ') + colors.error('[ERROR]');
+
 const colorForCtx = (ctx: string, color: any): string =>
   color && ctx in color && color[ctx] in codes ? codes[color[ctx]] : codes.grey;
-
-const escape = (text: string, code: string): string => `\x1b[${code}m${stripColorEscapes(text)}\x1b[0m`;
 
 function hasColor(text: string): boolean {
   // eslint-disable-next-line no-control-regex
   return text.match(/\x1b\[[0-9;]*m/) !== null;
 }
-const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+
+const escape = (text: string, code: string): string => `\x1b[${code}m${stripColorEscapes(text)}\x1b[0m`;
 
 function stripColorEscapes(text: string) {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b\[[0-9;]*m/, '');
 }
 
-export const errorMark = colors.red('✘ ') + colors.error('[ERROR]');
+const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
 function prettyTime() {
   const now = new Date();
