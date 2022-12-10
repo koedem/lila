@@ -1,7 +1,7 @@
 package lila.common
 
 import chess.Centis
-import chess.format.{ FEN, Uci }
+import chess.format.{ Fen, Uci }
 import play.api.i18n.Lang
 
 trait Iso[A, B]:
@@ -57,8 +57,4 @@ object Iso:
   given StringIso[NormalizedEmailAddress] =
     string[NormalizedEmailAddress](NormalizedEmailAddress.apply, _.value)
 
-  given IntIso[Centis] = int[Centis](Centis.apply, _.centis)
-
   given StringIso[Lang] = string[Lang](Lang.apply, _.toString)
-
-  given StringIso[FEN] = string[FEN](FEN.apply, _.value)

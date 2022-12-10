@@ -1,7 +1,7 @@
 package lila.hub
 package actorApi
 
-import chess.format.Uci
+import chess.format.{ BoardFen, Uci, Fen }
 import org.joda.time.{ DateTime, Period }
 import play.api.libs.json.*
 import scala.concurrent.Promise
@@ -201,7 +201,7 @@ package fishnet:
   case class StudyChapterRequest(
       studyId: StudyId,
       chapterId: StudyChapterId,
-      initialFen: Option[chess.format.FEN],
+      initialFen: Option[Fen.Epd],
       variant: chess.variant.Variant,
       moves: List[Uci],
       userId: UserId,
@@ -218,7 +218,7 @@ package round:
 
   case class MoveEvent(
       gameId: GameId,
-      fen: String,
+      fen: BoardFen,
       move: String
   )
   case class CorresMoveEvent(

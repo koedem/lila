@@ -9,6 +9,7 @@ import play.api.mvc.*
 import scala.concurrent.duration.*
 import scalatags.Text.all.stringFrag
 import views.*
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.api.Context
 import lila.app.{ given, * }
@@ -28,10 +29,11 @@ final class OAuth(env: Env, apiC: => Api) extends LilaController(env):
       state = State from get("state", req),
       codeChallengeMethod = get("code_challenge_method", req),
       codeChallenge = CodeChallenge from get("code_challenge", req),
-      scope = get("scope", req)
+      scope = get("scope", req),
+      username = UserStr from get("username", req)
     )
 
-  private def withPrompt(f: AuthorizationRequest.Prompt => Fu[Result])(implicit ctx: Context) =
+  private def withPrompt(f: AuthorizationRequest.Prompt => Fu[Result])(using ctx: Context) =
     reqToAuthorizationRequest(ctx.req).prompt match
       case Validated.Valid(prompt) => f(prompt)
       case Validated.Invalid(error) =>
@@ -113,7 +115,7 @@ final class OAuth(env: Env, apiC: => Api) extends LilaController(env):
                     .obj(
                       "token_type"    -> "Bearer",
                       "access_token"  -> token.plain,
-                      "refresh_token" -> s"invalid_for_bc_${lila.common.ThreadLocalRandom.nextString(17)}"
+                      "refresh_token" -> s"invalid_for_bc_${ThreadLocalRandom.nextString(17)}"
                     )
                     .add("expires_in" -> token.expires.map(_.getSeconds - nowSeconds))
                 )

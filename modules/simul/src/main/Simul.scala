@@ -1,7 +1,8 @@
 package lila.simul
 
+import ornicar.scalalib.ThreadLocalRandom
 import chess.Color
-import chess.format.FEN
+import chess.format.Fen
 import chess.variant.Variant
 import chess.Speed
 import org.joda.time.DateTime
@@ -17,7 +18,7 @@ case class Simul(
     applicants: List[SimulApplicant],
     pairings: List[SimulPairing],
     variants: List[Variant],
-    position: Option[FEN],
+    position: Option[Fen.Epd],
     createdAt: DateTime,
     estimatedStartAt: Option[DateTime] = None,
     hostId: UserId,
@@ -150,14 +151,14 @@ object Simul:
       name: String,
       clock: SimulClock,
       variants: List[Variant],
-      position: Option[FEN],
+      position: Option[Fen.Epd],
       color: String,
       text: String,
       estimatedStartAt: Option[DateTime],
       team: Option[TeamId],
       featurable: Option[Boolean]
   ): Simul = Simul(
-    _id = SimulId(lila.common.ThreadLocalRandom nextString 8),
+    _id = SimulId(ThreadLocalRandom nextString 8),
     name = name,
     status = SimulStatus.Created,
     clock = clock,

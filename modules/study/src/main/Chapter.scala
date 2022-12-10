@@ -1,10 +1,11 @@
 package lila.study
 
 import chess.format.pgn.{ Glyph, Tags }
-import chess.opening.{ FullOpening, FullOpeningDB }
+import chess.opening.{ Opening, OpeningDb }
 import chess.variant.Variant
 import chess.{ Centis, Color, Outcome }
 import org.joda.time.DateTime
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.tree.Node.{ Comment, Gamebook, Shapes }
 import lila.user.User
@@ -61,9 +62,9 @@ case class Chapter(
   def forceVariation(force: Boolean, path: Path): Option[Chapter] =
     updateRoot(_.forceVariationAt(force, path))
 
-  def opening: Option[FullOpening] =
+  def opening: Option[Opening] =
     if (!Variant.openingSensibleVariants(setup.variant)) none
-    else FullOpeningDB searchInFens root.mainline.map(_.fen)
+    else OpeningDb searchInFens root.mainline.map(_.fen.opening)
 
   def isEmptyInitial = order == 1 && root.children.nodes.isEmpty
 
@@ -164,7 +165,7 @@ object Chapter:
 
   val idSize = 8
 
-  def makeId = StudyChapterId(lila.common.ThreadLocalRandom nextString idSize)
+  def makeId = StudyChapterId(ThreadLocalRandom nextString idSize)
 
   def make(
       studyId: StudyId,

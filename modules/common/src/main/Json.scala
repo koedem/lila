@@ -2,18 +2,18 @@ package lila.common
 
 import org.joda.time.DateTime
 import play.api.libs.json.{ Json as PlayJson, * }
-import chess.format.{ FEN, Uci }
+import chess.format.{ Uci }
 
 object Json:
 
-  inline given opaqueFormat[A, T](using
+  given opaqueFormat[A, T](using
       bts: SameRuntime[A, T],
       stb: SameRuntime[T, A],
       format: Format[A]
   ): Format[T] =
     format.bimap(bts.apply, stb.apply)
 
-  inline given [A](using bts: SameRuntime[A, String]): KeyWrites[A] with
+  given [A](using bts: SameRuntime[A, String]): KeyWrites[A] with
     def writeKey(key: A) = bts(key)
 
   private val stringFormatBase: Format[String] = Format(Reads.StringReads, Writes.StringWrites)
@@ -67,29 +67,18 @@ object Json:
     Writes[O](o => JsString(to(o)))
   )
 
-  given Reads[chess.Centis] = Reads.of[Int] map chess.Centis.apply
-
   given userStrReads: Reads[UserStr] = Reads.of[String] flatMapResult { str =>
     JsResult.fromTry(UserStr.read(str) toTry s"Invalid username: $str")
   }
-  given userIdReads: Reads[UserId] = Reads.of[String] map { UserId(_) }
 
-  given Writes[DateTime] = Writes[DateTime] { time =>
-    JsNumber(time.getMillis)
-  }
+  given Writes[DateTime] = writeAs(_.getMillis)
 
-  given Writes[chess.Color] = Writes { c =>
-    JsString(c.name)
-  }
-
-  given Format[FEN] = stringIsoFormat[FEN]
+  given Writes[chess.Color] = writeAs(_.name)
 
   given Reads[Uci] = Reads.of[String] flatMapResult { str =>
     JsResult.fromTry(Uci(str) toTry s"Invalid UCI: $str")
   }
-  given Writes[Uci] = Writes { u =>
-    JsString(u.uci)
-  }
+  given Writes[Uci] = writeAs(_.uci)
 
   given Reads[LilaOpeningFamily] = Reads[LilaOpeningFamily] { f =>
     f.get[String]("key")

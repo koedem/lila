@@ -1,7 +1,6 @@
 package controllers
 
-import chess.format.Forsyth.SituationPlus
-import chess.format.{ FEN, Forsyth }
+import chess.format.Fen
 import chess.variant.{ FromPosition, Standard, Variant }
 import chess.{ Black, Situation, White }
 import play.api.libs.json.Json
@@ -27,18 +26,18 @@ final class UserAnalysis(
       case Array(key) => load("", Variant orDefault key)
       case Array(key, fen) =>
         Variant.byKey get key match
-          case Some(variant) if variant != Standard       => load(fen, variant)
-          case _ if FEN.clean(fen) == Standard.initialFen => load("", Standard)
-          case Some(Standard)                             => load(fen, FromPosition)
-          case _                                          => load(arg, FromPosition)
+          case Some(variant) if variant != Standard           => load(fen, variant)
+          case _ if Fen.Epd.clean(fen) == Standard.initialFen => load("", Standard)
+          case Some(Standard)                                 => load(fen, FromPosition)
+          case _                                              => load(arg, FromPosition)
       case _ => load("", Standard)
 
   def load(urlFen: String, variant: Variant) =
     Open { implicit ctx =>
-      val decodedFen: Option[FEN] = lila.common.String
+      val decodedFen: Option[Fen.Epd] = lila.common.String
         .decodeUriPath(urlFen)
         .filter(_.trim.nonEmpty)
-        .orElse(get("fen")) map FEN.clean
+        .orElse(get("fen")) map Fen.Epd.clean
       val pov         = makePov(decodedFen, variant)
       val orientation = get("color").flatMap(chess.Color.fromName) | pov.color
       env.api.roundApi
@@ -59,14 +58,14 @@ final class UserAnalysis(
       }
     }
 
-  private[controllers] def makePov(fen: Option[FEN], variant: Variant): Pov =
+  private[controllers] def makePov(fen: Option[Fen.Epd], variant: Variant): Pov =
     makePov {
       fen.filter(_.value.nonEmpty).flatMap {
-        Forsyth.<<<@(variant, _)
-      } | SituationPlus(Situation(variant), 1)
+        Fen.readWithMoveNumber(variant, _)
+      } | Situation.AndFullMoveNumber(Situation(variant), 1)
     }
 
-  private[controllers] def makePov(from: SituationPlus): Pov =
+  private[controllers] def makePov(from: Situation.AndFullMoveNumber): Pov =
     Pov(
       lila.game.Game
         .make(

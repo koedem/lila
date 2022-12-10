@@ -1,7 +1,7 @@
 package lila.study
 
 import chess.format.pgn.Tags
-import chess.format.{ FEN, Forsyth }
+import chess.format.Fen
 import chess.variant.{ Crazyhouse, Variant }
 import lila.chat.{ Chat, ChatApi }
 import lila.game.{ Game, Namer }
@@ -77,25 +77,26 @@ final private class ChapterMaker(
 
   private def fromFenOrBlank(study: Study, data: Data, order: Int, userId: UserId): Chapter =
     val variant = data.variant | Variant.default
-    val (root, isFromFen) = data.fen.filterNot(_.initial).flatMap { Forsyth.<<<@(variant, _) } match
-      case Some(sit) =>
-        Node.Root(
-          ply = sit.turns,
-          fen = Forsyth >> sit,
-          check = sit.situation.check,
-          clock = none,
-          crazyData = sit.situation.board.crazyData,
-          children = Node.emptyChildren
-        ) -> true
-      case None =>
-        Node.Root(
-          ply = 0,
-          fen = variant.initialFen,
-          check = false,
-          clock = none,
-          crazyData = variant.crazyhouse option Crazyhouse.Data.init,
-          children = Node.emptyChildren
-        ) -> false
+    val (root, isFromFen) =
+      data.fen.filterNot(_.isInitial).flatMap { Fen.readWithMoveNumber(variant, _) } match
+        case Some(sit) =>
+          Node.Root(
+            ply = sit.turns,
+            fen = Fen write sit,
+            check = sit.situation.check,
+            clock = none,
+            crazyData = sit.situation.board.crazyData,
+            children = Node.emptyChildren
+          ) -> true
+        case None =>
+          Node.Root(
+            ply = 0,
+            fen = variant.initialFen,
+            check = false,
+            clock = none,
+            crazyData = variant.crazyhouse option Crazyhouse.Data.init,
+            children = Node.emptyChildren
+          ) -> false
     Chapter.make(
       studyId = study.id,
       name = data.name,
@@ -121,7 +122,7 @@ final private class ChapterMaker(
       order: Int,
       userId: UserId,
       withRatings: Boolean,
-      initialFen: Option[FEN] = None
+      initialFen: Option[Fen.Epd] = None
   ): Fu[Chapter] =
     for {
       root <- getBestRoot(game, data.pgn, initialFen)
@@ -164,7 +165,7 @@ final private class ChapterMaker(
         )
       }
 
-  private[study] def getBestRoot(game: Game, pgnOpt: Option[String], initialFen: Option[FEN]): Fu[Node.Root] =
+  private[study] def getBestRoot(game: Game, pgnOpt: Option[String], initialFen: Option[Fen.Epd]): Fu[Node.Root] =
     initialFen.fold(gameRepo initialFen game) { fen =>
       fuccess(fen.some)
     } map { goodFen =>
@@ -196,8 +197,7 @@ private[study] object ChapterMaker:
     def key = toString.toLowerCase
     case Normal, Practice, Gamebook, Conceal
   object Mode:
-    val all                = List(Normal, Practice, Gamebook, Conceal)
-    def apply(key: String) = all.find(_.key == key)
+    def apply(key: String) = values.find(_.key == key)
 
   trait ChapterData:
     def orientation: Orientation
@@ -216,7 +216,7 @@ private[study] object ChapterMaker:
       name: StudyChapterName,
       game: Option[String] = None,
       variant: Option[Variant] = None,
-      fen: Option[FEN] = None,
+      fen: Option[Fen.Epd] = None,
       pgn: Option[String] = None,
       orientation: Orientation = Orientation.Auto,
       mode: ChapterMaker.Mode = ChapterMaker.Mode.Normal,

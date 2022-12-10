@@ -3,6 +3,7 @@ package lila.ublog
 import org.joda.time.DateTime
 import play.api.data.*
 import play.api.data.Forms.*
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.common.Form.{ cleanNonEmptyText, cleanText, stringIn, into, given }
 import lila.i18n.{ defaultLang, LangList }
@@ -44,7 +45,7 @@ final class UblogForm(markup: UblogMarkup, val captcher: lila.hub.actors.Captche
         imageAlt = post.image.flatMap(_.alt),
         imageCredit = post.image.flatMap(_.credit),
         language = post.language.code.some,
-        topics = post.topics.map(_.value).mkString(", ").some,
+        topics = post.topics.mkString(", ").some,
         live = post.live,
         discuss = ~post.discuss,
         gameId = GameId(""),
@@ -76,7 +77,7 @@ object UblogForm:
 
     def create(user: User, updated: Markdown) =
       UblogPost(
-        id = UblogPostId(lila.common.ThreadLocalRandom nextString 8),
+        id = UblogPostId(ThreadLocalRandom nextString 8),
         blog = UblogBlog.Id.User(user.id),
         title = title,
         intro = intro,

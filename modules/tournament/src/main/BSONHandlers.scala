@@ -1,7 +1,7 @@
 package lila.tournament
 
 import chess.Clock.{ Config as ClockConfig }
-import chess.format.FEN
+import chess.format.Fen
 import chess.Mode
 import chess.variant.Variant
 import reactivemongo.api.bson.*
@@ -63,8 +63,8 @@ object BSONHandlers:
   given tourHandler: BSON[Tournament] with
     def reads(r: BSON.Reader) =
       val variant = r.intO("variant").fold[Variant](Variant.default)(Variant.orDefault)
-      val position: Option[FEN] =
-        r.getO[FEN]("fen").filterNot(_.initial) orElse
+      val position: Option[Fen.Epd] =
+        r.getO[Fen.Epd]("fen").filterNot(_.isInitial) orElse
           r.strO("eco").flatMap(Thematic.byEco).map(_.fen) // for BC
       val startsAt   = r date "startsAt"
       val conditions = r.getO[Condition.All]("conditions") getOrElse Condition.All.empty
@@ -105,7 +105,7 @@ object BSONHandlers:
         "clock"       -> o.clock,
         "minutes"     -> o.minutes,
         "variant"     -> o.variant.some.filterNot(_.standard).map(_.id),
-        "fen"         -> o.position.map(_.value),
+        "fen"         -> o.position,
         "mode"        -> o.mode.some.filterNot(_.rated).map(_.id),
         "password"    -> o.password,
         "conditions"  -> o.conditions.ifNonEmpty,

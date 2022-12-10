@@ -120,7 +120,7 @@ final class Store(val coll: Coll, val userhack: Coll, userRepo: lila.user.UserRe
           "ua"   -> HTTPRequest.userAgent(req).|("?"),
           "date" -> DateTime.now,
           "up"   -> up,
-          "api"  -> apiVersion.map(_.value),
+          "api"  -> apiVersion,
           "fp"   -> fp.flatMap(FingerHash.from)
         )
       )

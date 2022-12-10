@@ -5,8 +5,9 @@ import org.joda.time.DateTime
 import reactivemongo.akkastream.{ cursorProducer, AkkaStreamCursor }
 import reactivemongo.api.*
 import reactivemongo.api.bson.*
+import ornicar.scalalib.ThreadLocalRandom
 
-import lila.common.{ ApiVersion, EmailAddress, LightUser, NormalizedEmailAddress, ThreadLocalRandom }
+import lila.common.{ ApiVersion, EmailAddress, LightUser, NormalizedEmailAddress }
 import lila.db.dsl.{ *, given }
 import lila.rating.Glicko
 import lila.rating.{ Perf, PerfType }
@@ -680,7 +681,7 @@ final class UserRepo(val coll: Coll)(using ec: scala.concurrent.ExecutionContext
       F.count                 -> Count.default,
       F.enabled               -> true,
       F.createdAt             -> DateTime.now,
-      F.createdWithApiVersion -> mobileApiVersion.map(_.value),
+      F.createdWithApiVersion -> mobileApiVersion,
       F.seenAt                -> DateTime.now,
       F.playTime              -> User.PlayTime(0, 0),
       F.lang                  -> lang

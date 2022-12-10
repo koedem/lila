@@ -1,9 +1,9 @@
 package lila.study
 
 import org.joda.time.DateTime
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.user.User
-import lila.common.Iso
 
 case class Study(
     _id: StudyId,
@@ -93,7 +93,7 @@ object Study:
     lazy val key = Visibility.this.toString.toLowerCase
     case Private, Unlisted, Public
   object Visibility:
-    val byKey = List(Private, Unlisted, Public).map { v =>
+    val byKey = values.map { v =>
       v.key -> v
     }.toMap
 
@@ -144,7 +144,7 @@ object Study:
 
   case class LightStudy(isPublic: Boolean, contributors: Set[UserId])
 
-  def makeId = StudyId(lila.common.ThreadLocalRandom nextString 8)
+  def makeId = StudyId(ThreadLocalRandom nextString 8)
 
   def make(
       user: User,

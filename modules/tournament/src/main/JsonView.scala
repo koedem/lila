@@ -1,6 +1,6 @@
 package lila.tournament
 
-import chess.format.FEN
+import chess.format.Fen
 import com.softwaremill.tagging.*
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
@@ -114,7 +114,7 @@ final class JsonView(
           .add("schedule" -> tour.schedule.map(scheduleJson))
           .add("private" -> tour.isPrivate)
           .add("quote" -> tour.isCreated.option(lila.quote.Quote.one(tour.id.value)))
-          .add("defender" -> shieldOwner.map(_.value))
+          .add("defender" -> shieldOwner)
           .add("greatPlayer" -> GreatPlayer.wikiUrl(tour.name).map { url =>
             Json.obj("name" -> tour.name, "url" -> url)
           })
@@ -283,7 +283,7 @@ final class JsonView(
     Json
       .obj(
         "id"          -> game.id,
-        "fen"         -> chess.format.Forsyth.boardAndColor(game.situation),
+        "fen"         -> chess.format.Fen.writeBoardAndColor(game.situation),
         "orientation" -> game.naturalOrientation.name,
         "color"    -> game.naturalOrientation.name, // app BC https://github.com/lichess-org/lila/issues/7195
         "lastMove" -> (game.lastMoveKeys | ""),
@@ -579,7 +579,7 @@ object JsonView:
     )
   }
 
-  private[tournament] def positionJson(fen: FEN): JsObject =
+  private[tournament] def positionJson(fen: Fen.Epd): JsObject =
     Thematic.byFen(fen) match
       case Some(pos) =>
         Json

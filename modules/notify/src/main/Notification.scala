@@ -4,6 +4,8 @@ import lila.common.paginator.Paginator
 import lila.notify.MentionedInThread.PostId
 import org.joda.time.DateTime
 import reactivemongo.api.bson.Macros.Annotations.Key
+import ornicar.scalalib.ThreadLocalRandom
+import alleycats.Zero
 
 case class NewNotification(notification: Notification, unreadNotifications: Notification.UnreadCount)
 
@@ -27,7 +29,8 @@ object Notification:
   object Id extends OpaqueString[Id]
 
   opaque type UnreadCount = Int
-  object UnreadCount extends OpaqueInt[UnreadCount]
+  object UnreadCount extends OpaqueInt[UnreadCount]:
+    given Zero[UnreadCount] = Zero(0)
 
   case class AndUnread(pager: Paginator[Notification], unread: UnreadCount)
 
@@ -39,7 +42,7 @@ object Notification:
 
   def make(notifies: UserId, content: NotificationContent): Notification =
     val idSize = 8
-    val id     = lila.common.ThreadLocalRandom nextString idSize
+    val id     = ThreadLocalRandom nextString idSize
     Notification(Id(id), notifies into Notifies, content, NotificationRead(false), DateTime.now)
 
 sealed abstract class NotificationContent(val key: String)

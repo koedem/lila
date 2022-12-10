@@ -1,14 +1,14 @@
 package lila.tournament
 
 import chess.Clock.Config as ClockConfig
-import chess.format.FEN
+import chess.format.Fen
 import chess.{ Mode, Speed }
 import org.joda.time.{ DateTime, Duration, Interval }
 import play.api.i18n.Lang
 import scala.util.chaining.*
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.common.GreatPlayer
-import lila.common.ThreadLocalRandom
 import lila.i18n.defaultLang
 import lila.rating.PerfType
 import lila.user.User
@@ -20,7 +20,7 @@ case class Tournament(
     clock: ClockConfig,
     minutes: Int,
     variant: chess.variant.Variant,
-    position: Option[FEN],
+    position: Option[Fen.Epd],
     mode: Mode,
     password: Option[String] = None,
     conditions: Condition.All,
@@ -155,7 +155,7 @@ object Tournament:
       clock: ClockConfig,
       minutes: Int,
       variant: chess.variant.Variant,
-      position: Option[FEN],
+      position: Option[Fen.Epd],
       mode: Mode,
       password: Option[String],
       waitMinutes: Int,

@@ -13,13 +13,13 @@ import scalatags.Text.Frag
 import lila.api.{ BodyContext, Context, HeaderContext, PageData }
 import lila.app.{ *, given }
 import lila.common.{ ApiVersion, HTTPRequest, Nonce }
-import lila.i18n.I18nLangPicker
+import lila.i18n.{ I18nKey, I18nLangPicker }
 import lila.notify.Notification.Notifies
 import lila.oauth.{ OAuthScope, OAuthServer }
 import lila.security.{ AppealUser, FingerPrintedUser, Granter, Permission }
 import lila.user.{ Holder, User as UserModel, UserContext }
 import lila.common.config
-//import lila.user.{ UserMarks, UserMark }
+import scala.concurrent.ExecutionContext
 
 abstract private[controllers] class LilaController(val env: Env)
     extends BaseController
@@ -570,11 +570,11 @@ abstract private[controllers] class LilaController(val env: Env)
           val enabledId = me.enabled option me.id
           enabledId.??(env.team.api.nbRequests) zip
             enabledId.??(env.challenge.api.countInFor.get) zip
-            enabledId.??(id => env.notifyM.api.unreadCount(Notifies(id)).dmap(_.value)) zip
+            enabledId.??(id => env.notifyM.api.unreadCount(id into Notifies)) zip
             env.mod.inquiryApi.forMod(me)
         else
           fuccess {
-            (((0, 0), 0), none)
+            (((0, 0), UnreadCount(0)), none)
           }
       } map { case (pref, (((teamNbRequests, nbChallenges), nbNotifications), inquiry)) =>
         PageData(
@@ -668,7 +668,7 @@ abstract private[controllers] class LilaController(val env: Env)
         .mapValues { errors =>
           JsArray {
             errors.map { e =>
-              JsString(lila.i18n.Translator.txt.literal(e.message, e.args, lang))
+              JsString(lila.i18n.Translator.txt.literal(I18nKey(e.message), e.args, lang))
             }
           }
         }

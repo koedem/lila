@@ -2,13 +2,14 @@ package lila.setup
 
 import akka.stream.scaladsl.*
 import chess.variant.{ FromPosition, Variant }
-import chess.format.FEN
+import chess.format.Fen
 import chess.{ Clock, Mode }
 import org.joda.time.DateTime
 import play.api.data.*
 import play.api.data.Forms.*
 import play.api.libs.json.Json
 import scala.concurrent.duration.*
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.common.Json.*
 import lila.common.{ Bearer, Days, Template }
@@ -30,7 +31,7 @@ object SetupBulk:
       startClocksAt: Option[DateTime],
       message: Option[Template],
       rules: Set[GameRule],
-      fen: Option[FEN] = None
+      fen: Option[Fen.Epd] = None
   ):
     def clockOrDays = clock.toLeft(days | Days(3))
 
@@ -39,7 +40,7 @@ object SetupBulk:
     def validFen = ApiConfig.validFen(variant, fen)
 
     def autoVariant =
-      if (variant.standard && fen.exists(!_.initial)) copy(variant = FromPosition)
+      if (variant.standard && fen.exists(!_.isInitial)) copy(variant = FromPosition)
       else this
 
   private def timestampInNearFuture = longNumber(
@@ -67,7 +68,7 @@ object SetupBulk:
           variant: Option[String],
           clock: Option[Clock.Config],
           days: Option[Days],
-          fen: Option[FEN],
+          fen: Option[Fen.Epd],
           rated: Boolean,
           pairTs: Option[Long],
           clockTs: Option[Long],
@@ -132,7 +133,7 @@ object SetupBulk:
       message: Option[Template],
       rules: Set[GameRule] = Set.empty,
       pairedAt: Option[DateTime] = None,
-      fen: Option[FEN] = None
+      fen: Option[Fen.Epd] = None
   ):
     def userSet = Set(games.flatMap(g => List(g.white, g.black)))
     def collidesWith(other: ScheduledBulk) = {
@@ -244,7 +245,7 @@ final class SetupBulkApi(oauthServer: OAuthServer, idGenerator: IdGenerator)(usi
                 }
                 .dmap {
                   ScheduledBulk(
-                    _id = lila.common.ThreadLocalRandom nextString 8,
+                    _id = ThreadLocalRandom nextString 8,
                     by = me.id,
                     _,
                     data.variant,

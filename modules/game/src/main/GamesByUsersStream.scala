@@ -2,7 +2,7 @@ package lila.game
 
 import actorApi.{ FinishGame, StartGame }
 import akka.stream.scaladsl.*
-import chess.format.FEN
+import chess.format.Fen
 import play.api.libs.json.*
 import scala.concurrent.duration.*
 
@@ -31,7 +31,7 @@ final class GamesByUsersStream(gameRepo: lila.game.GameRepo)(using
           case StartGame(game) if matches(game)        => queue.offer(game).unit
           case FinishGame(game, _, _) if matches(game) => queue.offer(game).unit
         }
-        queue.watchCompletion().foreach { _ =>
+        queue.watchCompletion().addEffectAnyway {
           Bus.unsubscribe(sub, chans)
         }
     }

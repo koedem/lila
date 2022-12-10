@@ -11,7 +11,8 @@ import lila.tree.Eval.{ Cp, Mate }
 opaque type AccuracyPercent = Double
 object AccuracyPercent extends OpaqueDouble[AccuracyPercent]:
 
-  given Percent[AccuracyPercent] = _.value
+  given lila.db.NoDbHandler[AccuracyPercent] with {}
+  given Percent[AccuracyPercent] = Percent.of(AccuracyPercent)
 
   extension (a: AccuracyPercent)
     def *(weight: Double)            = apply(a.value * weight)
@@ -75,7 +76,7 @@ for x in xs:
     val allWinPercents = (Cp.initial :: cps) map WinPercent.fromCentiPawns
     allWinPercents.headOption flatMap { firstWinPercent =>
       val windowSize          = (cps.size / 10) atLeast 2 atMost 8
-      val allWinPercentValues = allWinPercents.map(_.value)
+      val allWinPercentValues = WinPercent raw allWinPercents
       val windows =
         List
           .fill(windowSize.atMost(allWinPercentValues.size) - 2)(allWinPercentValues take windowSize)
