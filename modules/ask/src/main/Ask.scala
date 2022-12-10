@@ -1,6 +1,7 @@
 package lila.ask
 
 import org.joda.time.DateTime
+import ornicar.scalalib.ThreadLocalRandom
 
 import lila.user.User
 
@@ -130,7 +131,7 @@ object Ask {
       footer: Option[String]
   ) =
     Ask(
-      _id = _id getOrElse (lila.common.ThreadLocalRandom nextString idSize),
+      _id = _id getOrElse (ThreadLocalRandom nextString idSize),
       question = question,
       choices = choices,
       tags = tags,
