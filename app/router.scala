@@ -29,23 +29,23 @@ inline given puzzleKey: Conversion[String, PuzzleTheme.Key] = PuzzleTheme.Key(_)
 // Used when constructing URLs from routes
 // TODO actually use the types in the routes
 object ReverseRouterConversions:
-  inline given Conversion[GameId, String]                   = _.value
-  inline given Conversion[GameFullId, String]               = _.value
-  inline given Conversion[GameAnyId, String]                = _.value
-  inline given Conversion[StudyId, String]                  = _.value
-  inline given Conversion[StudyChapterId, String]           = _.value
-  inline given Conversion[PuzzleId, String]                 = _.value
-  inline given Conversion[SimulId, String]                  = _.value
-  inline given Conversion[SwissId, String]                  = _.value
-  inline given Conversion[TourId, String]                   = _.value
-  inline given Conversion[TeamId, String]                   = _.value
-  inline given Conversion[RelayRoundId, String]             = _.value
-  inline given Conversion[UblogPostId, String]              = _.value
-  inline given Conversion[UserId, String]                   = _.value
-  inline given Conversion[UserName, String]                 = _.value
-  inline given Conversion[chess.opening.OpeningKey, String] = _.value
-  inline given Conversion[chess.format.Uci, String]         = _.uci
-  inline given Conversion[Option[UserName], Option[String]] = UserName.raw(_)
+  given Conversion[GameId, String]                   = _.value
+  given Conversion[GameFullId, String]               = _.value
+  given Conversion[GameAnyId, String]                = _.value
+  given Conversion[StudyId, String]                  = _.value
+  given Conversion[StudyChapterId, String]           = _.value
+  given Conversion[PuzzleId, String]                 = _.value
+  given Conversion[SimulId, String]                  = _.value
+  given Conversion[SwissId, String]                  = _.value
+  given Conversion[TourId, String]                   = _.value
+  given Conversion[TeamId, String]                   = _.value
+  given Conversion[RelayRoundId, String]             = _.value
+  given Conversion[UblogPostId, String]              = _.value
+  given Conversion[UserId, String]                   = _.value
+  given Conversion[UserName, String]                 = _.value
+  given Conversion[chess.opening.OpeningKey, String] = _.value
+  given Conversion[chess.format.Uci, String]         = _.uci
+  given Conversion[Option[UserName], Option[String]] = UserName.raw(_)
   // where a UserStr is accepted, we can pass a UserName or UserId
   inline given Conversion[UserName, UserStr]                       = _ into UserStr
   inline given Conversion[UserId, UserStr]                         = _ into UserStr
