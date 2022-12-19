@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 import scala.jdk.CollectionConverters.*
 
 import lila.common.config.*
-import lila.pref.NotifyAllows
 import FirebasePush.given
 
 @Module
@@ -26,11 +25,10 @@ final class Env(
     appConfig: Configuration,
     ws: StandaloneWSClient,
     db: lila.db.Db,
-    userRepo: lila.user.UserRepo,
-    getLightUser: lila.common.LightUser.Getter,
+    getLightUser: lila.common.LightUser.GetterFallback,
     proxyRepo: lila.round.GameProxyRepo,
     gameRepo: lila.game.GameRepo,
-    prefApi: lila.pref.PrefApi,
+    notifyAllows: lila.notify.GetNotifyAllows,
     postApi: lila.forum.ForumPostApi
 )(using
     ec: scala.concurrent.ExecutionContext,
@@ -41,8 +39,8 @@ final class Env(
 
   def vapidPublicKey = config.web.vapidPublicKey
 
-  private lazy val deviceApi  = new DeviceApi(db(config.deviceColl))
-  lazy val webSubscriptionApi = new WebSubscriptionApi(db(config.subscriptionColl))
+  private val deviceApi  = new DeviceApi(db(config.deviceColl))
+  val webSubscriptionApi = new WebSubscriptionApi(db(config.subscriptionColl))
 
   def registerDevice    = deviceApi.register
   def unregisterDevices = deviceApi.unregister

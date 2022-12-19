@@ -257,12 +257,14 @@ trait LilaLibraryExtensions extends LilaTypes:
       try await(duration, name)
       catch case _: Exception => default
 
-    def withTimeout(duration: FiniteDuration)(using EC, Scheduler): Fu[A] =
-      withTimeout(duration, LilaTimeout(s"Future timed out after $duration"))
-
     def withTimeout(
         duration: FiniteDuration,
-        error: => Throwable
+        error: => String
+    )(using EC, Scheduler): Fu[A] = withTimeoutError(duration, LilaTimeout(s"$error timeout after $duration"))
+
+    def withTimeoutError(
+        duration: FiniteDuration,
+        error: => Exception with util.control.NoStackTrace
     )(using EC)(using scheduler: Scheduler): Fu[A] =
       Future firstCompletedOf Seq(
         fua,
@@ -314,8 +316,8 @@ trait LilaLibraryExtensions extends LilaTypes:
     def >>|(fub: => Fu[Boolean]): Fu[Boolean] =
       fua.flatMap { if (_) fuTrue else fub }(EC.parasitic)
 
-    def ifThen(fub: => Funit): Funit =
-      fua.flatMap { if (_) fub else funit }(EC.parasitic)
+    def ifThen[A](fub: => Fu[A])(using zero: Zero[A]): Fu[A] =
+      fua.flatMap { if (_) fub else fuccess(zero.zero) }(EC.parasitic)
 
     inline def unary_! = fua.map { !_ }(EC.parasitic)
 

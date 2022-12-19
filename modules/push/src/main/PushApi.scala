@@ -13,34 +13,31 @@ import lila.hub.actorApi.map.Tell
 import lila.hub.actorApi.push.TourSoon
 import lila.hub.actorApi.round.{ IsOnGame, MoveEvent }
 import lila.notify.*
-import lila.pref.{ Allows, NotificationPref, NotifyAllows }
+import lila.notify.{ NotificationPref, NotifyAllows }
 import lila.user.User
 
 final private class PushApi(
     firebasePush: FirebasePush,
     webPush: WebPush,
-    userRepo: lila.user.UserRepo,
-    implicit val lightUser: LightUser.Getter,
     proxyRepo: lila.round.GameProxyRepo,
     gameRepo: lila.game.GameRepo,
-    prefApi: lila.pref.PrefApi,
+    notifyAllows: lila.notify.GetNotifyAllows,
     postApi: lila.forum.ForumPostApi
-)(using scala.concurrent.ExecutionContext, akka.actor.Scheduler):
+)(using scala.concurrent.ExecutionContext, akka.actor.Scheduler)(using lightUser: LightUser.GetterFallback):
+
   private[push] def notifyPush(
       to: Iterable[NotifyAllows],
       content: NotificationContent,
       params: Iterable[(String, String)]
   ): Funit = content match
     case PrivateMessage(sender, text) =>
-      lightUser(sender) flatMap (_ ?? (luser => privateMessage(to.head, sender, luser.titleName, text)))
+      lightUser(sender).flatMap(luser => privateMessage(to.head, sender, luser.titleName, text))
     case MentionedInThread(mentioner, topic, _, _, postId) =>
-      lightUser(mentioner) flatMap (_ ?? (luser => forumMention(to.head, luser.titleName, topic, postId)))
+      lightUser(mentioner).flatMap(luser => forumMention(to.head, luser.titleName, topic, postId))
     case StreamStart(streamerId, streamerName) =>
       streamStart(to, streamerId, streamerName)
     case InvitedToStudy(invitedBy, studyName, studyId) =>
-      lightUser(invitedBy) flatMap (_ ?? (luser =>
-        invitedToStudy(to.head, luser.titleName, studyName, studyId)
-      ))
+      lightUser(invitedBy).flatMap(luser => invitedToStudy(to.head, luser.titleName, studyName, studyId))
     case _ => funit
 
   def finish(game: Game): Funit =
@@ -210,26 +207,22 @@ final private class PushApi(
     )
 
   def privateMessage(to: NotifyAllows, senderId: UserId, senderName: String, text: String): Funit =
-    userRepo.isKid(to.userId) flatMap {
-      !_ ?? {
-        filterPush(
-          to,
-          _.message,
-          PushApi.Data(
-            title = senderName,
-            body = text,
-            stacking = Stacking.PrivateMessage,
-            payload = Json.obj(
-              "userId" -> to.userId,
-              "userData" -> Json.obj(
-                "type"     -> "newMessage",
-                "threadId" -> senderId
-              )
-            )
+    filterPush(
+      to,
+      _.message,
+      PushApi.Data(
+        title = senderName,
+        body = text,
+        stacking = Stacking.PrivateMessage,
+        payload = Json.obj(
+          "userId" -> to.userId,
+          "userData" -> Json.obj(
+            "type"     -> "newMessage",
+            "threadId" -> senderId
           )
         )
-      }
-    }
+      )
+    )
 
   def invitedToStudy(to: NotifyAllows, invitedBy: String, studyName: StudyName, studyId: StudyId): Funit =
     filterPush(
@@ -254,39 +247,37 @@ final private class PushApi(
   def challengeCreate(c: Challenge): Funit =
     c.destUser ?? { dest =>
       c.challengerUser.ifFalse(c.hasClock) ?? { challenger =>
-        lightUser(challenger.id) flatMap {
-          _ ?? { lightChallenger =>
-            maybePush(
-              dest.id,
-              _.challenge.create,
-              NotificationPref.Challenge,
-              PushApi.Data(
-                title = s"${lightChallenger.titleName} (${challenger.rating.show}) challenges you!",
-                body = describeChallenge(c),
-                stacking = Stacking.ChallengeCreate,
-                payload = Json.obj(
-                  "userId" -> dest.id,
-                  "userData" -> Json.obj(
-                    "type"        -> "challengeCreate",
-                    "challengeId" -> c.id
-                  )
+        lightUser(challenger.id) flatMap { lightChallenger =>
+          maybePush(
+            dest.id,
+            _.challenge.create,
+            NotificationPref.Challenge,
+            PushApi.Data(
+              title = s"${lightChallenger.titleName} (${challenger.rating.show}) challenges you!",
+              body = describeChallenge(c),
+              stacking = Stacking.ChallengeCreate,
+              payload = Json.obj(
+                "userId" -> dest.id,
+                "userData" -> Json.obj(
+                  "type"        -> "challengeCreate",
+                  "challengeId" -> c.id
                 )
               )
             )
-          }
+          )
         }
       }
     }
 
   def challengeAccept(c: Challenge, joinerId: Option[UserId]): Funit =
     c.challengerUser.ifTrue(c.finalColor.white && !c.hasClock) ?? { challenger =>
-      joinerId ?? lightUser flatMap { lightJoiner =>
+      joinerId ?? lightUser.optional flatMap { lightJoiner =>
         maybePush(
           challenger.id,
           _.challenge.accept,
           NotificationPref.Challenge,
           PushApi.Data(
-            title = s"${lightJoiner.fold("Anonymous")(_.titleName)} accepts your challenge!",
+            title = s"${lightJoiner.fold("A player")(_.titleName)} accepts your challenge!",
             body = describeChallenge(c),
             stacking = Stacking.ChallengeAccept,
             payload = Json.obj(
@@ -328,7 +319,6 @@ final private class PushApi(
 
   def forumMention(to: NotifyAllows, mentionedBy: String, topicName: String, postId: ForumPostId): Funit =
     postApi.getPost(postId) flatMap { post =>
-      to.userId.pp("forumMention")
       filterPush(
         to,
         _.forumMention,
@@ -375,16 +365,18 @@ final private class PushApi(
       event: NotificationPref.Event,
       data: PushApi.Data
   ): Funit =
-    prefApi.getNotificationPref(userId) flatMap (x =>
-      filterPush(NotifyAllows(userId, x.allows(event)), monitor, data)
-    )
+    notifyAllows(userId, event) flatMap { allows =>
+      filterPush(NotifyAllows(userId, allows), monitor, data)
+    }
 
-  private def filterPush(to: NotifyAllows, monitor: MonitorType, data: PushApi.Data): Funit = {
-    to.web ?? webPush(to.userId, data).addEffects(res => monitor(lila.mon.push.send)("web", res.isSuccess))
-    to.device ?? firebasePush(to.userId, data).addEffects(res =>
+  private def filterPush(to: NotifyAllows, monitor: MonitorType, data: PushApi.Data): Funit = for
+    _ <- to.web ?? webPush(to.userId, data).addEffects(res =>
+      monitor(lila.mon.push.send)("web", res.isSuccess)
+    )
+    _ <- to.device ?? firebasePush(to.userId, data).addEffects(res =>
       monitor(lila.mon.push.send)("firebase", res.isSuccess)
     )
-  }
+  yield ()
 
   private def describeChallenge(c: Challenge) =
     import lila.challenge.Challenge.TimeControl.*
@@ -406,7 +398,8 @@ final private class PushApi(
       case false => f
     }
 
-  private def asyncOpponentName(pov: Pov): Fu[String] = Namer playerText pov.opponent
+  private def asyncOpponentName(pov: Pov): Fu[String] =
+    Namer.playerText(pov.opponent)(using lightUser.optional)
 
 private object PushApi:
 

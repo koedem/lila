@@ -61,18 +61,25 @@ lichess.load.then(() => {
       return false;
     });
 
-    $('.streamer-show, .streamer')
-      .on('change', '.subscribe-switch', (e: Event) => {
-        const el = e.target as HTMLInputElement;
-        xhr
-          .text(el.formAction, { method: 'post' })
-          .then(() => (el.formAction = el.formAction.replace(/set=[^&]+/, `set=${!el.checked}`)));
-      })
-      .on('click', '.test-xhr', (e: Event) => {
-        const el = e.target as HTMLButtonElement;
-        xhr.text(el.formAction, { method: 'post' });
-        $(el).detach();
-      });
+    $('.streamer-subscribe input').on('change', (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      $(target)
+        .parents('.streamer-subscribe')
+        .each(function (this: HTMLElement) {
+          xhr.text(
+            $(this)
+              .data('action')
+              .replace(/set=[^&]+/, `set=${target.checked}`),
+            { method: 'post' }
+          );
+        });
+    });
+
+    $('.streamer-show, .streamer').on('click', '.test-xhr', (e: Event) => {
+      const el = e.target as HTMLButtonElement;
+      xhr.text(el.formAction, { method: 'post' });
+      $(el).detach();
+    });
 
     $('.mselect .button').on('click', function (this: HTMLElement) {
       const $p = $(this).parent();

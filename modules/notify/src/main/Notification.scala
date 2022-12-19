@@ -6,7 +6,6 @@ import ornicar.scalalib.ThreadLocalRandom
 import alleycats.Zero
 
 import lila.common.paginator.Paginator
-import lila.pref.NotifyAllows
 import lila.user.User
 import lila.notify.Notification.*
 
@@ -14,9 +13,9 @@ sealed abstract class NotificationContent(val key: String)
 
 case class MentionedInThread(
     mentionedBy: UserId,
-    topic: String,
+    topicName: String,
     topidId: ForumTopicId,
-    category: String,
+    category: ForumCategId,
     postId: ForumPostId
 ) extends NotificationContent("mention")
 
@@ -98,13 +97,16 @@ object Notification:
   opaque type Id = String
   object Id extends OpaqueString[Id]
 
+  opaque type UnreadCount = Int
+  object UnreadCount extends OpaqueInt[UnreadCount]:
+    given Zero[UnreadCount] = Zero(0)
+
   opaque type NotificationRead = Boolean
   object NotificationRead extends YesNo[NotificationRead]
 
-  case class AndUnread(pager: Paginator[Notification], unread: Int)
-  case class IncrementUnread()
+  case class AndUnread(pager: Paginator[Notification], unread: UnreadCount)
 
-  def make(to: UserId, content: NotificationContent): Notification =
+  def make[U](to: U, content: NotificationContent)(using userIdOf: UserIdOf[U]): Notification =
     val idSize = 8
-    val id = ThreadLocalRandom nextString idSize
-    new Notification(id, to, content, NotificationRead(false), DateTime.now)
+    val id     = ThreadLocalRandom nextString idSize
+    Notification(id, userIdOf(to), content, NotificationRead(false), DateTime.now)

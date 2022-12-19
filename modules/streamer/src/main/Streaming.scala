@@ -11,8 +11,6 @@ import ornicar.scalalib.ThreadLocalRandom
 
 import lila.common.{ Bus, LilaScheduler }
 import lila.common.config.Secret
-import lila.notify.StreamStart
-import lila.relation.SubscriptionRepo
 import lila.user.User
 
 final private class Streaming(
@@ -22,9 +20,7 @@ final private class Streaming(
     keyword: Stream.Keyword,
     alwaysFeatured: () => lila.common.UserIds,
     googleApiKey: Secret,
-    twitchApi: TwitchApi,
-    notifyApi: lila.notify.NotifyApi,
-    subsRepo: SubscriptionRepo
+    twitchApi: TwitchApi
 )(using
     ec: scala.concurrent.ExecutionContext,
     scheduler: akka.actor.Scheduler
@@ -38,14 +34,13 @@ final private class Streaming(
   var fakeActives = scala.collection.mutable.Set[Streamer.Id]()
   case class FakeStream(streamer: Streamer) extends Stream {
     def serviceName = "fake"
-    val language = "en"
-    val status = "fake stream"
+    val language    = "en"
+    val status      = "fake stream"
   }
-
 
   def getLiveStreams: LiveStreams = liveStreams
 
-  LilaScheduler(_.Every(15 seconds), _.AtMost(10 seconds), _.Delay(20 seconds)) {
+  LilaScheduler("Streaming", _.Every(15 seconds), _.AtMost(10 seconds), _.Delay(20 seconds)) {
     for {
       streamerIds <- api.allListedIds
       activeIds = streamerIds.filter { id =>
@@ -62,7 +57,7 @@ final private class Streaming(
               }
             } map { Twitch.Stream(name, title, _, language) }
           }.flatten
-        } zip fetchYouTubeStreams(streamers)) zip {(api byIds fakeActives) map (_ map FakeStream.apply)}
+        } zip fetchYouTubeStreams(streamers)) zip { (api byIds fakeActives) map (_ map FakeStream.apply) }
       streams = LiveStreams {
         ThreadLocalRandom.shuffle {
           (twitchStreams ::: youTubeStreams ::: fakeStreams) pipe dedupStreamers
@@ -72,7 +67,7 @@ final private class Streaming(
     } yield publishStreams(streamers, streams)
   }
 
-  private val streamStartMemo = lila.memo.ExpireSetMemo[UserId](2 hour)
+  private val streamStartOnceEvery = lila.memo.OnceEvery[UserId](2 hour)
 
   private def publishStreams(streamers: List[Streamer], newStreams: LiveStreams) =
     if (newStreams != liveStreams)
@@ -80,15 +75,11 @@ final private class Streaming(
         liveStreams has s.streamer
       } foreach { s =>
         import s.streamer.userId
-        if (true)//!streamStartMemo.get(UserId(userId)))
-          streamStartMemo.put(userId)
+        if (true) // streamStartOnceEvery(userId))
           Bus.publish(
-            lila.hub.actorApi.streamer.StreamStart(userId),
+            lila.hub.actorApi.streamer.StreamStart(userId, s.streamer.name.value),
             "streamStart"
           )
-          subsRepo.subscribersOnlineSince(userId, 7) map { subs =>
-            notifyApi.notifyMany(subs, StreamStart(userId, s.streamer.name.value))
-          }
       }
     liveStreams = newStreams
     streamers foreach { streamer =>

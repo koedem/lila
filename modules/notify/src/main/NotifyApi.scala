@@ -11,25 +11,54 @@ import lila.db.dsl.{ *, given }
 import lila.db.paginator.Adapter
 import lila.hub.actorApi.socket.{ SendTo, SendTos }
 import lila.memo.CacheApi.*
-import lila.pref.{ Allows, NotifyAllows }
 import lila.user.{ User, UserRepo }
 import lila.i18n.*
 
 final class NotifyApi(
     jsonHandlers: JSONHandlers,
     repo: NotificationRepo,
+    colls: NotifyColls,
     userRepo: UserRepo,
     cacheApi: lila.memo.CacheApi,
     maxPerPage: MaxPerPage,
-    prefApi: lila.pref.PrefApi,
-    getLightUser: lila.common.LightUser.Getter
+    prefApi: lila.pref.PrefApi
 )(using scala.concurrent.ExecutionContext):
 
   import Notification.*
   import BSONHandlers.given
   import jsonHandlers.*
 
-  private val unreadCountCache = cacheApi[UserId, Int](32768, "notify.unreadCountCache") {
+  object prefs:
+    import NotificationPref.{ *, given }
+
+    def form(me: User) =
+      colls.pref
+        .byId[NotificationPref](me.id)
+        .dmap(_ | default)
+        .map(NotificationPref.form.form.fill)
+
+    def set(me: User, pref: NotificationPref) =
+      colls.pref.update.one($id(me.id), pref, upsert = true).void
+
+    def allows(userId: UserId, event: Event): Fu[Allows] =
+      colls.pref
+        .primitiveOne[Allows]($id(userId), event.key)
+        .dmap(_ | default.allows(event))
+
+    def getAllows(userIds: Iterable[UserId], event: NotificationPref.Event): Fu[List[NotifyAllows]] =
+      colls.pref.tempPrimary
+        .find($inIds(userIds), $doc(s"notification.$event" -> true).some)
+        .cursor[Bdoc]()
+        .listAll() dmap { docs =>
+        for {
+          doc    <- docs
+          userId <- doc.getAsOpt[UserId]("_id")
+          allowsOpt = doc child "notification" flatMap (_ int event.key) map Allows.fromCode
+          allows    = allowsOpt | NotificationPref.default.allows(event)
+        } yield NotifyAllows(userId, allows)
+      }
+
+  private val unreadCountCache = cacheApi[UserId, UnreadCount](32768, "notify.unreadCountCache") {
     _.expireAfterAccess(15 minutes)
       .buildAsyncFuture(repo.unreadNotificationsCount)
   }
@@ -37,7 +66,7 @@ final class NotifyApi(
   def getNotifications(userId: UserId, page: Int): Fu[Paginator[Notification]] =
     Paginator(
       adapter = new Adapter(
-        collection = repo.coll,
+        collection = colls.notif,
         selector = repo.userNotificationsQuery(userId),
         projection = none,
         sort = repo.recentSort
@@ -47,17 +76,17 @@ final class NotifyApi(
     )
 
   def getNotificationsAndCount(userId: UserId, page: Int): Fu[Notification.AndUnread] =
-    getNotifications(userId, page) zip unreadCount(userId) map (AndUnread.apply _).tupled
+    getNotifications(userId, page) zip unreadCount(userId) map AndUnread.apply
 
   def markAllRead(userId: UserId): Funit =
-    repo.markAllRead(userId) >>- unreadCountCache.put(userId, fuccess(0))
+    repo.markAllRead(userId) >>- unreadCountCache.put(userId, fuccess(UnreadCount(0)))
 
   def markAllRead(userIds: Iterable[UserId]): Funit =
     repo.markAllRead(userIds) >>- userIds.foreach {
-      unreadCountCache.put(_, fuccess(0))
+      unreadCountCache.put(_, fuccess(UnreadCount(0)))
     }
 
-  def unreadCount(userId: UserId): Fu[Int] =
+  def unreadCount(userId: UserId): Fu[UnreadCount] =
     unreadCountCache get userId
 
   def insertNotification(notification: Notification): Funit =
@@ -72,53 +101,57 @@ final class NotifyApi(
 
   def exists = repo.exists
 
-  def notifyOne(to: UserId, content: NotificationContent): Funit =
+  def notifyOne[U: UserIdOf](to: U, content: NotificationContent): Funit =
     val note = Notification.make(to, content)
     !shouldSkip(note) ifThen {
       insertNotification(note) >> {
-        if (!Allows.canFilter(note.content.key)) bellOne(note.to)
-        else
-          prefApi.getNotificationPref(note.to) map (_ allows note.content.key) flatMap { allows =>
-            allows.bell ?? bellOne(note.to)
-            allows.push ?? fuccess(pushOne(NotifyAllows(note.to, allows), note.content))
-          }
+        NotificationPref.Event.byKey.get(content.key) match
+          case None => fuccess(bellOne(note.to))
+          case Some(event) =>
+            prefs.allows(note.to, event) map { allows =>
+              if allows.bell then bellOne(note.to)
+              if allows.push then pushOne(NotifyAllows(note.to, allows), note.content)
+            }
       }
     }
 
   // notifyMany tells clients that an update is available to bump their bell. there's no need
   // to assemble full notification pages for all clients at once, let them initiate
   def notifyMany(userIds: Iterable[UserId], content: NotificationContent): Funit =
-    prefApi.getNotifyAllows(userIds, content.key) flatMap { recips =>
-      pushMany(recips filter (_.allows.push), content)
-      bellMany(recips, content)
+    NotificationPref.Event.byKey.get(content.key) ?? { event =>
+      prefs.getAllows(userIds, event) flatMap { recips =>
+        pushMany(recips.filter(_.allows.push), content)
+        bellMany(recips, content)
+      }
     }
 
-  private def bellOne(to: UserId): Funit =
-    getNotifications(to, 1) zip unreadCount(to) dmap (AndUnread.apply _).tupled map { msg =>
-      Bus.publish(
-        SendTo.async(
-          to,
-          "notifications",
-          () =>
-            (userRepo langOf to) map I18nLangPicker.byStrOrDefault map (lang => jsonHandlers(msg)(using lang))
-        ),
-        "socketUsers"
-      )
-    }
+  private def bellOne(to: UserId): Unit =
+    Bus.publish(
+      SendTo.onlineUser(
+        to,
+        "notifications",
+        () =>
+          for
+            notifications <- getNotifications(to, 1) zip unreadCount(to) dmap AndUnread.apply
+            langStr       <- userRepo.langOf(to)
+            lang = I18nLangPicker.byStrOrDefault(langStr)
+          yield jsonHandlers(notifications)(using lang)
+      ),
+      "socketUsers"
+    )
 
   private def bellMany(recips: Iterable[NotifyAllows], content: NotificationContent) =
-    val bells = recips filter (_.allows.bell) map (_.userId)
-    bells map unreadCountCache.invalidate // or maybe update only if getIfPresent?
-    repo.insertMany(bells map (to => Notification.make(to, content))) >>- {
+    val bells = recips.collect { case r if r.allows.bell => r.userId }
+    bells foreach unreadCountCache.invalidate // or maybe update only if getIfPresent?
+    repo.insertMany(bells.map(to => Notification.make(to, content))) >>-
       Bus.publish(
         SendTos(
-          bells toSet,
+          bells.toSet,
           "notifications",
           Json.obj("incrementUnread" -> true)
         ),
         "socketUsers"
       )
-    }
 
   private def pushOne(to: NotifyAllows, content: NotificationContent) =
     pushMany(Seq(to), content)
@@ -137,4 +170,3 @@ final class NotifyApi(
       case PrivateMessage(sender, _) =>
         repo.hasRecentPrivateMessageFrom(note.to, sender)
       case _ => userRepo.isKid(note.to)
-    

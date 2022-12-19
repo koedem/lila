@@ -5,6 +5,7 @@ import com.softwaremill.macwire.*
 import lila.common.autoconfig.*
 import play.api.Configuration
 
+import lila.db.dsl.Coll
 import lila.common.Bus
 import lila.common.config.*
 
@@ -18,20 +19,19 @@ final class Env(
     cacheApi: lila.memo.CacheApi,
     prefApi: lila.pref.PrefApi,
     subsRepo: lila.relation.SubscriptionRepo
-)(using
-    ec: scala.concurrent.ExecutionContext,
-    system: ActorSystem
-):
+)(using scala.concurrent.ExecutionContext, ActorSystem):
 
   lazy val jsonHandlers = wire[JSONHandlers]
 
-  private lazy val notifyColl = db(CollName("notify"))
+  private val colls = new NotifyColls(notif = db(CollName("notify")), pref = db(CollName("notify_pref")))
 
   private val maxPerPage = MaxPerPage(7)
 
   private lazy val repo = wire[NotificationRepo]
 
   lazy val api = wire[NotifyApi]
+
+  val getAllows = GetNotifyAllows(api.prefs.allows)
 
   // api actor
   Bus.subscribeFun("notify") {
@@ -46,4 +46,14 @@ final class Env(
           )
         }
       }
+    case lila.hub.actorApi.streamer.StreamStart(userId, streamerName) =>
+      subsRepo.subscribersOnlineSince(userId, 7) map { subs =>
+        api.notifyMany(subs, StreamStart(userId, streamerName))
+      }
   }
+
+final private class NotifyColls(val notif: Coll, val pref: Coll)
+
+private type GetNotifyAllowsType                   = (UserId, NotificationPref.Event) => Fu[Allows]
+opaque type GetNotifyAllows <: GetNotifyAllowsType = GetNotifyAllowsType
+object GetNotifyAllows extends TotalWrapper[GetNotifyAllows, GetNotifyAllowsType]

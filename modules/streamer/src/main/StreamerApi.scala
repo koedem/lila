@@ -40,38 +40,23 @@ final class StreamerApi(
       coll.insert.one(s.streamer) inject s.some
     }
 
-  val forSubscriber: PartialFunction[(UserStr, Option[User]), Fu[Option[Streamer.WithContext]]] =
-    case (susername, Some(u)) =>
-      for {
-        swuOpt <- find(susername)
-        subscribed <- subsRepo.isSubscribed(u.id, susername)
-      } yield swuOpt map(swu => Streamer.WithUser(swu.streamer, swu.user, subscribed))
-    case (sid, None) => find(sid)
+  def forSubscriber(streamerName: UserStr, me: Option[User]): Fu[Option[Streamer.WithContext]] =
+    me.foldLeft(find(streamerName)) { (streamerFu, me) =>
+      streamerFu flatMap {
+        _ ?? { s =>
+          subsRepo.isSubscribed(me.id, s.streamer).map { sub => s.copy(subscribed = sub).some }
+        }
+      }
+    }
 
-  def withUsers(live: LiveStreams, userId: Option[UserId]): Fu[List[Streamer.WithUserAndStream]] =
-    userRepo.coll
-      .aggregateList(100, readPreference = ReadPreference.secondaryPreferred) { framework =>
-        import framework._
-        Match($inIds(live.streams.map(_.streamer.userId))) -> List(
-          PipelineOperator(
-            $lookup.simple(
-              from = subsRepo.coll,
-              as = "subs",
-              local = "_id",
-              foreign = "s"
-            )
-          ),
-          AddFields($doc("subscribed" -> $doc("$in" -> List(userId.??(_.toString), "$subs.u"))))
-        )
-      }
-      .map { docs =>
-        for {
-          doc        <- docs
-          user       <- doc.asOpt[User]
-          stream     <- live.streams.find(_.streamer.userId == user.id)
-          subscribed <- doc.getAsOpt[Boolean]("subscribed")
-        } yield Streamer.WithUserAndStream(stream.streamer, user, stream.some, subscribed)
-      }
+  def withUsers(live: LiveStreams, me: Option[UserId]): Fu[List[Streamer.WithUserAndStream]] = for {
+    users <- userRepo.byIdsSecondary(live.streams.map(_.streamer.userId))
+    subs  <- me.??(subsRepo.filterSubscribed(_, users.map(_.id)))
+  } yield live.streams.flatMap { s =>
+    users.find(_ is s.streamer) map {
+      Streamer.WithUserAndStream(s.streamer, _, s.some, subs(s.streamer.userId))
+    }
+  }
 
   def allListedIds: Fu[Set[Streamer.Id]] = cache.listedIds.getUnit
 
@@ -116,7 +101,7 @@ final class StreamerApi(
         )
         ~modChange.list ?? {
           notifyApi.notifyOne(
-            streamer.userId,
+            streamer,
             lila.notify.GenericLink(
               url = "/streamer/edit",
               title = "Listed on /streamer".some,

@@ -11,7 +11,7 @@ final class StreamerPager(
     userRepo: UserRepo,
     maxPerPage: lila.common.config.MaxPerPage,
     subsRepo: lila.relation.SubscriptionRepo
-)(using ec: scala.concurrent.ExecutionContext):
+)(using scala.concurrent.ExecutionContext):
 
   import BsonHandlers.given
 
@@ -32,53 +32,42 @@ final class StreamerPager(
     "_id"
   )
 
-  private def notLive(live: LiveStreams, forUser: Option[UserId]): AdapterLike[Streamer.WithContext] =
-    new AdapterLike[Streamer.WithContext]:
+  private def notLive(live: LiveStreams, forUser: Option[UserId]): AdapterLike[Streamer.WithContext] = new:
 
-      def nbResults: Fu[Int] = fuccess(1000)
+    def nbResults: Fu[Int] = fuccess(1000)
 
-      def slice(offset: Int, length: Int): Fu[Seq[Streamer.WithContext]] =
-        coll
-          .aggregateList(length, readPreference = ReadPreference.secondaryPreferred) { framework =>
-            import framework._
-            Match(
-              $doc(
-                "approval.granted" -> true,
-                "listed"           -> Streamer.Listed(true),
-                "_id" $nin live.streams.map(_.streamer.id)
-              )
-            ) -> List(
-              Sort(Descending("liveAt")),
-              Skip(offset),
-              Limit(length),
-              PipelineOperator(
-                $lookup.simple(
-                  from = userRepo.coll,
-                  as = "user",
-                  local = "_id",
-                  foreign = "_id"
-                )
-              ),
-              UnwindField("user"),
-              PipelineOperator(
-                $lookup.simple(
-                  from = subsRepo.coll,
-                  as = "subs",
-                  local = "_id",
-                  foreign = "s"
-                )
-              ),
-              AddFields($doc("subscribed" -> $doc("$in" -> List(forUser.??(_.toString), "$subs.u"))))
+    def slice(offset: Int, length: Int): Fu[Seq[Streamer.WithContext]] =
+      coll
+        .aggregateList(length, readPreference = ReadPreference.secondaryPreferred) { framework =>
+          import framework._
+          Match(
+            $doc(
+              "approval.granted" -> true,
+              "listed"           -> Streamer.Listed(true),
+              "_id" $nin live.streams.map(_.streamer.id)
             )
+          ) -> List(
+            Sort(Descending("liveAt")),
+            Skip(offset),
+            Limit(3),
+            PipelineOperator(userLookup),
+            UnwindField("user")
+          )
+        }
+        .map { docs =>
+          for {
+            doc      <- docs
+            streamer <- doc.asOpt[Streamer]
+            user     <- doc.getAsOpt[User]("user")
+          } yield Streamer.WithUser(streamer, user, false)
+        }
+        .flatMap { streamers =>
+          forUser.fold(fuccess(streamers)) { me =>
+            subsRepo.filterSubscribed(me, streamers.map(_.user.id)) map { subs =>
+              streamers.map(s => s.copy(subscribed = subs(s.user.id)))
+            }
           }
-          .map { docs =>
-            for {
-              doc        <- docs
-              streamer   <- doc.asOpt[Streamer]
-              user       <- doc.getAsOpt[User]("user")
-              subscribed <- doc.getAsOpt[Boolean]("subscribed")
-            } yield Streamer.WithUser(streamer, user, subscribed)
-          }
+        }
 
   private def approval: AdapterLike[Streamer.WithContext] = new AdapterLike[Streamer.WithContext]:
 
@@ -94,14 +83,7 @@ final class StreamerPager(
             Sort(Ascending("updatedAt")),
             Skip(offset),
             Limit(length),
-            PipelineOperator(
-              $lookup.simple(
-                from = userRepo.coll,
-                as = "user",
-                local = "_id",
-                foreign = "_id"
-              )
-            ),
+            PipelineOperator(userLookup),
             UnwindField("user")
           )
         }
@@ -112,3 +94,10 @@ final class StreamerPager(
             user     <- doc.getAsOpt[User]("user")
           } yield Streamer.WithUser(streamer, user)
         }
+
+  private val userLookup = $lookup.simple(
+    from = userRepo.coll,
+    as = "user",
+    local = "_id",
+    foreign = "_id"
+  )

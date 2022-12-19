@@ -1,6 +1,6 @@
 /* Common imports for all pages */
 
-@import '../../../node_modules/breakpoint-sass/stylesheets/breakpoint';
+@import '../../node_modules/breakpoint-sass/stylesheets/breakpoint';
 
 @import 'abstract/all';
 
@@ -36,4 +36,3 @@
 @import 'component/reconnecting';
 @import 'component/announce';
 @import 'component/agreement';
-@import 'component/std-toggle';

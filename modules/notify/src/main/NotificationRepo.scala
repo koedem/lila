@@ -7,13 +7,12 @@ import scala.concurrent.duration.{ Duration, DurationInt }
 import lila.db.dsl.{ *, given }
 import lila.user.User
 
-final private class NotificationRepo(
-    val coll: Coll,
-    val userRepo: lila.user.UserRepo,
-    val prefApi: lila.pref.PrefApi
-)(using ec: scala.concurrent.ExecutionContext):
+final private class NotificationRepo(colls: NotifyColls)(using ec: scala.concurrent.ExecutionContext):
 
   import BSONHandlers.given
+  import Notification.UnreadCount
+
+  private val coll = colls.notif
 
   def insert(notification: Notification) =
     coll.insert.one(notification).void
@@ -33,8 +32,8 @@ final private class NotificationRepo(
   def markManyRead(doc: Bdoc): Funit =
     coll.update.one(doc, $set("read" -> true), multi = true).void
 
-  def unreadNotificationsCount(userId: UserId): Fu[Int] =
-    coll.countSel(unreadOnlyQuery(userId))
+  def unreadNotificationsCount(userId: UserId): Fu[UnreadCount] =
+    UnreadCount from coll.countSel(unreadOnlyQuery(userId))
 
   def hasRecent(note: Notification, criteria: ElementProducer, unreadSince: Duration): Fu[Boolean] =
     hasFresh(note.notifies, note.content.key, criteria, matchRecentOrUnreadSince(unreadSince))
@@ -63,9 +62,6 @@ final private class NotificationRepo(
     coll.exists(userNotificationsQuery(notifies) ++ selector)
 
   val recentSort = $sort desc "createdAt"
-
-  def mostRecentUnread(userId: UserId) =
-    coll.find($doc("notifies" -> userId, "read" -> false)).sort($sort.createdDesc).one[Notification]
 
   def userNotificationsQuery(userId: UserId) = $doc("notifies" -> userId)
 
