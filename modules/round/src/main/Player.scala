@@ -170,16 +170,18 @@ final private class Player(
 
     // publish correspondence moves
     if (game.isCorrespondence && game.nonAi)
-      Bus.publish(
-        CorresMoveEvent(
-          move = moveEvent,
-          playerUserId = game.player(color).userId,
-          mobilePushable = game.mobilePushable,
-          alarmable = game.alarmable,
-          unlimited = game.isUnlimited
-        ),
-        "moveEventCorres"
-      )
+      Bus
+        .publish(
+          CorresMoveEvent(
+            move = moveEvent,
+            playerUserId = game.player(color).userId,
+            mobilePushable = game.mobilePushable,
+            alarmable = game.alarmable,
+            unlimited = game.isUnlimited
+          ),
+          "moveEventCorres"
+        )
+        .pp("hey cool")
 
     // publish simul moves
     for {

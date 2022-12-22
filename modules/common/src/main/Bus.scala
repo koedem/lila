@@ -97,6 +97,11 @@ final private class EventBus[Event, Channel, Subscriber](
   def publish(event: Event, channel: Channel): Unit =
     Option(entries get channel) foreach {
       _ foreach {
+        if (
+          !event.toString.startsWith("GetCandidates") && !event.toString.startsWith("Mlat") && !event.toString
+            .startsWith("SendToFlag(tournament")
+        )
+          event.toString.pp("Bus.publish")
         publish(_, event)
       }
     }

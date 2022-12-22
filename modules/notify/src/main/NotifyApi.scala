@@ -43,7 +43,9 @@ final class NotifyApi(
     def allows(userId: UserId, event: Event): Fu[Allows] =
       colls.pref
         .primitiveOne[Allows]($id(userId), event.key)
-        .dmap(_ | default.allows(event))
+        .pp("primitiveOne")
+        .dmap(_.pp("got one") | default.allows(event).pp("default"))
+        .pp("dmap")
 
     def getAllows(userIds: Iterable[UserId], event: NotificationPref.Event): Fu[List[NotifyAllows]] =
       colls.pref.tempPrimary
@@ -59,7 +61,7 @@ final class NotifyApi(
         val defaultAllows = userIds.filterNot(customIds.contains).map {
           NotifyAllows(_, NotificationPref.default.allows(event))
         }
-        customAllows ::: defaultAllows.toList
+        (customAllows ::: defaultAllows.toList).pp
       }
 
   private val unreadCountCache = cacheApi[UserId, UnreadCount](32768, "notify.unreadCountCache") {
@@ -153,7 +155,7 @@ final class NotifyApi(
           bells.toSet,
           "notifications",
           Json.obj("incrementUnread" -> true)
-        ),
+        ).pp("it not worky"),
         "socketUsers"
       )
 

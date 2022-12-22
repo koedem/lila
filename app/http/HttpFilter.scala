@@ -38,7 +38,8 @@ final class HttpFilter(env: Env)(implicit val mat: Materializer) extends Filter:
     val statusCode = result.header.status
     val client     = HTTPRequest clientName req
     httpMon.time(actionName, client, req.method, statusCode).record(reqTime)
-    if (logRequests) logger.info(s"$statusCode $client $req $actionName ${reqTime}ms")
+    if (logRequests && actionName != "Fishnet.status") 
+      logger.info(s"${req.headers.get("x-real-ip").getOrElse("localhost")} $client - $statusCode $req $actionName ${reqTime}ms")
 
   private def redirectWrongDomain(req: RequestHeader): Option[Result] =
     (

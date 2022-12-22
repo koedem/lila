@@ -237,6 +237,7 @@ export default class StrongSocket {
   };
 
   handle = (m: MsgIn) => {
+    console.log(m);
     if (m.v && this.version !== false) {
       if (m.v <= this.version) {
         this.debug('already has event ' + m.v);

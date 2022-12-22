@@ -43,6 +43,10 @@ final class RemoteSocket(
 
   val onlineUserIds: AtomicReference[Set[UserId]] = new AtomicReference(initialUserIds)
 
+  val cancelme = summon[Scheduler].scheduleWithFixedDelay(Duration(4, SECONDS), Duration(4, SECONDS))(() => {
+    onlineUserIds.get().pp("onlines")
+  })
+
   val baseHandler: Handler =
     case In.ConnectUser(userId) =>
       onlineUserIds.getAndUpdate(_ + userId).unit

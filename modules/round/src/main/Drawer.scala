@@ -46,7 +46,13 @@ final private[round] class Drawer(
         )
       case Pov(g, color) if g playerCanOfferDraw color =>
         val progress = Progress(g) map { _ offerDraw color }
-        messenger.system(g, color.fold(trans.whiteOffersDraw, trans.blackOffersDraw).txt())
+        messenger.system(
+          g,
+          color
+            .fold(trans.whiteOffersDraw, trans.blackOffersDraw)
+            .txt()
+            .pp("there's some draw stuff happening")
+        )
         proxy.save(progress) >>-
           publishDrawOffer(progress.game) inject
           List(Event.DrawOffer(by = color.some))
@@ -81,10 +87,12 @@ final private[round] class Drawer(
 
   private def publishDrawOffer(game: Game): Unit = if (game.nonAi)
     if (game.isCorrespondence)
-      Bus.publish(
-        lila.hub.actorApi.round.CorresDrawOfferEvent(game.id),
-        "offerEventCorres"
-      )
+      Bus
+        .publish(
+          lila.hub.actorApi.round.CorresDrawOfferEvent(game.id),
+          "offerEventCorres"
+        )
+        .pp("oh goody")
     if (lila.game.Game.isBoardOrBotCompatible(game))
       Bus.publish(
         lila.game.actorApi.BoardDrawOffer(game),

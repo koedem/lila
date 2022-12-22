@@ -28,15 +28,11 @@ object layout:
       }
     def metaCsp(csp: Option[ContentSecurityPolicy])(implicit ctx: Context): Frag =
       metaCsp(csp getOrElse defaultCsp)
-    def metaThemeColor(using ctx: Context): Frag = if (ctx.pref.bg == lila.pref.Pref.Bg.SYSTEM) raw {
-      s"""<meta name="theme-color" media="(prefers-color-scheme: light)" content="${ctx.pref.themeColorLight}">""" +
-        s"""<meta name="theme-color" media="(prefers-color-scheme: dark)" content="${ctx.pref.themeColorDark}">"""
-    }
-    else
+    def metaThemeColor(implicit ctx: Context): Frag =
       raw {
         s"""<meta name="theme-color" content="${ctx.pref.themeColor}">"""
       }
-    def pieceSprite(using ctx: Context): Frag = pieceSprite(ctx.currentPieceSet)
+    def pieceSprite(implicit ctx: Context): Frag = pieceSprite(ctx.currentPieceSet)
     def pieceSprite(ps: lila.pref.PieceSet): Frag =
       link(
         id   := "piece-sprite",
@@ -190,8 +186,7 @@ object layout:
           jsModule("site")
         ),
       moreJs,
-      ctx.pageData.inquiry.isDefined option jsModule("mod.inquiry"),
-      ctx.pref.bg == lila.pref.Pref.Bg.SYSTEM option embedJsUnsafe(systemThemePolyfillJs)
+      ctx.pageData.inquiry.isDefined option jsModule("mod.inquiry")
     )
 
   private def hrefLang(lang: String, path: String) =
@@ -251,7 +246,10 @@ object layout:
           viewport,
           metaCsp(csp),
           metaThemeColor,
-          st.headTitle(fullTitle | s"$title • $siteName"),
+          st.headTitle(
+            if (netConfig.isProd) fullTitle | s"$title • lichess.org"
+            else s"${ctx.me.fold("anon")(_.username)} ${fullTitle | s"$title • lichess.dev"}"
+          ),
           cssTag("site"),
           ctx.pref.is3d option cssTag("board-3d"),
           ctx.pageData.inquiry.isDefined option cssTagNoTheme("mod.inquiry"),
@@ -275,7 +273,7 @@ object layout:
             tpe := "application/atom+xml",
             rel := "alternate"
           ),
-          ctx.pref.bg == lila.pref.Pref.Bg.TRANSPARENT option ctx.pref.bgImgOrDefault map { img =>
+          ctx.currentBg == "transp" option ctx.pref.bgImgOrDefault map { img =>
             raw(
               s"""<style id="bg-data">body.transp::before{background-image:url("${escapeHtmlRaw(img)
                   .replace("&amp;", "&")}");}</style>"""
@@ -328,7 +326,7 @@ object layout:
             .ifTrue(ctx.isAnon)
             .map(views.html.auth.bits.checkYourEmailBanner(_)),
           zenable option zenZone,
-          siteHeader(zenable),
+          siteHeader.apply,
           div(
             id := "main-wrap",
             cls := List(
@@ -412,7 +410,7 @@ object layout:
           title     := trans.team.teams.txt()
         )
 
-    def apply(zenable: Boolean)(using ctx: Context) =
+    def apply(implicit ctx: Context) =
       header(id := "top")(
         div(cls := "site-title-nav")(
           !ctx.isAppealUser option topnavToggle,
@@ -422,12 +420,7 @@ object layout:
             a(href := langHref("/"))(siteNameFrag)
           ),
           ctx.blind option h2("Navigation"),
-          !ctx.isAppealUser option frag(
-            topnav(),
-            ctx.me.exists(!_.isPatron) && !zenable option a(cls := "site-title-nav__donate")(
-              href := routes.Plan.index
-            )(trans.patron.donate())
-          )
+          !ctx.isAppealUser option topnav()
         ),
         div(cls := "site-buttons")(
           !ctx.isAppealUser option clinput,
@@ -470,13 +463,12 @@ object layout:
 
     private val cache = scala.collection.mutable.AnyRefMap.empty[Lang, String]
 
-    private def jsCode(using lang: Lang) =
+    private def jsCode(implicit lang: Lang) =
       cache.getOrElseUpdate(
         lang,
         s"""lichess={load:new Promise(r=>document.addEventListener("DOMContentLoaded",r)),quantity:${lila.i18n
             .JsQuantity(lang)},siteI18n:${safeJsonValue(i18nJsObject(i18nKeys))}}"""
       )
 
-    def apply(nonce: Nonce)(using Lang) =
+    def apply(nonce: Nonce)(implicit lang: Lang) =
       embedJsUnsafe(jsCode, nonce)
-  end inlineJs
