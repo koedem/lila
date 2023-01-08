@@ -415,6 +415,7 @@
   <string name="siteDescription">Nemokamas šachmatų žaidimas internete. Žaiskite šachmatais patrauklioje sąsajoje. Nebūtina registracija, nėra reklamų, nereikia jokių priedų. Žaiskite šachmatais prieš kompiuterį, draugus arba atsitiktinius varžovus.</string>
   <string name="xJoinedTeamY">%1$s prisijungė prie „%2$s“ komandos</string>
   <string name="xCreatedTeamY">%1$s sukūrė „%2$s“ komandą</string>
+  <string name="startedStreaming">pradėjo transliuoti</string>
   <string name="xStartedStreaming">%s pradėjo transliaciją</string>
   <string name="averageElo">Reitingo vidurkis</string>
   <string name="location">Vietovė</string>
@@ -603,6 +604,8 @@ kompiuterinę analizę, partijos pokalbį bei URL dalinimuisi.</string>
   <string name="blog">Tinklaraštis</string>
   <string name="notes">Užrašai</string>
   <string name="typePrivateNotesHere">Čia galite rašytis asmeninius užrašus</string>
+  <string name="writeAPrivateNoteAboutThisUser">Parašykite privatų užrašą apie šį vartotoją</string>
+  <string name="noNoteYet">Kol kas nėra užrašų</string>
   <string name="invalidUsernameOrPassword">Neteisingas prisijungimo vardas arba slaptažodis</string>
   <string name="incorrectPassword">Neteisingas slaptažodis</string>
   <string name="invalidAuthenticationCode">Neteisingas patvirtinimo kodas</string>
@@ -776,6 +779,7 @@ kompiuterinę analizę, partijos pokalbį bei URL dalinimuisi.</string>
   <string name="kidMode">Vaiko veiksena</string>
   <string name="kidModeExplanation">Tai yra dėl saugumo. Vaiko veiksenoje išjungiamas visas bendravimas svetainėje. Įjunkite tai savo vaikams bei moksleiviams, norėdami juos apsaugoti nuo kitų interneto naudotojų.</string>
   <string name="inKidModeTheLichessLogoGetsIconX">Vaiko veiksenoje „lichess“ logotipas gauna %s piktogramą tam, kad žinotumėte, jog jūsų vaikai yra saugūs.</string>
+  <string name="askYourChessTeacherAboutLiftingKidMode">Jūsų paskyra yra valdoma. Norėdami pašalinti vaiko režimą kreipkitės į savo šachmatų mokytoją.</string>
   <string name="enableKidMode">Įjungti vaiko veikseną</string>
   <string name="disableKidMode">Išjungti vaiko veikseną</string>
   <string name="security">Saugumas</string>
@@ -812,6 +816,7 @@ kompiuterinę analizę, partijos pokalbį bei URL dalinimuisi.</string>
   <string name="light">Šviesus</string>
   <string name="dark">Tamsus</string>
   <string name="transparent">Permatomas</string>
+  <string name="deviceTheme">Įrenginio tema</string>
   <string name="backgroundImageUrl">Fono paveikslo URL:</string>
   <string name="boardGeometry">Lentos geometrija</string>
   <string name="boardTheme">Lentos stilius</string>

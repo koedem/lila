@@ -42,7 +42,6 @@ final class Env(
   // remote socket support
   Bus.subscribeFun("remoteSocketIn:evalGet") { case TellSriIn(sri, _, msg) =>
     msg obj "d" foreach { d =>
-      // TODO send once, let lila-ws distribute
       socketHandler.evalGet(Sri(sri), d, res => Bus.publish(TellSriOut(sri, res), "remoteSocketOut"))
     }
   }
@@ -55,7 +54,7 @@ final class Env(
 
   def cli = new lila.common.Cli:
     def process = { case "eval-cache" :: "drop" :: variantKey :: fenParts =>
-      Variant(variantKey).fold(fufail[String]("Invalid variant")) { variant =>
+      Variant(Variant.LilaKey(variantKey)).fold(fufail("Invalid variant")) { variant =>
         api.drop(variant, chess.format.Fen.Epd(fenParts mkString " ")) inject "done!"
       }
     }

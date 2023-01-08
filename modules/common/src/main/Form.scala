@@ -8,7 +8,7 @@ import play.api.data.format.Formatter
 import play.api.data.Forms.*
 import play.api.data.JodaForms.*
 import play.api.data.validation.{ Constraint, Constraints }
-import play.api.data.{ Field, FormError, JodaFormats, Mapping }
+import play.api.data.{ Field, FormError, JodaFormats, Mapping, Form => PlayForm }
 import play.api.data.validation as V
 import scala.util.Try
 
@@ -48,7 +48,7 @@ object Form:
       d -> format(d)
     }
 
-  def mustBeOneOf(choices: Iterable[Any]) = s"Must be one of: ${choices mkString ", "}"
+  def mustBeOneOf[A](choices: Iterable[A]) = s"Must be one of: ${choices mkString ", "}"
 
   def numberIn(choices: Options[Int]) =
     number.verifying(mustBeOneOf(choices.map(_._1)), hasKey(choices, _))
@@ -129,6 +129,9 @@ object Form:
   def stringIn(choices: Set[String]) =
     text.verifying(mustBeOneOf(choices), choices.contains)
 
+  def typeIn[A: Formatter](choices: Set[A]) =
+    of[A].verifying(mustBeOneOf(choices), choices.contains)
+
   def tolerantBoolean = of[Boolean](formatter.tolerantBooleanFormatter)
 
   def hasKey[A](choices: Options[A], key: A) =
@@ -144,9 +147,11 @@ object Form:
   private def pluralize(pattern: String, nb: Int) =
     pattern.replace("{s}", if (nb == 1) "" else "s")
 
+  given intBase: Formatter[Int]      = intFormat
+  given strBase: Formatter[String]   = stringFormat
+  given boolBase: Formatter[Boolean] = booleanFormat
+
   object formatter:
-    private val strBase                                                      = stringFormat
-    private val intBase                                                      = intFormat
     def string[A <: String](to: String => A): Formatter[A]                   = strBase.transform(to, identity)
     def stringFormatter[A](from: A => String, to: String => A): Formatter[A] = strBase.transform(to, from)
     def stringOptionFormatter[A](from: A => String, to: String => Option[A]): Formatter[A] =
@@ -202,9 +207,6 @@ object Form:
 
     val field = of[URL]
 
-  given Formatter[String]  = stringFormat
-  given Formatter[Boolean] = booleanFormat
-
   given autoFormat[A, T](using
       sr: SameRuntime[A, T],
       rs: SameRuntime[T, A],
@@ -213,11 +215,13 @@ object Form:
     def bind(key: String, data: Map[String, String]) = base.bind(key, data) map sr.apply
     def unbind(key: String, value: T)                = base.unbind(key, rs(value))
 
-  given Formatter[chess.variant.Variant] =
-    formatter.stringFormatter[chess.variant.Variant](_.key, chess.variant.Variant.orDefault)
+  given Formatter[chess.variant.Variant] = {
+    import chess.variant.Variant
+    formatter.stringFormatter[Variant](_.key.value, str => Variant.orDefault(Variant.LilaKey(str)))
+  }
 
   extension [A](f: Formatter[A])
-    def transform[B](to: A => B, from: B => A): Formatter[B] = new Formatter[B]:
+    def transform[B](to: A => B, from: B => A): Formatter[B] = new:
       def bind(key: String, data: Map[String, String]) = f.bind(key, data) map to
       def unbind(key: String, value: B)                = f.unbind(key, from(value))
     def into[B](using sr: SameRuntime[A, B], rs: SameRuntime[B, A]): Formatter[B] =
@@ -226,6 +230,8 @@ object Form:
   extension [A](m: Mapping[A])
     def into[B](using sr: SameRuntime[A, B], rs: SameRuntime[B, A]): Mapping[B] =
       m.transform(sr.apply, rs.apply)
+
+  extension [A](f: PlayForm[A]) def fillOption(o: Option[A]) = o.fold(f)(f.fill)
 
   object strings:
     def separator(sep: String) = of[List[String]](

@@ -18,6 +18,8 @@ import lila.tree.Node.{ Comment, Comments, Gamebook, Shape, Shapes }
 
 object BSONHandlers:
 
+  private given BSONHandler[Pos] = chessPosKeyHandler
+
   given BSON[Shape] with
     def reads(r: Reader) =
       val brush = r str "b"
@@ -215,11 +217,8 @@ object BSONHandlers:
       }
     )
 
-  given BSONHandler[Path] = BSONStringHandler.as[Path](Path.apply, _.toString)
-  given BSONHandler[Variant] = tryHandler[Variant](
-    { case BSONInteger(v) => Variant(v) toTry s"No such variant: $v" },
-    x => BSONInteger(x.id)
-  )
+  given BSONHandler[Path]    = BSONStringHandler.as[Path](Path.apply, _.toString)
+  given BSONHandler[Variant] = variantByIdHandler
 
   given BSONHandler[Tag] = tryHandler[Tag](
     { case BSONString(v) =>

@@ -65,7 +65,7 @@
   <string name="goDeeper">Syvennä analyysiä</string>
   <string name="showThreat">Näytä uhka</string>
   <string name="inLocalBrowser">paikallisesta selaimesta</string>
-  <string name="toggleLocalEvaluation">Paikallinen analyysi päälle/päältä</string>
+  <string name="toggleLocalEvaluation">Paikallinen analyysi päälle/pois</string>
   <string name="promoteVariation">Nosta muunnelmaa</string>
   <string name="makeMainLine">Päämuunnelmaksi</string>
   <string name="deleteFromHere">Poista tästä alkaen</string>
@@ -363,6 +363,7 @@
   <string name="siteDescription">Ilmaista virtuaalishakkia. Pelaa shakkia selkeällä käyttöliittymällä. Ei rekisteröitymistä, ei mainoksia eikä selaimen lisäosia. Pelaa shakkia kavereita, satunnaisia vastustajia tai tekoälyä vastaan.</string>
   <string name="xJoinedTeamY">%1$s liittyi joukkueeseen %2$s</string>
   <string name="xCreatedTeamY">%1$s loi joukkueen %2$s</string>
+  <string name="startedStreaming">alkoi striimata</string>
   <string name="xStartedStreaming">%s alkoi striimata</string>
   <string name="averageElo">Vahvuuslukukeskiarvo</string>
   <string name="location">Sijainti</string>
@@ -538,6 +539,8 @@
   <string name="blog">Blogi</string>
   <string name="notes">Muistiinpanot</string>
   <string name="typePrivateNotesHere">Kirjoita yksityisiä muistiinpanoja tähän</string>
+  <string name="writeAPrivateNoteAboutThisUser">Kirjoita tätä käyttäjää koskeva yksityinen muistiinpano</string>
+  <string name="noNoteYet">Ei vielä muistiinpanoja</string>
   <string name="invalidUsernameOrPassword">Virheellinen käyttäjätunnus tai salasana</string>
   <string name="incorrectPassword">Salasana ei kelpaa</string>
   <string name="invalidAuthenticationCode">Todennuskoodi ei kelpaa</string>
@@ -703,6 +706,7 @@
   <string name="kidMode">Lapsitila</string>
   <string name="kidModeExplanation">Turvallisuusasia. Lapsitilassa kaikki kommunikointi sivustolla on pois käytöstä. Käytä tätä suojaamaan lasta tai koululaista muilta internetin käyttäjiltä.</string>
   <string name="inKidModeTheLichessLogoGetsIconX">Lapsitilassa Lichessin logoon liitetään %s-kuvake, josta tiedät lastesi olevan turvassa.</string>
+  <string name="askYourChessTeacherAboutLiftingKidMode">Käyttäjätunnuksesi on hallinnassa. Lapsitilan poistoa voit pyytää shakkiopettajaltasi.</string>
   <string name="enableKidMode">Lapsitila käyttöön</string>
   <string name="disableKidMode">Lapsitila käytöstä</string>
   <string name="security">Turvallisuus</string>
@@ -737,7 +741,7 @@
   <string name="light">Vaalea</string>
   <string name="dark">Tumma</string>
   <string name="transparent">Läpinäkyvä</string>
-  <string name="deviceTheme" comment="deviceTheme&#10;&#10;The user may choose light mode, dark mode, or to automatically choose the theme based on the device's configuration. This text represents the latter option.&#10;&#10;(That is, if the operating system's theme is set to dark mode, lichess will follow. This is a common option in applications where a dark mode may be enabled)">Laitteen teema</string>
+  <string name="deviceTheme">Laitteen teema</string>
   <string name="backgroundImageUrl">Taustakuvan URL:</string>
   <string name="boardGeometry">Laudan geometria</string>
   <string name="boardTheme">Laudan tyyli</string>

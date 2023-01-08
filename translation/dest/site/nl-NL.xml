@@ -363,6 +363,7 @@
   <string name="siteDescription">Gratis online schaken. Schaak nu met een heldere vormgeving. Geen registratie nodig, geen advertenties, geen plug-ins vereist. Schaak tegen de computer, vrienden of willekeurige tegenstanders.</string>
   <string name="xJoinedTeamY">%1$s sloot zich bij team %2$s aan</string>
   <string name="xCreatedTeamY">%1$s heeft team %2$s opgericht</string>
+  <string name="startedStreaming">is begonnen met streamen</string>
   <string name="xStartedStreaming">%s is begonnen met streamen</string>
   <string name="averageElo">Gemiddelde rating</string>
   <string name="location">Plaats</string>
@@ -538,6 +539,8 @@
   <string name="blog">Blog</string>
   <string name="notes">Notities</string>
   <string name="typePrivateNotesHere">Type privénotities hier</string>
+  <string name="writeAPrivateNoteAboutThisUser">Maak een privé aantekening over deze gebruiker</string>
+  <string name="noNoteYet">Nog geen aantekeningen</string>
   <string name="invalidUsernameOrPassword">Ongeldige gebruikersnaam of wachtwoord</string>
   <string name="incorrectPassword">Onjuist wachtwoord</string>
   <string name="invalidAuthenticationCode">Ongeldige authenticatiecode</string>
@@ -703,6 +706,7 @@
   <string name="kidMode">Kindvriendelijke modus</string>
   <string name="kidModeExplanation">Dit gaat over veiligheid. In kindvriendelijke modus, worden alle communicatiemogelijkheden op de website uitgeschakeld. Activeer dit voor kinderen en scholieren, om hen te beschermen tegen andere internetgebruikers.</string>
   <string name="inKidModeTheLichessLogoGetsIconX">In kindvriendelijke modus, krijgt het Lichess-logo een %s-icoontje, zodat je weet dat je kinderen veilig zijn.</string>
+  <string name="askYourChessTeacherAboutLiftingKidMode">Je account wordt beheerd. Vraag je schaakdocent om de kindermodus uit te zetten.</string>
   <string name="enableKidMode">Activeer Kindermodus</string>
   <string name="disableKidMode">Deactiveer Kindermodus</string>
   <string name="security">Beveiliging</string>
@@ -737,7 +741,7 @@
   <string name="light">Licht</string>
   <string name="dark">Donker</string>
   <string name="transparent">Transparant</string>
-  <string name="deviceTheme" comment="deviceTheme&#10;&#10;The user may choose light mode, dark mode, or to automatically choose the theme based on the device's configuration. This text represents the latter option.&#10;&#10;(That is, if the operating system's theme is set to dark mode, lichess will follow. This is a common option in applications where a dark mode may be enabled)">Apparaatthema</string>
+  <string name="deviceTheme">Apparaatthema</string>
   <string name="backgroundImageUrl">Achtergrondafbeelding URL:</string>
   <string name="boardGeometry">Bordgeometrie</string>
   <string name="boardTheme">Bordthema</string>

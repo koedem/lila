@@ -26,7 +26,6 @@ playDependencyClasspath := (Runtime / externalDependencyClasspath).value
 // playCompileEverything := PlayCommands.playCompileEverythingTask.value.asInstanceOf[Seq[Analysis]]
 ivyLoggingLevel     := UpdateLogging.DownloadOnly
 Compile / mainClass := Some("lila.app.Lila")
-reStart / mainClass := Some("lila.app.Lila") // sbt-revolver
 // Adds the Play application directory to the command line args passed to Play
 bashScriptExtraDefines += "addJava \"-Duser.dir=$(realpath \"$(cd \"${app_home}/..\"; pwd -P)\"  $(is_cygwin && echo \"fix\"))\"\n"
 // by default, compile any routes files in the root named "routes" or "*.routes"
@@ -382,7 +381,7 @@ lazy val mailer = module("mailer",
 )
 
 lazy val plan = module("plan",
-  Seq(common, user),
+  Seq(common, user, security),
   Seq(play.jsonJoda) ++ specs2.bundle ++ reactivemongo.bundle
 )
 

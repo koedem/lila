@@ -420,7 +420,12 @@ object layout:
             a(href := langHref("/"))(siteNameFrag)
           ),
           ctx.blind option h2("Navigation"),
-          !ctx.isAppealUser option topnav()
+          !ctx.isAppealUser option frag(
+            topnav(),
+            ctx.noKid && ctx.me.exists(!_.isPatron) && !zenable option a(cls := "site-title-nav__donate")(
+              href := routes.Plan.index
+            )(trans.patron.donate())
+          )
         ),
         div(cls := "site-buttons")(
           !ctx.isAppealUser option clinput,

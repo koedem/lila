@@ -86,7 +86,7 @@
   <string name="averageRatingX">Gjennomsnittleg rating: %s</string>
   <string name="recentGames">Nylege parti</string>
   <string name="topGames">Topp-parti</string>
-  <string name="masterDbExplanation">To millionar over-bordet spel av %1$s+ FIDE rangerte spelarar frå %2$s til %3$s</string>
+  <string name="masterDbExplanation">Brettsjakkparti med spelarar som har FIDE-rating %1$s+ frå %2$s til %3$s</string>
   <plurals name="mateInXHalfMoves">
     <item quantity="one">Matt om %s halvtrekk</item>
     <item quantity="other">Matt om %s halvtrekk</item>
@@ -363,6 +363,7 @@
   <string name="siteDescription">Fritt tilgjengeleg nettsjakk. Spel sjakk på ei rein nettside utan registrering, reklame eller programtillegg. Spel sjakk mot datamaskin, vener eller tilfeldige motspelarar.</string>
   <string name="xJoinedTeamY">%1$s blei med i laget %2$s</string>
   <string name="xCreatedTeamY">%1$s oppretta lag %2$s</string>
+  <string name="startedStreaming">starta å strøyma</string>
   <string name="xStartedStreaming">%s starta å strøyme</string>
   <string name="averageElo">Gjennomsnittleg rating</string>
   <string name="location">Stad</string>
@@ -539,6 +540,8 @@ få en computeranalyse, chatte eller dele ein URL.</string>
   <string name="blog">Blogg</string>
   <string name="notes">Notat</string>
   <string name="typePrivateNotesHere">Skriv private notat her</string>
+  <string name="writeAPrivateNoteAboutThisUser">Skriv eit privat notat om denne brukaren</string>
+  <string name="noNoteYet">Ingen merknad så langt</string>
   <string name="invalidUsernameOrPassword">Feil brukarnamn eller passord</string>
   <string name="incorrectPassword">Feil passord</string>
   <string name="invalidAuthenticationCode">Ugyldig godkjenningskode</string>
@@ -704,6 +707,7 @@ få en computeranalyse, chatte eller dele ein URL.</string>
   <string name="kidMode">Barnemodus</string>
   <string name="kidModeExplanation">Dette handlar om tryggleik. I barnemodus er all kommunikasjon avskrudd. Bruk dette for å verne barn og skoleelevar mot andre Internett-brukarar.</string>
   <string name="inKidModeTheLichessLogoGetsIconX">I barnemodus får lichess-logoen eit %s symbol, så du kan sjå at barna dine er trygge.</string>
+  <string name="askYourChessTeacherAboutLiftingKidMode">Kontoen din er under administrasjon. Spør sjakklæraren din om det er mogleg å få oppheva barnemodusen.</string>
   <string name="enableKidMode">Skru på barnemodus</string>
   <string name="disableKidMode">Skru av barnemodus</string>
   <string name="security">Tryggleik</string>
@@ -738,6 +742,7 @@ få en computeranalyse, chatte eller dele ein URL.</string>
   <string name="light">Lys</string>
   <string name="dark">Mørk</string>
   <string name="transparent">Gjennomskinleg</string>
+  <string name="deviceTheme">Einingstema</string>
   <string name="backgroundImageUrl">URL for bakgrunnsbilete:</string>
   <string name="boardGeometry">Brettgeometri</string>
   <string name="boardTheme">Brett-tema</string>

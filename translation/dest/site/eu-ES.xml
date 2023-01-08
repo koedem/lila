@@ -161,7 +161,7 @@
   <string name="rememberMe">Webgunean sartuta mantendu</string>
   <string name="youNeedAnAccountToDoThat">Kontu bat behar duzu hori egiteko</string>
   <string name="signUp">Izen ematea</string>
-  <string name="computersAreNotAllowedToPlay">Xake-programen erabilera debekatuta dago. Mesedez, ez erabili beste jokalari, xake-programa edo datu-baseren laguntzariik. Kontuan izan kontu asko sortzea ere oso gaizki ikusita dagoela; kontu gehieg sortzeak zu kanporatzea ekar dezake.</string>
+  <string name="computersAreNotAllowedToPlay">Xake-programen erabilera debekatuta dago. Mesedez, ez erabili beste jokalari, xake-programa edo datu-baseren laguntzariik. Kontuan izan kontu asko sortzea ere oso gaizki ikusita dagoela; kontu gehiegi sortzeak zu kanporatzea ekar dezake.</string>
   <string name="games">Partidak</string>
   <string name="forum">Foroa</string>
   <string name="xPostedInForumY">%1$s erabiltzailearen mezu berria %2$s gaian</string>
@@ -363,6 +363,7 @@
   <string name="siteDescription">Doako xake zerbitzaria. Xakean interfaze argiarekin jokatu. Izena ematea ez da beharrezkoa. Iragarkirik gabe. Jokatu xakean ordenagailu, lagun edo beste aurkariekin.</string>
   <string name="xJoinedTeamY">%1$s %2$s taldean sartu da</string>
   <string name="xCreatedTeamY">%1$s(e)k %2$s taldea sortu du</string>
+  <string name="startedStreaming">emanaldiarekin hasi da</string>
   <string name="xStartedStreaming">%s emanaldiarekin hasi da</string>
   <string name="averageElo">Bataz besteko puntuazioa</string>
   <string name="location">Lokalizazioa</string>
@@ -538,6 +539,8 @@
   <string name="blog">Bloga</string>
   <string name="notes">Oharrak</string>
   <string name="typePrivateNotesHere">Ohar pribatuak idatzi hemen</string>
+  <string name="writeAPrivateNoteAboutThisUser">Idatzi erabiltzaile honi buruzko ohar pribatua</string>
+  <string name="noNoteYet">Ez dago oharrik</string>
   <string name="invalidUsernameOrPassword">Erabiltzaile edo pasahitz okerra</string>
   <string name="incorrectPassword">Pasahitza ez da zuzena</string>
   <string name="invalidAuthenticationCode">Autentikazio kodea ez da zuzena</string>
@@ -703,6 +706,7 @@
   <string name="kidMode">Haurren modua</string>
   <string name="kidModeExplanation">Hau segurtasunari buruzkoa da. Haurren moduan, webguneko komunikazio guztiak desaktibatuta daude. Aktibatu zure haur eta ikasleei beste Internet erabiltzaileengandik babesteko.</string>
   <string name="inKidModeTheLichessLogoGetsIconX">Haurren moduan, lichess logoak %s ikonoa du, haurrak seguru daudela jakin dezazun.</string>
+  <string name="askYourChessTeacherAboutLiftingKidMode">Zure kontua beste norbaitek kudeatzen du. Eskatu zure irakasleari haur modua desaktibatzeko.</string>
   <string name="enableKidMode">Haurren modua aktibatu</string>
   <string name="disableKidMode">Haurren modua desaktibatu</string>
   <string name="security">Segurtasuna</string>
@@ -737,6 +741,7 @@
   <string name="light">Argia</string>
   <string name="dark">Iluna</string>
   <string name="transparent">Gardena</string>
+  <string name="deviceTheme">Gailuaren gaia</string>
   <string name="backgroundImageUrl">Atzeko-planoko irudia:</string>
   <string name="boardGeometry">Taularen geometria</string>
   <string name="boardTheme">Taularen itxura</string>
