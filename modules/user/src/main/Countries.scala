@@ -212,6 +212,7 @@ object Countries:
     C("RO", "Romania"),
     C("RS", "Serbia"),
     C("RU", "Russia"),
+    C("RU-TAT", "Tatarstan"),
     C("RW", "Rwanda"),
     C("SA", "Saudi Arabia"),
     C("SB", "Solomon Islands"),
@@ -290,11 +291,7 @@ object Countries:
     c.code -> c.name
   }
 
-  val map: Map[String, Country] = all.view
-    .map { c =>
-      c.code -> c
-    }
-    .to(Map)
+  val map: Map[String, Country] = all.mapBy(_.code)
 
   val nameMap: Map[Country, String] = all.view
     .map { c =>

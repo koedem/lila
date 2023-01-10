@@ -8,7 +8,7 @@ import lila.common.ApiVersion
 
 object mon:
 
-  @inline private def tags(elems: (String, Any)*): Map[String, Any] = Map.from(elems)
+  private def tags(elems: (String, Any)*): Map[String, Any] = Map.from(elems)
 
   object http:
     private val t = timer("http.time")
@@ -538,12 +538,16 @@ object mon:
           )
           .increment()
         ()
-      val move        = send("move")
-      val takeback    = send("takeback")
-      val corresAlarm = send("corresAlarm")
-      val finish      = send("finish")
-      val message     = send("message")
-      val tourSoon    = send("tourSoon")
+      val move         = send("move")
+      val takeback     = send("takeback")
+      val corresAlarm  = send("corresAlarm")
+      val finish       = send("finish")
+      val message      = send("message")
+      val tourSoon     = send("tourSoon")
+      val forumMention = send("forumMention")
+      val invitedStudy = send("invitedStudy")
+      val streamStart  = send("streamStart")
+
       object challenge:
         val create = send("challengeCreate")
         val accept = send("challengeAccept")
@@ -638,13 +642,16 @@ object mon:
   object picfit:
     def uploadTime(user: String) = future("picfit.upload.time", tags("user" -> user))
     def uploadSize(user: String) = histogram("picfit.upload.size").withTag("user", user)
-  class executor(name: String):
-    val queuedSubmissions = histogram("executor.queuedSubmissions").withTag("name", name)
-    val queuedTasks       = histogram("executor.queuedTasks").withTag("name", name)
-    val poolSize          = histogram("executor.poolSize").withTag("name", name)
-    val activeThreads     = histogram("executor.activeThreads").withTag("name", name)
-    val runningThreads    = histogram("executor.runningThreads").withTag("name", name)
-    val steals            = gauge("executor.steals").withTag("name", name)
+
+  object jvm:
+    def threads() =
+      val perState = gauge("jvm.threads.group")
+      val total    = gauge("jvm.threads.group.total")
+      for
+        group <- ornicar.scalalib.Jvm.threadGroups()
+        _ = total.withTags(tags("name" -> group.name)).update(group.total)
+        (state, count) <- group.states
+      yield perState.withTags(tags("name" -> group.name, "state" -> state.toString)).update(count)
 
   def chronoSync[A] = lila.common.Chronometer.syncMon[A]
 

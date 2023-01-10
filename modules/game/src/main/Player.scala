@@ -1,7 +1,7 @@
 package lila.game
 
 import cats.implicits.*
-import chess.Color
+import chess.{ Ply, Color }
 import scala.util.chaining.*
 
 import lila.user.User
@@ -14,11 +14,11 @@ case class Player(
     aiLevel: Option[Int],
     isWinner: Option[Boolean] = None,
     isOfferingDraw: Boolean = false,
-    proposeTakebackAt: Int = 0, // ply when takeback was proposed
+    proposeTakebackAt: Ply = Ply(0), // ply when takeback was proposed
     userId: Option[UserId] = None,
     rating: Option[IntRating] = None,
     ratingDiff: Option[IntRatingDiff] = None,
-    provisional: Boolean = false,
+    provisional: RatingProvisional = RatingProvisional.No,
     blurs: Blurs = Blurs.zeroBlurs.zero,
     berserk: Boolean = false,
     name: Option[String] = None
@@ -52,11 +52,11 @@ case class Player(
 
   def removeDrawOffer = copy(isOfferingDraw = false)
 
-  def proposeTakeback(ply: Int) = copy(proposeTakebackAt = ply)
+  def proposeTakeback(ply: Ply) = copy(proposeTakebackAt = ply)
 
-  def removeTakebackProposition = copy(proposeTakebackAt = 0)
+  def removeTakebackProposition = copy(proposeTakebackAt = Ply(0))
 
-  def isProposingTakeback = proposeTakebackAt != 0
+  def isProposingTakeback = proposeTakebackAt > 0
 
   def nameSplit: Option[(String, Option[Int])] =
     name map {
@@ -73,7 +73,7 @@ case class Player(
 
   def ratingAfter = rating map (_ + ~ratingDiff)
 
-  def stableRating = rating ifFalse provisional
+  def stableRating = rating ifFalse provisional.value
 
   def stableRatingAfter = stableRating map (_ + ~ratingDiff)
 
@@ -98,7 +98,7 @@ object Player:
       color: Color,
       userId: UserId,
       rating: IntRating,
-      provisional: Boolean
+      provisional: RatingProvisional
   ): Player =
     Player(
       id = IdGenerator.player(color),
@@ -131,18 +131,19 @@ object Player:
       rating = rating
     )
 
-  case class HoldAlert(ply: Int, mean: Int, sd: Int):
+  case class HoldAlert(ply: Ply, mean: Int, sd: Int):
     def suspicious = HoldAlert.suspicious(ply)
   object HoldAlert:
     type Map = Color.Map[Option[HoldAlert]]
     val emptyMap: Map                 = Color.Map(none, none)
-    def suspicious(ply: Int): Boolean = ply >= 16 && ply <= 40
+    def suspicious(ply: Ply): Boolean = ply >= 16 && ply <= 40
     def suspicious(m: Map): Boolean   = m exists { _ exists (_.suspicious) }
 
-  case class UserInfo(id: UserId, rating: IntRating, provisional: Boolean)
+  case class UserInfo(id: UserId, rating: IntRating, provisional: RatingProvisional)
 
   import reactivemongo.api.bson.*
   import lila.db.BSON
+  import lila.db.dsl.given
 
   given BSONDocumentHandler[HoldAlert] = Macros.handler
 
@@ -184,11 +185,11 @@ object Player:
             aiLevel = doc int aiLevel,
             isWinner = win,
             isOfferingDraw = doc booleanLike isOfferingDraw getOrElse false,
-            proposeTakebackAt = doc int proposeTakebackAt getOrElse 0,
+            proposeTakebackAt = Ply(doc.int(proposeTakebackAt) | 0),
             userId = userId,
             rating = doc.getAsOpt[IntRating](rating) flatMap ratingRange,
             ratingDiff = doc.getAsOpt[IntRatingDiff](ratingDiff) flatMap ratingDiffRange,
-            provisional = doc booleanLike provisional getOrElse false,
+            provisional = ~doc.getAsOpt[RatingProvisional](provisional),
             blurs = doc.getAsOpt[Blurs](blursBits) getOrElse Blurs.zeroBlurs.zero,
             berserk = doc booleanLike berserk getOrElse false,
             name = doc string name
@@ -203,7 +204,7 @@ object Player:
       proposeTakebackAt -> p.proposeTakebackAt.some.filter(_ > 0),
       rating            -> p.rating,
       ratingDiff        -> p.ratingDiff,
-      provisional       -> p.provisional.option(true),
+      provisional       -> p.provisional.yes.option(true),
       blursBits         -> p.blurs.nonEmpty.??(p.blurs),
       name              -> p.name
     )

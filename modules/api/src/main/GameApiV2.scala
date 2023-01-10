@@ -157,7 +157,7 @@ final class GameApiV2(
         batchSize = config.perSecond.value
       )
       .documentSource()
-      .grouped(20)
+      .grouped(30)
       .mapAsync(1) { pairings =>
         config.tour.isTeamBattle.?? {
           playerRepo.teamsOfPlayers(config.tour.id, pairings.flatMap(_.users).distinct).dmap(_.toMap)
@@ -203,10 +203,11 @@ final class GameApiV2(
     swissApi
       .gameIdSource(
         swissId = config.swissId,
+        player = config.player,
         batchSize = config.perSecond.value
       )
-      .grouped(20)
-      .mapAsync(1)(gameRepo.gamesFromSecondary)
+      .grouped(30)
+      .mapAsync(1)(gameRepo.gamesTemporarilyFromPrimary)
       .mapConcat(identity)
       .throttle(config.perSecond.value, 1 second)
       .mapAsync(4)(enrich(config.flags))
@@ -312,7 +313,7 @@ final class GameApiV2(
       .add("winner" -> g.winnerColor.map(_.name))
       .add("opening" -> g.opening.ifTrue(withFlags.opening))
       .add("moves" -> withFlags.moves.option {
-        withFlags keepDelayIf g.playable applyDelay g.pgnMoves mkString " "
+        withFlags keepDelayIf g.playable applyDelay g.sans mkString " "
       })
       .add("pgn" -> pgn)
       .add("daysPerTurn" -> g.daysPerTurn)
@@ -396,5 +397,6 @@ object GameApiV2:
       swissId: SwissId,
       format: Format,
       flags: WithFlags,
-      perSecond: MaxPerSecond
+      perSecond: MaxPerSecond,
+      player: Option[UserId]
   ) extends Config

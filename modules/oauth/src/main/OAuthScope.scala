@@ -31,7 +31,8 @@ object OAuthScope:
     case object Write extends OAuthScope("racer:write", trans.racerWrite)
 
   object Puzzle:
-    case object Read extends OAuthScope("puzzle:read", trans.puzzleRead)
+    case object Read  extends OAuthScope("puzzle:read", trans.puzzleRead)
+    case object Write extends OAuthScope("puzzle:write", I18nKey("Solve puzzles"))
 
   object Team:
     case object Read  extends OAuthScope("team:read", trans.teamRead)
@@ -75,6 +76,7 @@ object OAuthScope:
     Tournament.Write,
     Racer.Write,
     Puzzle.Read,
+    Puzzle.Write,
     Team.Read,
     Team.Write,
     Team.Lead,
@@ -109,9 +111,7 @@ object OAuthScope:
     Msg.Write
   )
 
-  val byKey: Map[String, OAuthScope] = all.map { s =>
-    s.key -> s
-  } toMap
+  val byKey: Map[String, OAuthScope] = all.mapBy(_.key)
 
   def keyList(scopes: Iterable[OAuthScope]) = scopes.map(_.key) mkString ", "
 

@@ -28,7 +28,8 @@ final class Env(
     picfitApi: lila.memo.PicfitApi,
     notifyApi: lila.notify.NotifyApi,
     userRepo: lila.user.UserRepo,
-    timeline: lila.hub.actors.Timeline,
+    subsRepo: lila.relation.SubscriptionRepo,
+    prefApi: lila.pref.PrefApi,
     db: lila.db.Db
 )(using
     ec: scala.concurrent.ExecutionContext,
@@ -67,7 +68,6 @@ final class Env(
     ws = ws,
     api = api,
     isOnline = isOnline,
-    timeline = timeline,
     keyword = config.keyword,
     alwaysFeatured = (() => alwaysFeaturedSetting.get()),
     googleApiKey = config.googleApiKey,
@@ -76,8 +76,10 @@ final class Env(
 
   lazy val liveStreamApi = wire[LiveStreamApi]
 
-  lila.common.Bus.subscribeFun("adjustCheater") { case lila.hub.actorApi.mod.MarkCheater(userId, true) =>
-    api.demote(userId).unit
+  lila.common.Bus.subscribeFun("adjustCheater", "adjustBooster", "shadowban") {
+    case lila.hub.actorApi.mod.MarkCheater(userId, true) => api.demote(userId).unit
+    case lila.hub.actorApi.mod.MarkBooster(userId)       => api.demote(userId).unit
+    case lila.hub.actorApi.mod.Shadowban(userId, true)   => api.demote(userId).unit
   }
 
   scheduler.scheduleWithFixedDelay(1 hour, 1 day) { () =>

@@ -34,10 +34,11 @@ blumpkin
 bollock
 boner
 boob
+braindea?d
 bugger
 buk?kake
 bull?shit
-cheat(ing|er|)
+che[ae]t(ing|er|)
 chess(|-|_)bot(.?com)?
 chicken
 chink
@@ -262,6 +263,7 @@ gaa?ndu?
   def fr = dict("""
 batard
 connard
+encul[eé]
 fdp
 pd
 pute
@@ -274,7 +276,7 @@ angsthase
 arschloch
 bl(ö|oe|o)dmann?
 drecksa(u|ck)
-ficker
+fick(|er)
 fotze
 hurensohn
 mistkerl

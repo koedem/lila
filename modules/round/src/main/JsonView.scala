@@ -47,7 +47,7 @@ final class JsonView(
       })
       .add("rating" -> p.rating.ifTrue(withFlags.rating))
       .add("ratingDiff" -> p.ratingDiff.ifTrue(withFlags.rating))
-      .add("provisional" -> (p.provisional && withFlags.rating))
+      .add("provisional" -> (p.provisional.yes && withFlags.rating))
       .add("offeringRematch" -> isOfferingRematch(Pov(g, p)))
       .add("offeringDraw" -> p.isOfferingDraw)
       .add("proposingTakeback" -> p.isProposingTakeback)
@@ -148,7 +148,7 @@ final class JsonView(
       .add("ai" -> p.aiLevel)
       .add("rating" -> p.rating.ifTrue(withFlags.rating))
       .add("ratingDiff" -> p.ratingDiff.ifTrue(withFlags.rating))
-      .add("provisional" -> (p.provisional && withFlags.rating))
+      .add("provisional" -> (p.provisional.yes && withFlags.rating))
       .add("checks" -> checkCount(g, p.color))
       .add("berserk" -> p.berserk)
       .add("blurs" -> (withFlags.blurs ?? blurs(g, p)))
@@ -223,7 +223,7 @@ final class JsonView(
           .obj(
             "game" -> {
               gameJsonView(game, initialFen) ++ Json.obj(
-                "pgn" -> pov.game.pgnMoves.mkString(" ")
+                "pgn" -> pov.game.sans.mkString(" ")
               )
             },
             "white"       -> Json.obj("user" -> white),
@@ -259,7 +259,7 @@ final class JsonView(
             "variant" -> game.variant,
             "opening" -> game.opening,
             "fen"     -> fen,
-            "turns"   -> game.turns,
+            "turns"   -> game.ply,
             "player"  -> game.turnColor.name,
             "status"  -> game.status
           )

@@ -9,9 +9,7 @@ object Namer:
   ): String =
     playerTextUser(player, player.userId flatMap lightUser, withRating)
 
-  def playerText(player: Player, withRating: Boolean = false)(using
-      lightUser: LightUser.Getter
-  ): Fu[String] =
+  def playerText(player: Player, withRating: Boolean = false)(using lightUser: LightUser.Getter): Fu[String] =
     player.userId.??(lightUser) dmap {
       playerTextUser(player, _, withRating)
     }
@@ -38,7 +36,7 @@ object Namer:
         s"${playerTextUser(game.whitePlayer, wu, withRatings)} - ${playerTextUser(game.blackPlayer, bu, withRatings)}"
       }
 
-  def ratingString(p: Player): String =
-    p.rating.fold("?") { rating =>
-      s"$rating${p.provisional ?? "?"}"
+  def ratingString(p: Player): Option[String] =
+    p.rating.map { rating =>
+      s"$rating${p.provisional.yes ?? "?"}"
     }

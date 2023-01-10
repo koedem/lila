@@ -14,7 +14,6 @@ import lila.api.{ BodyContext, Context, HeaderContext, PageData }
 import lila.app.{ *, given }
 import lila.common.{ ApiVersion, HTTPRequest, Nonce }
 import lila.i18n.{ I18nKey, I18nLangPicker }
-import lila.notify.Notification.Notifies
 import lila.oauth.{ OAuthScope, OAuthServer }
 import lila.security.{ AppealUser, FingerPrintedUser, Granter, Permission }
 import lila.user.{ Holder, User as UserModel, UserContext }
@@ -567,14 +566,14 @@ abstract private[controllers] class LilaController(val env: Env)
       env.pref.api.getPref(me, ctx.req) zip {
         if (isPage)
           env.user.lightUserApi preloadUser me
-          val enabledId = me.enabled option me.id
+          val enabledId = me.enabled.yes option me.id
           enabledId.??(env.team.api.nbRequests) zip
             enabledId.??(env.challenge.api.countInFor.get) zip
-            enabledId.??(id => env.notifyM.api.unreadCount(id into Notifies)) zip
+            enabledId.??(env.notifyM.api.unreadCount) zip
             env.mod.inquiryApi.forMod(me)
         else
           fuccess {
-            (((0, 0), UnreadCount(0)), none)
+            (((0, 0), lila.notify.Notification.UnreadCount(0)), none)
           }
       } map { case (pref, (((teamNbRequests, nbChallenges), nbNotifications), inquiry)) =>
         PageData(

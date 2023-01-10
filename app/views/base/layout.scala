@@ -28,11 +28,15 @@ object layout:
       }
     def metaCsp(csp: Option[ContentSecurityPolicy])(implicit ctx: Context): Frag =
       metaCsp(csp getOrElse defaultCsp)
-    def metaThemeColor(implicit ctx: Context): Frag =
+    def metaThemeColor(using ctx: Context): Frag = if (ctx.pref.bg == lila.pref.Pref.Bg.SYSTEM) raw {
+      s"""<meta name="theme-color" media="(prefers-color-scheme: light)" content="${ctx.pref.themeColorLight}">""" +
+        s"""<meta name="theme-color" media="(prefers-color-scheme: dark)" content="${ctx.pref.themeColorDark}">"""
+    }
+    else
       raw {
         s"""<meta name="theme-color" content="${ctx.pref.themeColor}">"""
       }
-    def pieceSprite(implicit ctx: Context): Frag = pieceSprite(ctx.currentPieceSet)
+    def pieceSprite(using ctx: Context): Frag = pieceSprite(ctx.currentPieceSet)
     def pieceSprite(ps: lila.pref.PieceSet): Frag =
       link(
         id   := "piece-sprite",
@@ -186,7 +190,8 @@ object layout:
           jsModule("site")
         ),
       moreJs,
-      ctx.pageData.inquiry.isDefined option jsModule("mod.inquiry")
+      ctx.pageData.inquiry.isDefined option jsModule("mod.inquiry"),
+      ctx.pref.bg == lila.pref.Pref.Bg.SYSTEM option embedJsUnsafe(systemThemePolyfillJs)
     )
 
   private def hrefLang(lang: String, path: String) =
@@ -273,7 +278,7 @@ object layout:
             tpe := "application/atom+xml",
             rel := "alternate"
           ),
-          ctx.currentBg == "transp" option ctx.pref.bgImgOrDefault map { img =>
+          ctx.pref.bg == lila.pref.Pref.Bg.TRANSPARENT option ctx.pref.bgImgOrDefault map { img =>
             raw(
               s"""<style id="bg-data">body.transp::before{background-image:url("${escapeHtmlRaw(img)
                   .replace("&amp;", "&")}");}</style>"""
@@ -326,7 +331,7 @@ object layout:
             .ifTrue(ctx.isAnon)
             .map(views.html.auth.bits.checkYourEmailBanner(_)),
           zenable option zenZone,
-          siteHeader.apply,
+          siteHeader(zenable),
           div(
             id := "main-wrap",
             cls := List(
@@ -335,7 +340,7 @@ object layout:
               "is3d"    -> ctx.pref.is3d
             )
           )(body),
-          ctx.me.exists(_.enabled) option div(id := "friend_box")(
+          ctx.me.exists(_.enabled.yes) option div(id := "friend_box")(
             div(cls := "friend_box_title")(trans.nbFriendsOnline.plural(0, iconTag(""))),
             div(cls   := "content_wrap none")(
               div(cls := "content list")
@@ -410,7 +415,7 @@ object layout:
           title     := trans.team.teams.txt()
         )
 
-    def apply(implicit ctx: Context) =
+    def apply(zenable: Boolean)(using ctx: Context) =
       header(id := "top")(
         div(cls := "site-title-nav")(
           !ctx.isAppealUser option topnavToggle,
@@ -420,7 +425,12 @@ object layout:
             a(href := langHref("/"))(siteNameFrag)
           ),
           ctx.blind option h2("Navigation"),
-          !ctx.isAppealUser option topnav()
+          !ctx.isAppealUser option frag(
+            topnav(),
+            ctx.noKid && ctx.me.exists(!_.isPatron) && !zenable option a(cls := "site-title-nav__donate")(
+              href := routes.Plan.index
+            )(trans.patron.donate())
+          )
         ),
         div(cls := "site-buttons")(
           !ctx.isAppealUser option clinput,
@@ -463,12 +473,13 @@ object layout:
 
     private val cache = scala.collection.mutable.AnyRefMap.empty[Lang, String]
 
-    private def jsCode(implicit lang: Lang) =
+    private def jsCode(using lang: Lang) =
       cache.getOrElseUpdate(
         lang,
         s"""lichess={load:new Promise(r=>document.addEventListener("DOMContentLoaded",r)),quantity:${lila.i18n
             .JsQuantity(lang)},siteI18n:${safeJsonValue(i18nJsObject(i18nKeys))}}"""
       )
 
-    def apply(nonce: Nonce)(implicit lang: Lang) =
+    def apply(nonce: Nonce)(using Lang) =
       embedJsUnsafe(jsCode, nonce)
+  end inlineJs

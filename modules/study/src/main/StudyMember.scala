@@ -12,18 +12,16 @@ object StudyMember:
 
   def make(user: User) = StudyMember(id = user.id, role = Role.Read)
 
-  sealed abstract class Role(val id: String, val canWrite: Boolean)
+  enum Role(val id: String, val canWrite: Boolean):
+    case Read  extends Role("r", false)
+    case Write extends Role("w", true)
   object Role:
-    case object Read  extends Role("r", false)
-    case object Write extends Role("w", true)
-    val byId = List(Read, Write).map { x =>
-      x.id -> x
-    }.toMap
+    val byId = values.mapBy(_.id)
 
 case class StudyMembers(members: StudyMember.MemberMap):
 
   def +(member: StudyMember) = copy(members = members + (member.id -> member))
-  def -(userId: UserId)     = copy(members = members - userId)
+  def -(userId: UserId)      = copy(members = members - userId)
 
   def update(id: UserId, f: StudyMember => StudyMember) = copy(
     members = members.view.mapValues { m =>
@@ -32,7 +30,7 @@ case class StudyMembers(members: StudyMember.MemberMap):
   )
 
   def contains(userId: UserId): Boolean = members contains userId
-  def contains(user: User): Boolean      = contains(user.id)
+  def contains(user: User): Boolean     = contains(user.id)
 
   def get = members.get
 

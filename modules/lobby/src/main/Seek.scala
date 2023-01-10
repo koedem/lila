@@ -1,6 +1,7 @@
 package lila.lobby
 
 import chess.{ Mode, Speed }
+import chess.variant.Variant
 import org.joda.time.DateTime
 import play.api.i18n.Lang
 import play.api.libs.json.*
@@ -15,7 +16,7 @@ import lila.user.User
 // correspondence chess, persistent
 case class Seek(
     _id: String,
-    variant: Int,
+    variant: Variant.Id,
     daysPerTurn: Option[Days],
     mode: Int,
     color: String,
@@ -28,7 +29,7 @@ case class Seek(
 
   val realColor = Color orDefault color
 
-  val realVariant = chess.variant.Variant orDefault variant
+  val realVariant = Variant.orDefault(variant)
 
   val realMode = Mode orDefault mode
 
@@ -65,7 +66,7 @@ case class Seek(
       .add("perf" -> perfType.map { pt =>
         Json.obj("key" -> pt.key)
       })
-      .add("provisional" -> perf.exists(_.provisional))
+      .add("provisional" -> perf.exists(_.provisional.yes))
 
   lazy val perfType = PerfPicker.perfType(Speed.Correspondence, realVariant, daysPerTurn)
 
@@ -106,8 +107,8 @@ object Seek:
   import reactivemongo.api.bson.*
   import lila.db.dsl.{ *, given }
   given BSONHandler[LobbyPerf] = BSONIntegerHandler.as[LobbyPerf](
-    b => LobbyPerf(IntRating(b.abs), b < 0),
-    x => x.rating.value * (if (x.provisional) -1 else 1)
+    b => LobbyPerf(IntRating(b.abs), RatingProvisional(b < 0)),
+    x => x.rating.value * (if x.provisional.yes then -1 else 1)
   )
   private given BSONHandler[Map[Perf.Key, LobbyPerf]] = typedMapHandler[Perf.Key, LobbyPerf]
   private[lobby] given BSONDocumentHandler[LobbyUser] = Macros.handler

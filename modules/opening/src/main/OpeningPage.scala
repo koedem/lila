@@ -1,6 +1,6 @@
 package lila.opening
 
-import chess.format.pgn.{ Pgn, San }
+import chess.format.pgn.{ Pgn, San, SanStr }
 import chess.format.{ Fen, OpeningFen, Uci }
 import chess.opening.{ Opening, OpeningDb, OpeningKey, OpeningName }
 import chess.Speed
@@ -12,14 +12,13 @@ case class OpeningPage(
     explored: Option[OpeningExplored],
     wiki: Option[OpeningWiki]
 ):
-  def opening = query.opening
-  def name    = query.name
+  export query.{ opening, name, isExactOpening, openingAndExtraMoves }
 
-  def nameParts: NamePart.NamePartList = query.openingAndExtraMoves match
+  def nameParts: NamePart.NamePartList = openingAndExtraMoves match
     case (op, moves) => (op ?? NamePart.from) ::: NamePart.from(moves)
 
 case object NamePart:
-  type NamePartList = List[Either[PgnMove, (NameSection, Option[OpeningKey])]]
+  type NamePartList = List[Either[SanStr, (NameSection, Option[OpeningKey])]]
   def from(op: Opening): NamePartList =
     val sections = NameSection.sectionsOf(op.name)
     sections.toList.zipWithIndex map { case (name, i) =>
@@ -30,22 +29,22 @@ case object NamePart:
             .map(_.key)
       )
     }
-  def from(moves: List[PgnMove]): NamePartList = moves.map(Left.apply)
+  def from(moves: List[SanStr]): NamePartList = moves.map(Left.apply)
 
 case class ResultCounts(
-    white: Int,
-    draws: Int,
-    black: Int
+    white: Long,
+    draws: Long,
+    black: Long
 ):
-  lazy val sum: Int = white + draws + black
+  lazy val sum: Long = white + draws + black
 
-  def whitePercent                     = percentOf(white)
-  def drawsPercent                     = percentOf(draws)
-  def blackPercent                     = percentOf(black)
-  private def percentOf(v: Int): Float = (v.toFloat * 100 / sum)
+  def whitePercent                      = percentOf(white)
+  def drawsPercent                      = percentOf(draws)
+  def blackPercent                      = percentOf(black)
+  private def percentOf(v: Long): Float = (v.toFloat * 100 / sum)
 
 case class OpeningNext(
-    san: String,
+    san: SanStr,
     uci: Uci.Move,
     fen: OpeningFen,
     query: OpeningQuery,
@@ -62,7 +61,9 @@ case class OpeningExplored(
     games: List[GameWithPgn],
     next: List[OpeningNext],
     history: PopularityHistoryPercent
-)
+) {
+  def lastPopularityPercent: Option[Float] = history.lastOption
+}
 
 object OpeningPage:
   def apply(

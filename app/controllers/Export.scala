@@ -7,6 +7,7 @@ import chess.format.{ Fen, Uci }
 import chess.variant.{ Standard, Variant }
 import play.api.mvc.{ RequestHeader, Result }
 import scala.concurrent.duration.*
+import scala.util.chaining.*
 
 import lila.app.{ given, * }
 import lila.common.{ HTTPRequest, IpAddress }
@@ -45,9 +46,8 @@ final class Export(env: Env) extends LilaController(env):
         Pov(g.game, Color.fromName(color) | Color.white),
         g.fen,
         Theme(theme).name,
-        PieceSet(piece).name
-      ) map
-        stream(cacheSeconds = if (g.game.finishedOrAborted) 3600 * 24 else 10)
+        PieceSet.get(piece).name
+      ) pipe stream(cacheSeconds = if (g.game.finishedOrAborted) 3600 * 24 else 10)
     }
 
   def legacyGameThumbnail(id: GameId, theme: Option[String], piece: Option[String]) =
@@ -57,45 +57,48 @@ final class Export(env: Env) extends LilaController(env):
 
   def gameThumbnail(id: GameId, theme: Option[String], piece: Option[String]) =
     exportImageOf(env.game.gameRepo game id) { game =>
-      env.game.gifExport.gameThumbnail(game, Theme(theme).name, PieceSet(piece).name) map
+      env.game.gifExport.gameThumbnail(game, Theme(theme).name, PieceSet.get(piece).name) pipe
         stream(cacheSeconds = if (game.finishedOrAborted) 3600 * 24 else 10)
     }
 
-  def puzzleThumbnail(id: String, theme: Option[String], piece: Option[String]) =
-    exportImageOf(env.puzzle.api.puzzle find PuzzleId(id)) { puzzle =>
+  def puzzleThumbnail(id: PuzzleId, theme: Option[String], piece: Option[String]) =
+    exportImageOf(env.puzzle.api.puzzle find id) { puzzle =>
       env.game.gifExport.thumbnail(
         fen = puzzle.fenAfterInitialMove,
-        lastMove = puzzle.line.head.uci.some,
+        lastMove = puzzle.line.head.some,
         orientation = puzzle.color,
         variant = Standard,
         Theme(theme).name,
-        PieceSet(piece).name
-      ) map stream()
+        PieceSet.get(piece).name
+      ) pipe stream()
     }
 
   def fenThumbnail(
       fen: String,
       color: String,
-      lastMove: Option[String],
-      variant: Option[String],
+      lastMove: Option[Uci],
+      variant: Option[Variant.LilaKey],
       theme: Option[String],
       piece: Option[String]
   ) =
     exportImageOf(fuccess(Fen read Fen.Epd.clean(fen))) { _ =>
       env.game.gifExport.thumbnail(
         fen = Fen.Epd.clean(fen),
-        lastMove = lastMove.flatMap(Uci.Move(_).map(_.uci)),
+        lastMove = lastMove,
         orientation = Color.fromName(color) | Color.White,
-        variant = Variant(variant.getOrElse("standard")) | Standard,
+        variant = Variant.orDefault(variant),
         Theme(theme).name,
-        PieceSet(piece).name
-      ) map stream()
+        PieceSet.get(piece).name
+      ) pipe stream()
     }
 
   private def stream(contentType: String = "image/gif", cacheSeconds: Int = 1209600)(
-      stream: Source[ByteString, ?]
-  ) =
-    Ok.chunked(stream)
-      .withHeaders(noProxyBufferHeader)
-      .withHeaders(CACHE_CONTROL -> s"max-age=$cacheSeconds")
-      .as(contentType)
+      upstream: Fu[Source[ByteString, ?]]
+  ): Fu[Result] = upstream
+    .map { stream =>
+      Ok.chunked(stream)
+        .withHeaders(noProxyBufferHeader)
+        .withHeaders(CACHE_CONTROL -> s"max-age=$cacheSeconds")
+        .as(contentType)
+    }
+    .recover { case lila.game.GifExport.UpstreamStatus(code) => Status(code) }

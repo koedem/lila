@@ -1,6 +1,6 @@
 package lila.swiss
 
-import chess.Clock.{ Config as ClockConfig }
+import chess.Clock.{ Config as ClockConfig, LimitMinutes, LimitSeconds, IncrementSeconds }
 import chess.Speed
 import chess.format.Fen
 import chess.variant.Variant
@@ -12,7 +12,7 @@ import play.api.data.validation.Constraint
 import play.api.Mode
 import scala.concurrent.duration.*
 
-import lila.common.Form.*
+import lila.common.Form.{ *, given }
 import lila.user.User
 
 final class SwissForm(implicit mode: Mode):
@@ -24,12 +24,12 @@ final class SwissForm(implicit mode: Mode):
       mapping(
         "name" -> optional(eventName(2, 30, user.isVerifiedOrAdmin)),
         "clock" -> mapping(
-          "limit"     -> number.verifying(clockLimits.contains),
-          "increment" -> number(min = 0, max = 120)
+          "limit"     -> number.into[LimitSeconds].verifying(clockLimits.contains),
+          "increment" -> number(min = 0, max = 120).into[IncrementSeconds]
         )(ClockConfig.apply)(unapply)
           .verifying("Invalid clock", _.estimateTotalSeconds > 0),
         "startsAt"      -> optional(inTheFuture(ISODateTimeOrTimestamp.isoDateTimeOrTimestamp)),
-        "variant"       -> optional(nonEmptyText.verifying(v => Variant(v).isDefined)),
+        "variant"       -> optional(typeIn(Variant.list.all.map(_.key).toSet)),
         "rated"         -> optional(boolean),
         "nbRounds"      -> number(min = minRounds, max = 100),
         "description"   -> optional(cleanNonEmptyText),
@@ -62,7 +62,7 @@ final class SwissForm(implicit mode: Mode):
   def create(user: User) =
     form(user) fill SwissData(
       name = none,
-      clock = ClockConfig(180, 0),
+      clock = ClockConfig(LimitSeconds(180), IncrementSeconds(0)),
       startsAt = Some(DateTime.now plusSeconds {
         if (mode == Mode.Prod) 60 * 10 else 20
       }),
@@ -106,13 +106,16 @@ final class SwissForm(implicit mode: Mode):
 
 object SwissForm:
 
-  val clockLimits: Seq[Int] = Seq(0, 15, 30, 45, 60, 90) ++ {
+  val clockLimits = LimitSeconds from (Seq(0, 15, 30, 45, 60, 90) ++ {
     (120 to 480 by 60) ++ (600 to 1800 by 300) ++ (2400 to 10800 by 600)
-  }
+  })
 
   val clockLimitChoices = options(
-    clockLimits,
-    l => s"${chess.Clock.Config(l, 0).limitString}${if (l <= 1) " minute" else " minutes"}"
+    LimitSeconds raw clockLimits,
+    l =>
+      s"${chess.Clock.Config(LimitSeconds(l), IncrementSeconds(0)).limitString}${
+          if (l <= 1) " minute" else " minutes"
+        }"
   )
 
   val roundIntervals: Seq[Int] =
@@ -161,7 +164,7 @@ object SwissForm:
       name: Option[String],
       clock: ClockConfig,
       startsAt: Option[DateTime],
-      variant: Option[String],
+      variant: Option[Variant.LilaKey],
       rated: Option[Boolean],
       nbRounds: Int,
       description: Option[String],
@@ -173,7 +176,7 @@ object SwissForm:
       forbiddenPairings: Option[String],
       manualPairings: Option[String]
   ):
-    def realVariant  = variant flatMap Variant.apply getOrElse Variant.default
+    def realVariant  = Variant.orDefault(variant)
     def realStartsAt = startsAt | DateTime.now.plusMinutes(10)
     def realChatFor  = chatFor | Swiss.ChatFor.default
     def realRoundInterval =

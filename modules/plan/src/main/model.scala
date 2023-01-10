@@ -7,13 +7,13 @@ import play.api.i18n.Lang
 import play.api.libs.json.{ JsArray, JsObject }
 
 import lila.user.User
+import lila.common.IpAddress
 
 case class Source(value: String) extends AnyVal
 
-sealed abstract class Freq(val renew: Boolean)
-object Freq:
-  case object Monthly extends Freq(renew = true)
-  case object Onetime extends Freq(renew = false)
+enum Freq(val renew: Boolean):
+  case Monthly extends Freq(renew = true)
+  case Onetime extends Freq(renew = false)
 
 case class Money(amount: BigDecimal, currency: Currency):
   def display(locale: Locale): String =
@@ -25,10 +25,12 @@ case class Money(amount: BigDecimal, currency: Currency):
   def code                              = s"${currencyCode}_$amount"
   override def toString                 = code
 
-case class Usd(value: BigDecimal) extends AnyVal:
-  def cents = (value * 100).toInt
+opaque type Usd = BigDecimal
+object Usd extends TotalWrapper[Usd, BigDecimal]:
+  extension (e: Usd) def cents = (e * 100).toInt
 
-case class Country(code: String) extends AnyVal
+opaque type Country = String
+object Country extends OpaqueString[Country]
 
 case class NextUrls(cancel: String, success: String)
 
@@ -36,21 +38,26 @@ case class ProductIds(monthly: String, onetime: String, gift: String)
 
 // stripe model
 
-case class StripeChargeId(value: String)       extends AnyVal
-case class StripeCustomerId(value: String)     extends AnyVal
-case class StripeSessionId(value: String)      extends AnyVal
-case class StripeSubscriptionId(value: String) extends AnyVal
+opaque type StripeChargeId = String
+object StripeChargeId extends OpaqueString[StripeChargeId]
+opaque type StripeCustomerId = String
+object StripeCustomerId extends OpaqueString[StripeCustomerId]
+opaque type StripeSessionId = String
+object StripeSessionId extends OpaqueString[StripeSessionId]
+opaque type StripeSubscriptionId = String
+object StripeSubscriptionId extends OpaqueString[StripeSubscriptionId]
 
 // /!\ In smallest currency unit /!\
 // https://stripe.com/docs/currencies#zero-decimal
-case class StripeAmount(smallestCurrencyUnit: Int) extends AnyVal:
-  def toMoney(currency: Currency) =
-    Money(
-      if (CurrencyApi zeroDecimalCurrencies currency) smallestCurrencyUnit
-      else BigDecimal(smallestCurrencyUnit) / 100,
-      currency
-    )
-object StripeAmount:
+opaque type StripeAmount = Int
+object StripeAmount extends OpaqueInt[lila.plan.StripeAmount]:
+  extension (e: StripeAmount)
+    def toMoney(currency: Currency) =
+      Money(
+        if (CurrencyApi zeroDecimalCurrencies currency) e
+        else BigDecimal(e) / 100,
+        currency
+      )
   def apply(money: Money): StripeAmount = StripeAmount {
     if (CurrencyApi.zeroDecimalCurrencies(money.currency)) money.amount.toInt else (money.amount * 100).toInt
   }
@@ -64,13 +71,22 @@ case class StripePrice(product: String, unit_amount: StripeAmount, currency: Cur
   def money  = unit_amount toMoney currency
 
 case class StripeSession(id: StripeSessionId)
+
+trait StripeSessionData:
+  def customerId: StripeCustomerId
+  def currency: Currency
+  def ipOption: Option[IpAddress]
+
 case class CreateStripeSession(
     customerId: StripeCustomerId,
     checkout: PlanCheckout,
     urls: NextUrls,
     giftTo: Option[User],
-    isLifetime: Boolean
-)
+    isLifetime: Boolean,
+    ip: IpAddress
+) extends StripeSessionData:
+  def currency = checkout.money.currency
+  def ipOption = ip.some
 
 case class StripeSubscription(
     id: String,
@@ -78,10 +94,14 @@ case class StripeSubscription(
     customer: StripeCustomerId,
     cancel_at_period_end: Boolean,
     status: String,
-    default_payment_method: Option[String]
-):
-  def renew    = !cancel_at_period_end
-  def isActive = status == "active"
+    default_payment_method: Option[String],
+    ip: Option[IpAddress]
+) extends StripeSessionData:
+  def renew      = !cancel_at_period_end
+  def isActive   = status == "active"
+  def customerId = customer
+  def currency   = item.price.currency
+  def ipOption   = ip
 
 case class StripeCustomer(
     id: StripeCustomerId,
@@ -100,11 +120,12 @@ case class StripeCharge(
     billing_details: Option[StripeCharge.BillingDetails],
     metadata: Map[String, String]
 ):
-  def country                = billing_details.flatMap(_.address).flatMap(_.country).map(Country.apply)
+  def country                = billing_details.flatMap(_.address).flatMap(_.country)
   def giftTo: Option[UserId] = UserId.from(metadata get "giftTo")
+  def ip: Option[IpAddress]  = metadata.get("ipAddress").flatMap(IpAddress.from)
 
 object StripeCharge:
-  case class Address(country: Option[String])
+  case class Address(country: Option[Country])
   case class BillingDetails(address: Option[Address])
 
 case class StripeInvoice(
@@ -135,6 +156,12 @@ case class StripeCompletedSession(
 case class StripeSetupIntent(payment_method: String)
 
 case class StripeSessionWithIntent(setup_intent: StripeSetupIntent)
+
+enum StripeMode:
+  case setup, payment, subscription
+
+opaque type StripeCanUse = Boolean
+object StripeCanUse extends YesNo[StripeCanUse]
 
 // payPal model
 

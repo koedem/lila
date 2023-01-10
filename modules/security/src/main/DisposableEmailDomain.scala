@@ -9,20 +9,22 @@ final class DisposableEmailDomain(
     ws: StandaloneWSClient,
     providerUrl: String,
     checkMailBlocked: () => Fu[List[String]]
-)(using ec: scala.concurrent.ExecutionContext):
+)(using scala.concurrent.ExecutionContext):
+
+  import DisposableEmailDomain.*
 
   private val staticRegex = toRegexStr(DisposableEmailDomain.staticBlacklist.iterator)
 
   private var regex = finalizeRegex(staticRegex)
 
   private[security] def refresh(): Unit =
-    for {
+    for
       blacklist <- ws.url(providerUrl).get().map(_.body[String].linesIterator) recover { case e: Exception =>
         logger.warn("DisposableEmailDomain.refresh", e)
         Iterator.empty
       }
       checked <- checkMailBlocked()
-    }
+    do
       val regexStr  = s"${toRegexStr(blacklist)}|${toRegexStr(checked.iterator)}"
       val nbDomains = regexStr.count('|' ==)
       lila.mon.email.disposableDomain.update(nbDomains)
@@ -36,13 +38,16 @@ final class DisposableEmailDomain(
     val lower = domain.lower
     !DisposableEmailDomain.whitelisted(lower) && regex.find(lower.value)
 
-  def isOk(domain: Domain) = !apply(domain)
+  def isOk(domain: Domain) = !apply(domain) && !mxRecordPasslist(domain)
 
-  def fromDomain(mixedCase: String): Boolean = Domain.from(mixedCase.toLowerCase).fold(true)(apply)
+  def asMxRecord(domain: Domain): Boolean =
+    apply(domain) && !mxRecordPasslist(domain.withoutSubdomain | domain)
 
 private object DisposableEmailDomain:
 
   def whitelisted(domain: Domain.Lower) = whitelist contains domain.value
+
+  private val mxRecordPasslist = Set(Domain("simplelogin.co"), Domain("simplelogin.com"))
 
   private val staticBlacklist = Set(
     "lichess.org",
@@ -207,5 +212,7 @@ private object DisposableEmailDomain:
     "freeshell.org",
     "hotmail.nl",
     "live.nl",
-    "startmail.com"
+    "startmail.com",
+    "palaciodegranda.com",
+    "laudepalaciogranda.com"
   )

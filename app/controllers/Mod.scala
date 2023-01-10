@@ -34,13 +34,13 @@ final class Mod(
         for {
           inquiry <- env.report.api.inquiries ofModId me.id
           _       <- modApi.setAlt(me, sus, v)
-          _       <- (v && sus.user.enabled) ?? env.api.accountClosure.close(sus.user, me)
-          _       <- (!v && sus.user.disabled) ?? modApi.reopenAccount(me.id into ModId, sus.user.id)
+          _       <- (v && sus.user.enabled.yes) ?? env.api.accountClosure.close(sus.user, me)
+          _       <- (!v && sus.user.enabled.no) ?? modApi.reopenAccount(me.id into ModId, sus.user.id)
         } yield (inquiry, sus).some
       }
     }(ctx =>
       me => { case (inquiry, suspect) =>
-        reportC.onInquiryClose(inquiry, me, suspect.some)(ctx)
+        reportC.onInquiryClose(inquiry, me, suspect.some)(using ctx)
       }
     )
 
@@ -54,7 +54,7 @@ final class Mod(
       }
     }(ctx =>
       me => { case (inquiry, suspect) =>
-        reportC.onInquiryClose(inquiry, me, suspect.some)(ctx)
+        reportC.onInquiryClose(inquiry, me, suspect.some)(using ctx)
       }
     )
 
@@ -84,8 +84,8 @@ final class Mod(
         } yield (inquiry, suspect).some
       }
     }(ctx =>
-      me => { case (inquiry, suspect) =>
-        reportC.onInquiryClose(inquiry, me, suspect.some)(ctx)
+      me => { (inquiry, suspect) =>
+        reportC.onInquiryClose(inquiry, me, suspect.some)(using ctx)
       }
     )
 
@@ -98,8 +98,8 @@ final class Mod(
         } yield (inquiry, suspect).some
       }
     }(ctx =>
-      me => { case (inquiry, suspect) =>
-        reportC.onInquiryClose(inquiry, me, suspect.some)(ctx)
+      me => { (inquiry, suspect) =>
+        reportC.onInquiryClose(inquiry, me, suspect.some)(using ctx)
       }
     )
 
@@ -117,8 +117,8 @@ final class Mod(
         }
       }
     }(ctx =>
-      me => { case (inquiry, suspect) =>
-        reportC.onInquiryClose(inquiry, me, suspect.some)(ctx)
+      me => { (inquiry, suspect) =>
+        reportC.onInquiryClose(inquiry, me, suspect.some)(using ctx)
       }
     )
 
@@ -207,14 +207,9 @@ final class Mod(
           .bindFromRequest()
           .fold(
             err => BadRequest(err.toString).toFuccess,
-            rawEmail => {
-              val email = env.security.emailAddressValidator
-                .validate(EmailAddress(rawEmail)) err s"Invalid email $rawEmail"
-              modApi.setEmail(me.id into ModId, user.id, email.acceptable) inject redirect(
-                user.username,
-                mod = true
-              )
-            }
+            email =>
+              modApi.setEmail(me.id into ModId, user.id, email) inject
+                redirect(user.username, mod = true)
           )
       }
     }
@@ -526,9 +521,8 @@ final class Mod(
       get("q") match
         case None => Ok(html.mod.emailConfirm("", none, none)).toFuccess
         case Some(rawQuery) =>
-          val query = rawQuery.trim.split(' ').toList
-          val email = query.headOption
-            .map(EmailAddress.apply) flatMap env.security.emailAddressValidator.validate
+          val query    = rawQuery.trim.split(' ').toList
+          val email    = query.headOption.flatMap(EmailAddress.from)
           val username = query lift 1
           def tryWith(setEmail: EmailAddress, q: String): Fu[Option[Result]] =
             env.mod.search(q) flatMap {
@@ -543,8 +537,8 @@ final class Mod(
               case _ => fuccess(none)
             }
           email.?? { em =>
-            tryWith(em.acceptable, em.acceptable.value) orElse {
-              username ?? { tryWith(em.acceptable, _) }
+            tryWith(em, em.value) orElse {
+              username ?? { tryWith(em, _) }
             } recover lila.db.recoverDuplicateKey(_ => none)
           } getOrElse BadRequest(html.mod.emailConfirm(rawQuery, none, none)).toFuccess
     }
@@ -597,7 +591,7 @@ final class Mod(
           for {
             logs      <- env.mod.logApi.userHistory(user.id)
             notes     <- env.socialInfo.fetchNotes(user, me.user)
-            notesJson <- lila.user.JsonView.notes(notes)(env.user.lightUserApi)
+            notesJson <- lila.user.JsonView.notes(notes)(using env.user.lightUserApi)
           } yield JsonOk(
             Json.obj(
               "logs" -> Json.arr(logs.map { log =>

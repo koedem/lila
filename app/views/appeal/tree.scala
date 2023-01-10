@@ -281,14 +281,14 @@ object tree:
       main(cls := "page page-small box box-pad appeal")(
         h1(cls := "box__top")("Appeal"),
         div(cls := s"nav-tree${if (isMarked) " marked" else ""}")(
-          if (me.disabled || query.contains("alt")) altScreen
+          if (me.enabled.no || query.contains("alt")) altScreen
           else
             renderNode(
               {
-                if (playban || query.contains("playban")) playbanMenu
-                else if (me.marks.engine || query.contains("engine")) engineMenu
+                if (me.marks.engine || query.contains("engine")) engineMenu
                 else if (me.marks.boost || query.contains("boost")) boostMenu
                 else if (me.marks.troll || query.contains("shadowban")) muteMenu
+                else if (playban || query.contains("playban")) playbanMenu
                 else if (me.marks.rankban || query.contains("rankban")) rankBanMenu
                 else cleanMenu
               },

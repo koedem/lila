@@ -9,6 +9,7 @@ import lila.rating.{ PerfType, UserRankMap }
 import play.api.i18n.Lang
 import lila.common.Json.given
 import lila.security.Granter
+import org.joda.time.DateTime
 
 final class UserApi(
     jsonView: lila.user.JsonView,
@@ -28,9 +29,10 @@ final class UserApi(
     net: NetConfig
 )(using scala.concurrent.ExecutionContext):
 
-  def one(u: User): JsObject =
+  def one(u: User, joinedAt: Option[DateTime] = None): JsObject = {
     addStreaming(jsonView.full(u, withRating = true, withProfile = true), u.id) ++
       Json.obj("url" -> makeUrl(s"@/${u.username}")) // for app BC
+  }.add("joinedTeamAt", joinedAt)
 
   def extended(
       username: UserStr,
@@ -48,7 +50,7 @@ final class UserApi(
       withFollows: Boolean,
       withTrophies: Boolean
   )(using Lang): Fu[JsObject] =
-    if (u.disabled) fuccess(jsonView disabled u.light)
+    if (u.enabled.no) fuccess(jsonView disabled u.light)
     else
       gameProxyRepo.urgentGames(u).dmap(_.headOption) zip
         (as.filter(u !=) ?? { me =>

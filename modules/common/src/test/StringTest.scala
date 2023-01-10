@@ -27,6 +27,8 @@ class StringTest extends Specification {
       rms(
         """🚌🚎🚐🚑🚒🚓🚕🚗🚙🚚🚛🚜🚲🛴🛵🛺🦼🦽 with new and better !pizzes on lichess.org"""
       ) === " with new and better !pizzes on lichess.org"
+      rms("🥹") === ""
+      rms("🥹🥹🥹 xxx 🥹") === " xxx "
     }
     "preserve languages" >> {
       Result.foreach(i18nValidStrings) { txt =>
@@ -112,6 +114,11 @@ class StringTest extends Specification {
         extractPosts("Answer me yes/no?") === List()
       }
     }
+  }
+
+  "noShouting" >> {
+    String.noShouting("HELLO SIR") === "hello sir"
+    String.noShouting("1. Nf3 O-O-O#") === "1. Nf3 O-O-O#"
   }
 
 }

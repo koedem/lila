@@ -33,9 +33,9 @@ trait dsl:
   type Bdoc = BSONDocument
   type Barr = BSONArray
 
-  def bsonWriteObjTry[A](using writer: BSONDocumentWriter[A])(a: A) = writer writeTry a
-  def bsonWriteTry[A](using writer: BSONWriter[A])(a: A)            = writer writeTry a
-  def bsonWriteOpt[A](using writer: BSONWriter[A])(a: A)            = writer writeOpt a
+  def bsonWriteObjTry[A](a: A)(using writer: BSONDocumentWriter[A]) = writer writeTry a
+  def bsonWriteTry[A](a: A)(using writer: BSONWriter[A])            = writer writeTry a
+  def bsonWriteOpt[A](a: A)(using writer: BSONWriter[A])            = writer writeOpt a
 
   // **********************************************************************************************//
   // Helpers
@@ -406,6 +406,11 @@ object dsl extends dsl with Handlers:
     def secondaryPreferred = coll withReadPreference ReadPreference.secondaryPreferred
     def secondary          = coll withReadPreference ReadPreference.secondary
 
+    // #TODO FIXME
+    // should be secondaryPreferred
+    // https://github.com/ReactiveMongo/ReactiveMongo/issues/1185
+    def tempPrimary = coll withReadPreference ReadPreference.primary
+
     def ext = this
 
     def one[D: BSONDocumentReader](selector: Bdoc): Fu[Option[D]] =
@@ -484,9 +489,7 @@ object dsl extends dsl with Handlers:
         }
         .cursor[D](readPreference)
         .collect[List](Int.MaxValue)
-        .map {
-          _.view.map(u => docId(u) -> u).toMap
-        }
+        .map(_.mapBy(docId))
 
     def byOrderedIds[D: BSONDocumentReader, I: BSONWriter](
         ids: Iterable[I],
@@ -562,11 +565,11 @@ object dsl extends dsl with Handlers:
         .cursor[Bdoc]()
         .list(Int.MaxValue)
         .dmap {
-          _ flatMap { obj =>
+          _.flatMap { obj =>
             obj.getAsOpt[I]("_id") flatMap { id =>
               fieldExtractor(obj) map { id -> _ }
             }
-          } toMap
+          }.toMap
         }
 
     def updateField[V: BSONWriter](selector: Bdoc, field: String, value: V) =

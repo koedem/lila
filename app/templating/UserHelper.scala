@@ -37,7 +37,7 @@ trait UserHelper extends HasEnv { self: I18nHelper with StringHelper with Number
       rating: IntRating,
       name: String,
       nb: Int,
-      provisional: Boolean,
+      provisional: RatingProvisional,
       clueless: Boolean,
       icon: Char
   )(using Lang): Frag =
@@ -47,7 +47,7 @@ trait UserHelper extends HasEnv { self: I18nHelper with StringHelper with Number
       cls      := "text"
     )(
       if (clueless) frag(nbsp, nbsp, nbsp, if (nb < 1) "-" else "?")
-      else frag(rating, provisional option "?")
+      else frag(rating, provisional.yes option "?")
     )
 
   def showPerfRating(perfType: PerfType, perf: Perf)(using Lang): Frag =
@@ -80,8 +80,8 @@ trait UserHelper extends HasEnv { self: I18nHelper with StringHelper with Number
     case d if d > 0 => goodTag(s"+$d")
     case d          => badTag(s"−${-d}")
 
-  def lightUser         = env.user.lightUserSync
-  def lightUserFallback = env.user.lightUserSyncFallback
+  inline def lightUser         = env.user.lightUserSync
+  inline def lightUserFallback = env.user.lightUserSyncFallback
 
   def usernameOrId(userId: UserId): String  = lightUser(userId).fold(userId.value)(_.name.value)
   def titleNameOrId(userId: UserId): String = lightUser(userId).fold(userId.value)(_.titleName)
@@ -98,16 +98,16 @@ trait UserHelper extends HasEnv { self: I18nHelper with StringHelper with Number
       else User.anonymous
     )
 
-  def userIdLink(
-      userIdOption: Option[UserId],
+  def userIdLink[U](
+      userIdOption: Option[U],
       cssClass: Option[String] = None,
       withOnline: Boolean = true,
       withTitle: Boolean = true,
       truncate: Option[Int] = None,
       params: String = "",
       modIcon: Boolean = false
-  )(using Lang): Tag =
-    userIdOption.flatMap(lightUser).fold[Tag](anonUserSpan(cssClass, modIcon)) { user =>
+  )(using Lang)(using idOf: UserIdOf[U]): Tag =
+    userIdOption.flatMap(u => lightUser(idOf(u))).fold[Tag](anonUserSpan(cssClass, modIcon)) { user =>
       userIdNameLink(
         userId = user.id,
         username = user.name,
@@ -224,7 +224,7 @@ trait UserHelper extends HasEnv { self: I18nHelper with StringHelper with Number
     frag(
       " (",
       perf.intRating,
-      perf.provisional option "?",
+      perf.provisional.yes option "?",
       ")"
     )
 

@@ -43,22 +43,21 @@ final private class TutorBuilder(
   val maxTime = fishnet.maxTime + 3.minutes
 
   def apply(userId: UserId): Fu[Option[TutorFullReport]] = for {
-    user <- userRepo byId userId orFail s"No such user $userId"
-    // hasFresh <- hasFreshReport(user)
-    // hasFresh <- fuFalse
-    // report <- !hasFresh ?? {
-    //   val chrono = lila.common.Chronometer.lapTry(produce(user))
-    //   chrono.mon { r => lila.mon.tutor.buildFull(r.isSuccess) }
-    //   for {
-    //     lap    <- chrono.lap
-    //     report <- Future fromTry lap.result
-    //     doc = bsonWriteObjTry(report).get ++ $doc(
-    //       "_id"    -> s"${report.user}:${dateFormatter print report.at}",
-    //       "millis" -> lap.millis
-    //     )
-    //     _ <- reportColl.insert.one(doc).void
-    //   } yield report.some
-    // }
+    user     <- userRepo byId userId orFail s"No such user $userId"
+    hasFresh <- hasFreshReport(user)
+    report <- !hasFresh ?? {
+      val chrono = lila.common.Chronometer.lapTry(produce(user))
+      chrono.mon { r => lila.mon.tutor.buildFull(r.isSuccess) }
+      for {
+        lap    <- chrono.lap
+        report <- Future fromTry lap.result
+        doc = bsonWriteObjTry(report).get ++ $doc(
+          "_id"    -> s"${report.user}:${dateFormatter print report.at}",
+          "millis" -> lap.millis
+        )
+        _ <- reportColl.insert.one(doc).void
+      } yield report.some
+    }
   } yield none
 
   private def produce(user: User): Fu[TutorFullReport] = for {
@@ -66,7 +65,7 @@ final private class TutorBuilder(
     perfStats <- perfStatsApi(user, eligiblePerfTypesOf(user), fishnet.maxGamesToConsider)
       .monSuccess(_.tutor buildSegment "perf-stats")
     tutorUsers = perfStats
-      .map { case (pt, stats) => TutorUser(user, pt, stats.stats) }
+      .map { (pt, stats) => TutorUser(user, pt, stats.stats) }
       .toList
       .sortBy(-_.perfStats.totalNbGames)
     _     <- fishnet.ensureSomeAnalysis(perfStats).monSuccess(_.tutor buildSegment "fishnet-analysis")
@@ -75,7 +74,7 @@ final private class TutorBuilder(
 
   private[tutor] def eligiblePerfTypesOf(user: User) =
     PerfType.standardWithUltra.filter { pt =>
-      user.perfs(pt).latest.exists(_ isAfter DateTime.now.minusMonths(2))
+      user.perfs(pt).latest.exists(_ isAfter DateTime.now.minusMonths(6))
     }
 
   private def hasFreshReport(user: User): Fu[Boolean] = reportColl.exists(

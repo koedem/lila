@@ -3,13 +3,14 @@ package lila.report
 import org.joda.time.DateTime
 import cats.data.NonEmptyList
 import ornicar.scalalib.ThreadLocalRandom
+import reactivemongo.api.bson.Macros.Annotations.Key
 
 import lila.user.User
 import lila.common.Iso
 
 case class Report(
-    _id: Report.ID, // also the url slug
-    user: UserId,   // the reportee
+    @Key("_id") id: Report.Id, // also the url slug
+    user: UserId,              // the reportee
     reason: Reason,
     room: Room,
     atoms: NonEmptyList[Report.Atom], // most recent first
@@ -21,10 +22,9 @@ case class Report(
 
   import Report.{ Atom, Score }
 
-  private given Ordering[Double] = scala.math.Ordering.Double.TotalOrdering
+  // private given Ordering[Double] = scala.math.Ordering.Double.TotalOrdering
 
-  def id   = _id
-  def slug = _id
+  inline def slug = id
 
   def closed  = !open
   def suspect = SuspectId(user)
@@ -86,21 +86,20 @@ case class Report(
 
 object Report:
 
-  type ID = String
+  opaque type Id = String
+  object Id extends OpaqueString[Id]
 
-  case class Score(value: Double) extends AnyVal:
-    def +(s: Score) = Score(s.value + value)
-    def *(m: Int)   = Score(value * m)
-    def /(m: Int)   = Score(value / m)
-    def color =
-      if (value >= 150) "red"
-      else if (value >= 100) "orange"
-      else if (value >= 50) "yellow"
-      else "green"
-    def atLeast(v: Int)   = Score(value atLeast v)
-    def atLeast(s: Score) = Score(value atLeast s.value)
-    def withinBounds      = Score(value atLeast 5 atMost 100)
-  given Iso.DoubleIso[Score] = Iso.double[Score](Score.apply, _.value)
+  opaque type Score = Double
+  object Score extends OpaqueDouble[Score]:
+    extension (a: Score)
+      def +(s: Score): Score = a + s
+      def color =
+        if (a >= 150) "red"
+        else if (a >= 100) "orange"
+        else if (a >= 50) "yellow"
+        else "green"
+      def atLeast(s: Score): Score = math.max(a, s)
+      def withinBounds: Score      = a atLeast 5 atMost 100
 
   case class Atom(
       by: ReporterId,
@@ -157,20 +156,19 @@ object Report:
   private[report] val appealText      = "Appeal"
 
   def make(c: Candidate.Scored, existing: Option[Report]) =
-    c match
-      case c @ Candidate.Scored(candidate, score) =>
-        existing.fold(
-          Report(
-            _id = ThreadLocalRandom nextString 8,
-            user = candidate.suspect.user.id,
-            reason = candidate.reason,
-            room = Room(candidate.reason),
-            atoms = NonEmptyList.one(c.atom),
-            score = score,
-            inquiry = none,
-            open = true,
-            done = none
-          )
-        )(_ add c.atom)
+    import c.*
+    existing.fold(
+      Report(
+        id = Id(ThreadLocalRandom nextString 8),
+        user = candidate.suspect.user.id,
+        reason = candidate.reason,
+        room = Room(candidate.reason),
+        atoms = NonEmptyList.one(c.atom),
+        score = score,
+        inquiry = none,
+        open = true,
+        done = none
+      )
+    )(_ add c.atom)
 
-  private[report] case class SnoozeKey(snoozerId: UserId, reportId: Report.ID)
+  private[report] case class SnoozeKey(snoozerId: UserId, reportId: Id)

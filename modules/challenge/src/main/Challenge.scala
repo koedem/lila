@@ -123,7 +123,7 @@ object Challenge:
     case Accepted extends Status(40)
 
   object Status:
-    val byId = values.map { s => s.id -> s }.toMap
+    val byId = values.mapBy(_.id)
 
   enum DeclineReason(val trans: I18nKey):
     val key = DeclineReason.this.toString.toLowerCase
@@ -144,12 +144,12 @@ object Challenge:
 
     val default            = Generic
     val all                = values.toList
-    val byKey              = all.map { r => r.key -> r }.toMap
+    val byKey              = values.mapBy(_.key)
     val allExceptBot       = all.filterNot(r => r == NoBot || r == OnlyBot)
     def apply(key: String) = all.find { d => d.key == key.toLowerCase || d.trans.value == key } | Generic
 
-  case class Rating(int: IntRating, provisional: Boolean):
-    def show = s"$int${if (provisional) "?" else ""}"
+  case class Rating(int: IntRating, provisional: RatingProvisional):
+    def show = s"$int${if provisional.yes then "?" else ""}"
   object Rating:
     def apply(p: lila.rating.Perf): Rating = Rating(p.intRating, p.provisional)
 

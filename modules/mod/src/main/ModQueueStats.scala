@@ -38,7 +38,7 @@ final class ModQueueStats(
   private def compute(period: Period): Fu[Result] =
     repo.coll
       .find($doc("_id" $gte dateFormat.print(Period dateSince period)))
-      .cursor[Bdoc](ReadPreference.secondaryPreferred)
+      .cursor[Bdoc](temporarilyPrimary)
       .listAll()
       .map { docs =>
         for {
@@ -62,10 +62,8 @@ final class ModQueueStats(
             "common" -> Json.obj(
               "xaxis" -> days.map(_._1.getMillis)
             ),
-            "rooms" -> Room.all
-              .map { room =>
-                room.key -> room.name
-              }
+            "rooms" -> Room.values
+              .map { room => room.key -> room.name }
               .appendedAll {
                 List(
                   "appeal"   -> "Appeal",

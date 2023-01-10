@@ -9,31 +9,13 @@ import lila.pref.PrefCateg
 import controllers.routes
 
 object pref:
-
+  import bits.*
   import trans.preferences.*
 
   private def categFieldset(categ: lila.pref.PrefCateg, active: lila.pref.PrefCateg) =
     div(cls := List("none" -> (categ != active)))
 
   private def setting(name: Frag, body: Frag) = st.section(h2(name), body)
-
-  private def radios(field: play.api.data.Field, options: Iterable[(Any, String)], prefix: String = "ir") =
-    st.group(cls := "radio")(
-      options.map { v =>
-        val id      = s"${field.id}_${v._1}"
-        val checked = field.value has v._1.toString
-        div(
-          input(
-            st.id := s"$prefix$id",
-            checked option st.checked,
-            tpe   := "radio",
-            value := v._1.toString,
-            name  := field.name
-          ),
-          label(`for` := s"$prefix$id")(v._2)
-        )
-      }.toList
-    )
 
   def apply(u: lila.user.User, form: play.api.data.Form[?], categ: lila.pref.PrefCateg)(using
       ctx: Context
@@ -42,7 +24,7 @@ object pref:
       title = s"${bits.categName(categ)} - ${u.username} - ${preferences.txt()}",
       active = categ.slug
     ) {
-      val booleanChoices = Seq(0 -> trans.no.txt(), 1 -> trans.yes.txt())
+      val booleanChoices = translatedBooleanIntChoices
       div(cls := "account box box-pad")(
         h1(cls := "box__top")(bits.categName(categ)),
         postForm(cls := "autosubmit", action := routes.Pref.formApply)(
@@ -153,12 +135,6 @@ object pref:
               castleByMovingTheKingTwoSquaresOrOntoTheRook(),
               radios(form("behavior.rookCastle"), translatedRookCastleChoices)
             ),
-            div(id := "correspondence-email-notif")(
-              setting(
-                correspondenceEmailNotification(),
-                radios(form("behavior.corresEmailNotif"), booleanChoices)
-              )
-            ),
             setting(
               inputMovesWithTheKeyboard(),
               radios(form("behavior.keyboardMove"), booleanChoices)
@@ -192,10 +168,6 @@ object pref:
             setting(
               trans.letOtherPlayersInviteYouToStudy(),
               radios(form("studyInvite"), translatedStudyInviteChoices)
-            ),
-            setting(
-              trans.receiveForumNotifications(),
-              radios(form("mention"), booleanChoices)
             ),
             setting(
               trans.shareYourInsightsData(),

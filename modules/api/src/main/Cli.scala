@@ -53,6 +53,11 @@ final private[api] class Cli(
     case "puzzle" :: "opening" :: "recompute" :: "all" :: Nil =>
       puzzle.opening.recomputeAll
       fuccess("started in background")
+    case "threads" :: Nil =>
+      fuccess {
+        val threads = ornicar.scalalib.Jvm.threadGroups()
+        s"${threads.map(_.total).sum} threads\n\n${threads.mkString("\n")}"
+      }
 
   private def run(args: List[String]): Fu[String] = {
     (processors lift args) | fufail("Unknown command: " + args.mkString(" "))

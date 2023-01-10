@@ -103,8 +103,6 @@ final class Env(
   val appVersionCommit  = config.getOptional[String]("app.version.commit")
   val appVersionMessage = config.getOptional[String]("app.version.message")
 
-  lila.log("plan").info("test!")
-  lila.log("plan").warn("test!")
   lazy val apiTimelineSetting = memo.settingStore[Int](
     "apiTimelineEntries",
     default = 10,
@@ -156,6 +154,7 @@ final class Env(
     }
 
   system.actorOf(Props(new templating.RendererActor), name = config.get[String]("hub.actor.renderer"))
+end Env
 
 final class EnvBoot(
     config: Configuration,

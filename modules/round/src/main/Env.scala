@@ -62,10 +62,9 @@ final class Env(
 ):
   private val (botSync, async, sync) = (lightUserApi.isBotSync, lightUserApi.async, lightUserApi.sync)
 
-  // private given ConfigLoader[AnimationDuration] = durationLoader(AnimationDuration.apply)
   private val config = appConfig.get[RoundConfig]("round")(AutoConfig.loader)
 
-  private val defaultGoneWeight                      = fuccess(1f)
+  private val defaultGoneWeight                     = fuccess(1f)
   private def goneWeight(userId: UserId): Fu[Float] = playban.getRageSit(userId).dmap(_.goneWeight)
   private val goneWeightsFor = (game: Game) =>
     if (!game.playable || !game.hasClock || game.hasAi || !Uptime.startedSinceMinutes(1))

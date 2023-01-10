@@ -117,7 +117,7 @@ final class Store(val coll: Coll, val userhack: Coll, userRepo: lila.user.UserRe
           "_id"  -> sessionId,
           "user" -> userId,
           "ip"   -> HTTPRequest.ipAddress(req),
-          "ua"   -> HTTPRequest.userAgent(req).|("?"),
+          "ua"   -> HTTPRequest.userAgent(req).fold("?")(_.value),
           "date" -> DateTime.now,
           "up"   -> up,
           "api"  -> apiVersion,

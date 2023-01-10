@@ -90,7 +90,10 @@ object String:
       .replace('\u0002', 'ª')
 
   // https://www.compart.com/en/unicode/block/U+1F300
-  private val multibyteSymbolsRegex               = "\\p{So}+".r
+  // https://www.compart.com/en/unicode/block/U+1F600
+  // https://www.compart.com/en/unicode/block/U+1F900
+  private val multibyteSymbolsRegex =
+    raw"[\p{So}\p{block=Emoticons}\p{block=Miscellaneous Symbols and Pictographs}\p{block=Supplemental Symbols and Pictographs}]".r
   def removeMultibyteSymbols(str: String): String = multibyteSymbolsRegex.replaceAllIn(str, "")
 
   // for publicly listed text like team names, study names, forum topics...
@@ -114,7 +117,7 @@ object String:
     text.lengthIs >= 5 && {
       import java.lang.Character.*
       // true if >1/2 of the latin letters are uppercase
-      (text take 80).foldLeft(0) { (i, c) =>
+      text.take(80).replace("O-O", "o-o").foldLeft(0) { (i, c) =>
         getType(c) match
           case UPPERCASE_LETTER => i + 1
           case LOWERCASE_LETTER => i - 1

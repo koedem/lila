@@ -32,6 +32,8 @@ object BSONHandlers:
   given BSONHandler[Blur]                 = BSONBooleanNullHandler.as[Blur](Blur.apply, _.id)
   given BSONHandler[CplRange]             = valueMapHandler(CplRange.byId)(_.cpl)
   given BSONHandler[AccuracyPercent]      = percentAsIntHandler[AccuracyPercent]
+  given BSONHandler[WinPercent]           = percentAsIntHandler[WinPercent]
+  given BSONHandler[ClockPercent]         = percentAsIntHandler[ClockPercent]
 
   private val BSONBooleanNullHandler = quickHandler[Boolean](
     { case BSONBoolean(v) => v; case BSONNull => false },
@@ -50,8 +52,8 @@ object BSONHandlers:
     def reads(r: BSON.Reader) =
       InsightMove(
         phase = r.get[Phase]("p"),
-        tenths = r.get[Int]("t"),
-        clockPercent = r.get[ClockPercent]("s"),
+        tenths = r.intO("t"),
+        clockPercent = r.getO[ClockPercent]("s"),
         role = r.get[Role]("r"),
         eval = r.intO("e"),
         cpl = r.intO("c"),

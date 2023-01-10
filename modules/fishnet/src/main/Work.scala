@@ -3,6 +3,7 @@ package lila.fishnet
 import org.joda.time.DateTime
 import ornicar.scalalib.ThreadLocalRandom
 
+import chess.Ply
 import chess.format.{ Fen, Uci }
 import chess.variant.Variant
 import lila.common.IpAddress
@@ -62,7 +63,7 @@ object Work:
       if (system) lila.user.User.lichessId.value
       else userId.value
 
-  case class Clock(wtime: Int, btime: Int, inc: Int)
+  case class Clock(wtime: Int, btime: Int, inc: chess.Clock.IncrementSeconds)
 
   case class Move(
       _id: Work.Id, // random
@@ -75,7 +76,7 @@ object Work:
       _id: Work.Id, // random
       sender: Sender,
       game: Game,
-      startPly: Int,
+      startPly: Ply,
       tries: Int,
       lastTryByKey: Option[Client.Key],
       acquired: Option[Acquired],

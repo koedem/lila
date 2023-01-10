@@ -389,6 +389,7 @@
   <string name="siteDescription">Șah online gratuit. Joacă șah acum într-o interfață simplă. Fără înregistrare, fără reclame, fără plugin-uri. Joacă șah cu calculatorul, cu prietenii sau cu alți jucători aleși la întâmplare.</string>
   <string name="xJoinedTeamY">%1$s a intrat în echipa %2$s</string>
   <string name="xCreatedTeamY">%1$s a creat echipa %2$s</string>
+  <string name="startedStreaming">e live</string>
   <string name="xStartedStreaming">%s a început să facă stream</string>
   <string name="averageElo">Medie rating</string>
   <string name="location">Locaţie</string>
@@ -570,6 +571,8 @@
   <string name="blog">Blog</string>
   <string name="notes">Note</string>
   <string name="typePrivateNotesHere">Scrie în privat aici</string>
+  <string name="writeAPrivateNoteAboutThisUser">Scrie o notiță privată despre acest utilizator</string>
+  <string name="noNoteYet">Încă nu există notițe</string>
   <string name="invalidUsernameOrPassword">Nume sau parolă invalidă</string>
   <string name="incorrectPassword">Parolă greșită</string>
   <string name="invalidAuthenticationCode">Cod de autentificare incorect</string>
@@ -739,6 +742,7 @@
   <string name="kidMode">Mod pentru copii</string>
   <string name="kidModeExplanation">În modul „copil”, toate modalitățile de comunicare sunt dezactivate. Activează asta pentru copilul tău sau pentru școlari, pentru a-i proteja de alți utilizatori ai internetului.</string>
   <string name="inKidModeTheLichessLogoGetsIconX">În modul „copil”, sigla paginii va avea iconița %s, în felul acesta vei ști când copiii tăi sunt în siguranță.</string>
+  <string name="askYourChessTeacherAboutLiftingKidMode">Contul tău este gestionat. Întreabă-ți profesorul de șah despre scoaterea modului copil.</string>
   <string name="enableKidMode">Activează modul „copil”</string>
   <string name="disableKidMode">Dezactivează modul „copil”</string>
   <string name="security">Securitate</string>
@@ -774,6 +778,7 @@
   <string name="light">Luminos</string>
   <string name="dark">Culoare închisă</string>
   <string name="transparent">Transparent</string>
+  <string name="deviceTheme">Tema dispozitivului</string>
   <string name="backgroundImageUrl">URL-ul imaginii de fundal:</string>
   <string name="boardGeometry">Geometria tablei</string>
   <string name="boardTheme">Tema tablei</string>

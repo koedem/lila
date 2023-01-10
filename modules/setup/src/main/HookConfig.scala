@@ -1,6 +1,7 @@
 package lila.setup
 
-import chess.Mode
+import chess.{ Mode, Clock }
+import chess.variant.Variant
 
 import lila.common.Days
 import lila.lobby.{ Color, Hook, Seek }
@@ -11,7 +12,7 @@ case class HookConfig(
     variant: chess.variant.Variant,
     timeMode: TimeMode,
     time: Double,
-    increment: Int,
+    increment: Clock.IncrementSeconds,
     days: Days,
     mode: Mode,
     color: Color,
@@ -108,10 +109,19 @@ case class HookConfig(
 
 object HookConfig extends BaseHumanConfig:
 
-  def from(v: Int, tm: Int, t: Double, i: Int, d: Days, m: Option[Int], e: Option[String], c: String) =
+  def from(
+      v: Variant.Id,
+      tm: Int,
+      t: Double,
+      i: Clock.IncrementSeconds,
+      d: Days,
+      m: Option[Int],
+      e: Option[String],
+      c: String
+  ) =
     val realMode = m.fold(Mode.default)(Mode.orDefault)
     new HookConfig(
-      variant = chess.variant.Variant(v) err s"Invalid game variant $v",
+      variant = chess.variant.Variant.orDefault(v),
       timeMode = TimeMode(tm) err s"Invalid time mode $tm",
       time = t,
       increment = i,
@@ -127,7 +137,7 @@ object HookConfig extends BaseHumanConfig:
     variant = variantDefault,
     timeMode = TimeMode.RealTime,
     time = 5d,
-    increment = 3,
+    increment = Clock.IncrementSeconds(3),
     days = Days(2),
     mode = Mode.default,
     ratingRange = RatingRange.default,
@@ -141,11 +151,11 @@ object HookConfig extends BaseHumanConfig:
 
     def reads(r: BSON.Reader): HookConfig =
       HookConfig(
-        variant = chess.variant.Variant orDefault (r int "v"),
+        variant = Variant idOrDefault r.getO[Variant.Id]("v"),
         timeMode = TimeMode orDefault (r int "tm"),
         time = r double "t",
-        increment = r int "i",
-        days = r.get[Days]("d"),
+        increment = r get "i",
+        days = r.get("d"),
         mode = Mode orDefault (r int "m"),
         color = Color.Random,
         ratingRange = r strO "e" flatMap RatingRange.apply getOrElse RatingRange.default

@@ -45,6 +45,15 @@ trait LilaModel:
   opaque type StudyId = String
   object StudyId extends OpaqueString[StudyId]
 
+  opaque type ForumPostId = String
+  object ForumPostId extends OpaqueString[ForumPostId]
+
+  opaque type ForumTopicId = String
+  object ForumTopicId extends OpaqueString[ForumTopicId]
+
+  opaque type ForumCategId = String
+  object ForumCategId extends OpaqueString[ForumCategId]
+
   opaque type StudyName = String
   object StudyName extends OpaqueString[StudyName]
 
@@ -91,6 +100,9 @@ trait LilaModel:
   opaque type Rating = Double
   object Rating extends OpaqueDouble[Rating]
 
+  opaque type RatingProvisional = Boolean
+  object RatingProvisional extends YesNo[RatingProvisional]
+
   opaque type Rank = Int
   object Rank extends OpaqueInt[Rank]
 
@@ -102,3 +114,6 @@ trait LilaModel:
 
   opaque type Markdown = String
   object Markdown extends OpaqueString[Markdown]
+
+  opaque type UserAgent = String
+  object UserAgent extends OpaqueString[UserAgent]

@@ -158,7 +158,7 @@
   <string name="viewInFullSize">An voller Gréisst ukucken</string>
   <string name="logOut">Ofmellen</string>
   <string name="signIn">Umellen</string>
-  <string name="rememberMe" comment="Appears on the sign-in screen.">Ageloggt bleiwen</string>
+  <string name="rememberMe">Ageloggt bleiwen</string>
   <string name="youNeedAnAccountToDoThat">Du brauchs een Account fir dat ze maachen</string>
   <string name="signUp">Registréieren</string>
   <string name="computersAreNotAllowedToPlay">Ënnerstëtzung vun Schachprogrammen, Datenbanken oder aneren Spiller ass wärend enger Partie net erlaabt. Wannechgelift bedenkt och, dass d\'Creatioun vun puer Benotzerkonten ongären gesinn ass and d\'Missachtung vun dëser Reegel, bis op Kulanz vun der Ekipp, zum Ausschloss aller betraffenen Konten féiert.</string>
@@ -538,6 +538,8 @@
   <string name="blog">Blog</string>
   <string name="notes">Notten</string>
   <string name="typePrivateNotesHere">Schreiw hei deng privat Notten</string>
+  <string name="writeAPrivateNoteAboutThisUser">Schreiw eng privat Notiz iwwert dësen Benotzer</string>
+  <string name="noNoteYet">Nach keng Notiz</string>
   <string name="invalidUsernameOrPassword">Ongëltege Benotzernumm oder Passwuert</string>
   <string name="incorrectPassword">Inkorrekt Passwuert</string>
   <string name="invalidAuthenticationCode">Ongëltegen Authentifizéierungscode</string>
@@ -737,6 +739,7 @@
   <string name="light">Hell</string>
   <string name="dark">Däischter</string>
   <string name="transparent">Transparent</string>
+  <string name="deviceTheme">Mam Gerät synchroniséieren</string>
   <string name="backgroundImageUrl">URL vum Hannergrondbild:</string>
   <string name="boardGeometry">Briet Geometrie</string>
   <string name="boardTheme">Briet Design</string>
@@ -931,4 +934,5 @@ Looss et eidel, fir Partie aus der normaler Ausgangspositioun ze starten.</strin
   <string name="until">Bis</string>
   <string name="lichessDbExplanation">Gewäert Partien vun allen Lichess Spiller</string>
   <string name="switchSides">Faarf wiesselen</string>
+  <string name="closingAccountWithdrawAppeal">Däin Benotzerkonto zou ze maachen wäert och däin Asproch zeréckzéihen</string>
 </resources>

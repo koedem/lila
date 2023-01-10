@@ -1,7 +1,7 @@
 package lila.relay
 
 import akka.actor.*
-import chess.format.pgn.Tags
+import chess.format.pgn.{ Tags, SanStr }
 import com.github.blemale.scaffeine.LoadingCache
 import io.mola.galimatias.URL
 import org.joda.time.DateTime
@@ -30,11 +30,11 @@ final private class RelayFetch(
     ws: StandaloneWSClient
 )(using ExecutionContext, akka.actor.Scheduler):
 
-  LilaScheduler(_.Every(500 millis), _.AtMost(15 seconds), _.Delay(30 seconds)) {
+  LilaScheduler("RelayFetch.official", _.Every(500 millis), _.AtMost(15 seconds), _.Delay(30 seconds)) {
     syncRelays(official = true)
   }
 
-  LilaScheduler(_.Every(750 millis), _.AtMost(10 seconds), _.Delay(1 minute)) {
+  LilaScheduler("RelayFetch.user", _.Every(750 millis), _.AtMost(10 seconds), _.Delay(1 minute)) {
     syncRelays(official = false)
   }
 
@@ -71,7 +71,7 @@ final private class RelayFetch(
         .addEffect(gs => lila.mon.relay.games(rt.tour.official, rt.round.slug).update(gs.size).unit)
         .flatMap { games =>
           sync(rt, games)
-            .withTimeout(7 seconds, SyncResult.Timeout)
+            .withTimeoutError(7 seconds, SyncResult.Timeout)
             .mon(_.relay.syncTime(rt.tour.official, rt.round.slug))
             .map { res =>
               res -> rt.round
@@ -283,7 +283,7 @@ private object RelayFetch:
       def toPgn(extraTags: Tags = Tags.empty) =
         val strMoves = moves.map(_ split ' ') map { move =>
           chess.format.pgn.Move(
-            san = ~move.headOption,
+            san = SanStr(~move.headOption),
             secondsLeft = move.lift(1).map(_.takeWhile(_.isDigit)) flatMap (_.toIntOption)
           )
         } mkString " "

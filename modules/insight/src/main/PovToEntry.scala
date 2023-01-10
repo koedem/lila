@@ -3,7 +3,8 @@ package lila.insight
 import cats.data.NonEmptyList
 import chess.format.Fen
 import chess.opening.OpeningDb
-import chess.{ Centis, Clock, Role, Situation, Stats }
+import chess.{ Ply, Centis, Clock, Role, Situation, Stats }
+import chess.format.pgn.SanStr
 import scala.util.chaining.*
 
 import lila.analyse.{ AccuracyCP, AccuracyPercent, Advice, WinPercent }
@@ -16,9 +17,9 @@ case class RichPov(
     provisional: Boolean,
     analysis: Option[lila.analyse.Analysis],
     situations: NonEmptyList[Situation],
-    clock: Clock.Config,
-    movetimes: Vector[Centis],
-    clockStates: Vector[Centis],
+    clock: Option[Clock.Config],
+    movetimes: Option[Vector[Centis]],
+    clockStates: Option[Vector[Centis]],
     advices: Map[Ply, Advice]
 ):
   lazy val division = chess.Divider(situations.map(_.board).toList)
@@ -49,7 +50,7 @@ final private class PovToEntry(
               situations <-
                 chess.Replay
                   .situations(
-                    moveStrs = game.pgnMoves,
+                    sans = game.sans,
                     initialFen = fen orElse {
                       !pov.game.variant.standardInitialPosition option pov.game.variant.initialFen
                     },
@@ -57,30 +58,21 @@ final private class PovToEntry(
                   )
                   .toOption
                   .flatMap(_.toNel)
-              clock       <- game.clock
-              movetimes   <- game moveTimes pov.color
-              clockStates <- game.clockHistory.map(_(pov.color))
             } yield RichPov(
               pov = pov,
               provisional = provisional,
               analysis = an,
               situations = situations,
-              clock = clock.config,
-              movetimes = movetimes.toVector,
-              clockStates = clockStates,
-              advices = an.?? {
-                _.advices.view
-                  .map { a =>
-                    a.info.ply -> a
-                  }
-                  .toMap
-              }
+              clock = game.clock.map(_.config),
+              movetimes = game.clock.flatMap(_ => game.moveTimes(pov.color)) map (_.toVector),
+              clockStates = game.clockHistory.map(_(pov.color)),
+              advices = an.??(_.advices.mapBy(_.info.ply))
             )
           }
       }
 
-  private def pgnMoveToRole(pgn: String): Role =
-    pgn.head match
+  private def sanToRole(san: SanStr): Role =
+    san.value.head match
       case 'N'       => chess.Knight
       case 'B'       => chess.Bishop
       case 'R'       => chess.Rook
@@ -99,7 +91,7 @@ final private class PovToEntry(
         from.pov.color.fold(is, is.map(_.invert))
       }
     }
-    val roles = from.pov.game.pgnMoves(from.pov.color) map pgnMoveToRole
+    val roles = from.pov.game.sansOf(from.pov.color) map sanToRole
     val situations =
       val pivot = if (from.pov.color == from.pov.game.startColor) 0 else 1
       from.situations.toList.zipWithIndex.collect {
@@ -107,17 +99,17 @@ final private class PovToEntry(
       }
     val blurs =
       val bools = from.pov.player.blurs.booleans
-      bools ++ Array.fill(from.movetimes.size - bools.length)(false)
-    val timeCvs = slidingMoveTimesCvs(from.movetimes)
-    from.clockStates.toList
-      .zip(from.movetimes)
-      .zip(roles)
+      bools ++ Array.fill(roles.size - bools.length)(false)
+    val timeCvs = from.movetimes map slidingMoveTimesCvs
+    roles.toList
       .zip(situations)
       .zip(blurs)
-      .zip(timeCvs)
+      .zip(timeCvs | Vector.fill(roles.size)(none))
+      .zip(from.clockStates.map(_.map(some)) | Vector.fill(roles.size)(none))
+      .zip(from.movetimes.map(_.map(some)) | Vector.fill(roles.size)(none))
       .zipWithIndex
-      .map { case ((((((clock, movetime), role), situation), blur), timeCv), i) =>
-        val ply      = i * 2 + from.pov.color.fold(1, 2)
+      .map { case ((((((role, situation), blur), timeCv), clock), movetime), i) =>
+        val ply      = Ply(i * 2 + from.pov.color.fold(1, 2))
         val prevInfo = prevInfos lift i
         val awareness = from.advices.get(ply - 1) flatMap {
           case o if o.judgment.isMistakeOrBlunder =>
@@ -143,8 +135,8 @@ final private class PovToEntry(
 
         InsightMove(
           phase = Phase.of(from.division, ply),
-          tenths = movetime.roundTenths,
-          clockPercent = ClockPercent(from.clock, clock),
+          tenths = movetime.map(_.roundTenths),
+          clockPercent = from.clock.flatMap(clk => clock.map(ClockPercent(clk, _))),
           role = role,
           eval = prevInfo.flatMap(_.eval.forceAsCp).map(_.ceiled.centipawns),
           cpl = cpDiffs.lift(i).flatten,
@@ -178,7 +170,7 @@ final private class PovToEntry(
 
   private def queenTrade(from: RichPov) =
     QueenTrade {
-      from.division.end.fold(from.situations.last.some)(from.situations.toList.lift) match
+      from.division.end.map(_.value).fold(from.situations.last.some)(from.situations.toList.lift) match
         case Some(situation) =>
           chess.Color.all.forall { color =>
             !situation.board.hasPiece(chess.Piece(color, chess.Queen))
@@ -203,11 +195,11 @@ final private class PovToEntry(
       color = pov.color,
       perf = perfType,
       opening = opening,
-      myCastling = Castling.fromMoves(game pgnMoves pov.color),
+      myCastling = Castling.fromMoves(game sansOf pov.color),
       rating = myRating,
       opponentRating = opRating,
       opponentStrength = for { m <- myRating; o <- opRating } yield RelativeStrength(m, o),
-      opponentCastling = Castling.fromMoves(game pgnMoves !pov.color),
+      opponentCastling = Castling.fromMoves(game sansOf !pov.color),
       moves = makeMoves(from),
       queenTrade = queenTrade(from),
       result = game.winnerUserId match {

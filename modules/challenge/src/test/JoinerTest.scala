@@ -4,15 +4,19 @@ import chess.variant.{ FromPosition, Standard }
 import org.specs2.mutable._
 
 import lila.game.Game
+import chess.Clock
 
 final class JoinerTest extends Specification {
+
+  val timeControl =
+    Challenge.TimeControl.Clock(Clock.Config(Clock.LimitSeconds(300), Clock.IncrementSeconds(0)))
 
   "create empty game" >> {
     "started at turn 0" >> {
       val challenge = Challenge.make(
         variant = Standard,
         initialFen = None,
-        timeControl = Challenge.TimeControl.Clock(chess.Clock.Config(300, 0)),
+        timeControl = timeControl,
         mode = chess.Mode.Casual,
         color = "white",
         challenger = Challenge.Challenger.Anonymous("secret"),
@@ -20,7 +24,7 @@ final class JoinerTest extends Specification {
         rematchOf = None
       )
       ChallengeJoiner.createGame(challenge, None, None) must beLike { case g: Game =>
-        g.chess.startedAtTurn === 0
+        g.chess.startedAtPly === 0
       }
     }
     "started at turn from position" >> {
@@ -28,7 +32,7 @@ final class JoinerTest extends Specification {
       val challenge = Challenge.make(
         variant = FromPosition,
         initialFen = Some(chess.format.Fen.Epd(position)),
-        timeControl = Challenge.TimeControl.Clock(chess.Clock.Config(300, 0)),
+        timeControl = timeControl,
         mode = chess.Mode.Casual,
         color = "white",
         challenger = Challenge.Challenger.Anonymous("secret"),
@@ -36,7 +40,7 @@ final class JoinerTest extends Specification {
         rematchOf = None
       )
       ChallengeJoiner.createGame(challenge, None, None) must beLike { case g: Game =>
-        g.chess.startedAtTurn === 6
+        g.chess.startedAtPly === 6
       }
     }
   }

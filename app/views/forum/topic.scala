@@ -97,7 +97,7 @@ object topic:
           description = shorten(posts.currentPageResults.headOption.??(_.post.text), 152)
         )
         .some,
-      csp = defaultCsp.withInlineIconFont.some
+      csp = defaultCsp.withInlineIconFont.withTwitter.some
     ) {
       val teamOnly = categ.team.filterNot(isMyTeamSync)
       val pager = views.html.base.bits

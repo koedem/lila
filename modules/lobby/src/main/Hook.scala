@@ -1,6 +1,7 @@
 package lila.lobby
 
 import chess.{ Clock, Mode, Speed }
+import chess.variant.Variant
 import org.joda.time.DateTime
 import play.api.i18n.Lang
 import play.api.libs.json.*
@@ -16,7 +17,7 @@ case class Hook(
     id: String,
     sri: Sri,            // owner socket sri
     sid: Option[String], // owner cookie (used to prevent multiple hooks)
-    variant: Int,
+    variant: Variant.Id,
     clock: Clock.Config,
     mode: Int,
     color: String,
@@ -28,7 +29,7 @@ case class Hook(
 
   val realColor = Color orDefault color
 
-  val realVariant = chess.variant.Variant orDefault variant
+  val realVariant = Variant.orDefault(variant)
 
   val realMode = Mode orDefault mode
 
@@ -71,7 +72,7 @@ case class Hook(
       "s"     -> speed.id,
       "i"     -> (if (clock.incrementSeconds > 0) 1 else 0)
     )
-    .add("prov" -> perf.map(_.provisional).filter(identity))
+    .add("prov" -> perf.map(_.provisional))
     .add("u" -> user.map(_.username))
     .add("rating" -> rating)
     .add("variant" -> realVariant.exotic.option(realVariant.key))

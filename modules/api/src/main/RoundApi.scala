@@ -177,7 +177,12 @@ final private[api] class RoundApi(
       }
     }
 
-  private def withTree(pov: Pov, analysis: Option[Analysis], initialFen: Option[Fen.Epd], withFlags: WithFlags)(
+  private def withTree(
+      pov: Pov,
+      analysis: Option[Analysis],
+      initialFen: Option[Fen.Epd],
+      withFlags: WithFlags
+  )(
       obj: JsObject
   ) =
     obj + ("treeParts" -> partitionTreeJsonWriter.writes(
@@ -187,7 +192,7 @@ final private[api] class RoundApi(
   private def withSteps(pov: Pov, initialFen: Option[Fen.Epd])(obj: JsObject) =
     obj + ("steps" -> lila.round.StepBuilder(
       id = pov.gameId,
-      pgnMoves = pov.game.pgnMoves,
+      sans = pov.game.sans,
       variant = pov.game.variant,
       initialFen = initialFen | pov.game.variant.initialFen
     ))
@@ -233,9 +238,7 @@ final private[api] class RoundApi(
   private def withAnalysis(g: Game, o: Option[Analysis])(json: JsObject) =
     json.add(
       "analysis",
-      o.map { a =>
-        analysisJson.bothPlayers(g.startedAt, a)
-      }
+      o.map { analysisJson.bothPlayers(g.startedAtPly, _) }
     )
 
   private def withExternalEngines(me: Option[User])(jsonFu: Fu[JsObject]): Fu[JsObject] =

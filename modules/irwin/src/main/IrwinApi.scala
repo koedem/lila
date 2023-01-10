@@ -55,7 +55,7 @@ final class IrwinApi(
     def withPovs(user: User): Fu[Option[IrwinReport.WithPovs]] =
       get(user) flatMap {
         _ ?? { report =>
-          gameRepo.gamesFromSecondary(report.games.map(_.gameId)) dmap { games =>
+          gameRepo.gamesTemporarilyFromPrimary(report.games.map(_.gameId)) dmap { games =>
             val povs = games.flatMap { g =>
               Pov(g, user) map { g.id -> _ }
             }.toMap
@@ -156,9 +156,7 @@ final class IrwinApi(
         import lila.notify.{ IrwinDone, Notification }
         modIds
           .map { modId =>
-            notifyApi.addNotification(
-              Notification.make(UserId(modId.value), IrwinDone(report.suspectId.value))
-            )
+            notifyApi.notifyOne(modId, lila.notify.IrwinDone(report.suspectId.value))
           }
           .sequenceFu
           .void

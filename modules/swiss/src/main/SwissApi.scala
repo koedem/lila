@@ -141,7 +141,7 @@ final class SwissApi(
         q = $id(SwissPlayer.makeId(swiss.id, userId)),
         u = $set(
           SwissPlayer.Fields.rating      -> perf.intRating,
-          SwissPlayer.Fields.provisional -> perf.provisional.option(true)
+          SwissPlayer.Fields.provisional -> perf.provisional.yes.option(true)
         )
       )
     }.sequenceFu
@@ -194,12 +194,13 @@ final class SwissApi(
 
   def gameIdSource(
       swissId: SwissId,
+      player: Option[UserId],
       batchSize: Int = 0,
-      readPreference: ReadPreference = ReadPreference.secondaryPreferred
+      readPreference: ReadPreference = temporarilyPrimary
   ): Source[GameId, ?] =
     SwissPairing.fields { f =>
       mongo.pairing
-        .find($doc(f.swissId -> swissId), $id(true).some)
+        .find($doc(f.swissId -> swissId) ++ player.??(u => $doc(f.players -> u)), $id(true).some)
         .sort($sort asc f.round)
         .batchSize(batchSize)
         .cursor[Bdoc](readPreference)
@@ -248,9 +249,7 @@ final class SwissApi(
               SwissPlayer.fields { f =>
                 mongo.player.countSel($doc(f.swissId -> swiss.id, f.score $gt player.score)).dmap(1.+)
               } map { rank =>
-                val pairingMap = pairings.view.map { p =>
-                  p.pairing.round -> p
-                }.toMap
+                val pairingMap = pairings.mapBy(_.pairing.round)
                 SwissPlayer
                   .ViewExt(
                     player,

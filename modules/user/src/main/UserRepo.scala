@@ -41,7 +41,7 @@ final class UserRepo(val coll: Coll)(using ec: scala.concurrent.ExecutionContext
 
   def enabledByIds[U](us: Iterable[U])(using idOf: UserIdOf[U]): Fu[List[User]] = {
     val ids = us.map(idOf.apply).filter(User.noGhost)
-    coll.list[User](enabledSelect ++ $inIds(ids), ReadPreference.secondaryPreferred)
+    coll.list[User](enabledSelect ++ $inIds(ids), temporarilyPrimary)
   }
 
   def byIdOrGhost(id: UserId): Fu[Option[Either[LightUser.Ghost, User]]] =
@@ -408,14 +408,13 @@ final class UserRepo(val coll: Coll)(using ec: scala.concurrent.ExecutionContext
     }
 
   def setEmail(id: UserId, email: EmailAddress): Funit = {
-    val normalizedEmail = email.normalize
+    val normalized = email.normalize
     coll.update
       .one(
         $id(id),
-        $set(F.email -> normalizedEmail) ++ $unset(F.prevEmail) ++ {
-          if (email.value == normalizedEmail.value) $unset(F.verbatimEmail)
-          else $set(F.verbatimEmail -> email)
-        }
+        if email.value == normalized.value then
+          $set(F.email -> normalized) ++ $unset(F.prevEmail, F.verbatimEmail)
+        else $set(F.email -> normalized, F.verbatimEmail -> email) ++ $unset(F.prevEmail)
       )
       .void
   } >>- lila.common.Bus.publish(lila.hub.actorApi.user.ChangeEmail(id, email), "email")
@@ -483,7 +482,7 @@ final class UserRepo(val coll: Coll)(using ec: scala.concurrent.ExecutionContext
       users: List[U]
   )(using idOf: UserIdOf[U], r: BSONHandler[User]): Fu[List[User.WithEmails]] =
     coll
-      .list[Bdoc]($inIds(users.map(idOf.apply)), ReadPreference.secondaryPreferred)
+      .list[Bdoc]($inIds(users.map(idOf.apply)), temporarilyPrimary)
       .map { docs =>
         for {
           doc  <- docs
@@ -503,7 +502,7 @@ final class UserRepo(val coll: Coll)(using ec: scala.concurrent.ExecutionContext
         $inIds(ids),
         $doc(F.verbatimEmail -> true, F.email -> true, F.prevEmail -> true).some
       )
-      .cursor[Bdoc](ReadPreference.secondaryPreferred)
+      .cursor[Bdoc](temporarilyPrimary)
       .listAll()
       .map { docs =>
         for
@@ -643,7 +642,7 @@ final class UserRepo(val coll: Coll)(using ec: scala.concurrent.ExecutionContext
     }
 
   def isErased(user: User): Fu[User.Erased] = User.Erased from {
-    user.disabled ?? {
+    user.enabled.no ?? {
       coll.exists($id(user.id) ++ $doc(F.erasedAt $exists true))
     }
   }

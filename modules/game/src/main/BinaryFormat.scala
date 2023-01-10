@@ -2,6 +2,7 @@ package lila.game
 
 import chess.*
 import chess.format.Uci
+import chess.format.pgn.SanStr
 import chess.variant.Variant
 import org.joda.time.DateTime
 import org.lichess.compression.clock.{ Encoder as ClockEncoder }
@@ -13,15 +14,15 @@ object BinaryFormat:
 
   object pgn:
 
-    def write(moves: PgnMoves): ByteArray =
+    def write(moves: Vector[SanStr]): ByteArray =
       ByteArray {
         format.pgn.Binary.writeMoves(moves).get
       }
 
-    def read(ba: ByteArray): PgnMoves =
+    def read(ba: ByteArray): Vector[SanStr] =
       format.pgn.Binary.readMoves(ba.value.toList).get.toVector
 
-    def read(ba: ByteArray, nb: Int): PgnMoves =
+    def read(ba: ByteArray, nb: Int): Vector[SanStr] =
       format.pgn.Binary.readMoves(ba.value.toList, nb).get.toVector
 
   object clockHistory:
@@ -72,12 +73,12 @@ object BinaryFormat:
         .toArray
     }
 
-    def read(ba: ByteArray, turns: Int): Vector[Centis] = Centis from {
+    def read(ba: ByteArray, turns: Ply): Vector[Centis] = Centis from {
       def dec(x: Int) = decodeMap.getOrElse(x, decodeMap(size - 1))
       ba.value map toInt flatMap { k =>
         Array(dec(k >> 4), dec(k & 15))
       }
-    }.view.take(turns).toVector
+    }.view.take(turns.value).toVector
 
   final class clock(start: Timestamp):
 
@@ -88,7 +89,7 @@ object BinaryFormat:
       config.limit - legacyElapsed
 
     def write(clock: Clock): ByteArray = ByteArray {
-      Array(writeClockLimit(clock.limitSeconds), clock.incrementSeconds.toByte) ++
+      Array(writeClockLimit(clock.limitSeconds.value), clock.incrementSeconds.value.toByte) ++
         writeSignedInt24(legacyElapsed(clock, White).centis) ++
         writeSignedInt24(legacyElapsed(clock, Black).centis) ++
         clock.timer.fold(Array.empty[Byte])(writeTimer)
@@ -107,7 +108,7 @@ object BinaryFormat:
 
         ia match
           case Array(b1, b2, b3, b4, b5, b6, b7, b8, _*) =>
-            val config      = Clock.Config(clock.readClockLimit(b1), b2)
+            val config      = Clock.Config(clock.readClockLimit(b1), Clock.IncrementSeconds(b2))
             val legacyWhite = Centis(readSignedInt24(b3, b4, b5))
             val legacyBlack = Centis(readSignedInt24(b6, b7, b8))
             Clock(
@@ -157,11 +158,10 @@ object BinaryFormat:
 
     def readConfig(ba: ByteArray): Option[Clock.Config] =
       ba.value match
-        case Array(b1, b2, _*) => Clock.Config(readClockLimit(b1), b2).some
+        case Array(b1, b2, _*) => Clock.Config(readClockLimit(b1), Clock.IncrementSeconds(b2)).some
         case _                 => None
 
-    def readClockLimit(i: Int) =
-      if (i < 181) i * 60 else (i - 180) * 15
+    def readClockLimit(i: Int) = Clock.LimitSeconds(if (i < 181) i * 60 else (i - 180) * 15)
 
   object castleLastMove:
 

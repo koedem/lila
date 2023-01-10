@@ -44,24 +44,24 @@ final class UserLoginsApi(
     store.chronoInfoByUser(user) flatMap { infos =>
       val ips = distinctRecent(infos.map(_.datedIp))
       val fps = distinctRecent(infos.flatMap(_.datedFp))
-      val fpClients: Map[FingerHash, UserAgent.Client] = infos.view.flatMap { i =>
+      val fpClients: Map[FingerHash, UserClient] = infos.view.flatMap { i =>
         i.fp map { fp =>
-          fp -> i.ua.client
+          fp -> UserClient(i.ua)
         }
       }.toMap
-      val ipClients: Map[IpAddress, Set[UserAgent.Client]] =
-        infos.foldLeft(Map.empty[IpAddress, Set[UserAgent.Client]]) { case (acc, info) =>
-          acc.updated(info.ip, acc.get(info.ip).fold(Set(info.ua.client))(_ + info.ua.client))
+      val ipClients: Map[IpAddress, Set[UserClient]] =
+        infos.foldLeft(Map.empty[IpAddress, Set[UserClient]]) { (acc, info) =>
+          acc.updated(info.ip, acc.get(info.ip).foldLeft(Set(UserClient(info.ua)))(_ ++ _))
         }
       fetchOtherUsers(user, ips.map(_.value).toSet, fps.map(_.value).toSet, maxOthers) zip
-        ip2proxy.keepProxies(ips.map(_.value).toList) map { case (otherUsers, proxies) =>
-          val othersByIp = otherUsers.foldLeft(Map.empty[IpAddress, Set[User]]) { case (acc, other) =>
-            other.ips.foldLeft(acc) { case (acc, ip) =>
+        ip2proxy.keepProxies(ips.map(_.value).toList) map { (otherUsers, proxies) =>
+          val othersByIp = otherUsers.foldLeft(Map.empty[IpAddress, Set[User]]) { (acc, other) =>
+            other.ips.foldLeft(acc) { (acc, ip) =>
               acc.updated(ip, acc.getOrElse(ip, Set.empty) + other.user)
             }
           }
-          val othersByFp = otherUsers.foldLeft(Map.empty[FingerHash, Set[User]]) { case (acc, other) =>
-            other.fps.foldLeft(acc) { case (acc, fp) =>
+          val othersByFp = otherUsers.foldLeft(Map.empty[FingerHash, Set[User]]) { (acc, other) =>
+            other.fps.foldLeft(acc) { (acc, fp) =>
               acc.updated(fp, acc.getOrElse(fp, Set.empty) + other.user)
             }
           }
@@ -81,7 +81,7 @@ final class UserLoginsApi(
                 fp,
                 printBan blocks fp.value,
                 Alts(othersByFp.getOrElse(fp.value, Set.empty)),
-                fpClients.getOrElse(fp.value, UserAgent.Client.PC)
+                fpClients.getOrElse(fp.value, UserClient.PC)
               )
             }.toList,
             uas = distinctRecent(infos.map(_.datedUa)).toList,
@@ -100,7 +100,7 @@ final class UserLoginsApi(
       max: Int
   ): Fu[List[OtherUser[User]]] =
     ipSet.nonEmpty ?? store.coll
-      .aggregateList(max, readPreference = ReadPreference.secondaryPreferred) { implicit framework =>
+      .aggregateList(max, readPreference = temporarilyPrimary) { implicit framework =>
         import framework.*
         import FingerHash.given
         Match(
@@ -189,15 +189,15 @@ object UserLogins:
         case (acc, Dated(v, date))                 => acc + (v -> date)
       }
       .view
-      .map { case (v, date) => Dated(v, date) }
+      .map(Dated.apply)
 
   case class Alts(users: Set[User]):
     lazy val boosters = users.count(_.marks.boost)
     lazy val engines  = users.count(_.marks.engine)
     lazy val trolls   = users.count(_.marks.troll)
     lazy val alts     = users.count(_.marks.alt)
-    lazy val closed   = users.count(u => u.disabled && u.marks.clean)
-    lazy val cleans   = users.count(u => u.enabled && u.marks.clean)
+    lazy val closed   = users.count(u => u.enabled.no && u.marks.clean)
+    lazy val cleans   = users.count(u => u.enabled.yes && u.marks.clean)
     def score =
       (boosters * 10 + engines * 10 + trolls * 10 + alts * 10 + closed * 2 + cleans) match
         case 0 => -999999 // rank empty alts last
@@ -209,7 +209,7 @@ object UserLogins:
       location: Location,
       proxy: Option[String],
       alts: Alts,
-      clients: Set[UserAgent.Client]
+      clients: Set[UserClient]
   ):
     def datedLocation = Dated(Location.WithProxy(location, proxy), ip.date)
 
@@ -217,7 +217,7 @@ object UserLogins:
       fp: Dated[FingerHash],
       banned: Boolean,
       alts: Alts,
-      client: UserAgent.Client
+      client: UserClient
   )
 
   case class WithMeSortedWithEmails[U: UserIdOf](

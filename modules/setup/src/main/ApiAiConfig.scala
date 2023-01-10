@@ -22,8 +22,8 @@ final case class ApiAiConfig(
   val strictFen = false
 
   val days      = daysO | Days(2)
-  val increment = clock.??(_.increment.roundSeconds)
   val time      = clock.??(_.limit.roundSeconds / 60)
+  val increment = clock.fold(Clock.IncrementSeconds(0))(_.incrementSeconds)
   val timeMode =
     if (clock.isDefined) TimeMode.RealTime
     else if (daysO.isDefined) TimeMode.Correspondence
@@ -67,14 +67,14 @@ object ApiAiConfig extends BaseConfig:
 
   def from(
       l: Int,
-      v: Option[String],
+      v: Option[Variant.LilaKey],
       cl: Option[Clock.Config],
       d: Option[Days],
       c: Option[String],
       pos: Option[Fen.Epd]
   ) =
     new ApiAiConfig(
-      variant = chess.variant.Variant.orDefault(~v),
+      variant = Variant.orDefault(v),
       clock = cl,
       daysO = d,
       color = Color.orDefault(~c),

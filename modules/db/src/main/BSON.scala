@@ -73,6 +73,8 @@ object BSON extends Handlers:
     inline def nIntD(k: String): Int                  = nIntO(k) getOrElse 0
     inline def intsD(k: String)                       = getO[List[Int]](k) getOrElse Nil
     inline def strsD(k: String)                       = getO[List[String]](k) getOrElse Nil
+    inline def yesnoD[A](k: String)(using sr: SameRuntime[A, Boolean], rs: SameRuntime[Boolean, A]): A =
+      getO[A](k) getOrElse rs(false)
 
     inline def contains = doc.contains
 
@@ -82,11 +84,12 @@ object BSON extends Handlers:
 
   final class Writer:
 
-    def boolO(b: Boolean): Option[BSONBoolean] = if (b) Some(BSONBoolean(true)) else None
-    def str(s: String): BSONString             = BSONString(s)
-    def strO(s: String): Option[BSONString]    = if (s.nonEmpty) Some(BSONString(s)) else None
-    def int(i: Int): BSONInteger               = BSONInteger(i)
-    def intO(i: Int): Option[BSONInteger]      = if (i != 0) Some(BSONInteger(i)) else None
+    def apply[A](a: A)(using writer: BSONWriter[A]): BSONValue = writer.writeTry(a).get
+    def boolO(b: Boolean): Option[BSONBoolean]                 = if (b) Some(BSONBoolean(true)) else None
+    def str(s: String): BSONString                             = BSONString(s)
+    def strO(s: String): Option[BSONString]                    = if (s.nonEmpty) Some(BSONString(s)) else None
+    def int(i: Int): BSONInteger                               = BSONInteger(i)
+    def intO(i: Int): Option[BSONInteger]                      = if (i != 0) Some(BSONInteger(i)) else None
     def date(d: DateTime)(using handler: BSONHandler[DateTime]): BSONValue = handler.writeTry(d).get
     def byteArrayO(b: ByteArray)(using handler: BSONHandler[ByteArray]): Option[BSONValue] =
       if (b.isEmpty) None else handler.writeOpt(b)
@@ -99,6 +102,8 @@ object BSON extends Handlers:
     def double(i: Double): BSONDouble                 = BSONDouble(i)
     def doubleO(i: Double): Option[BSONDouble]        = if (i != 0) Some(BSONDouble(i)) else None
     def zero[A](a: A)(using zero: Zero[A]): Option[A] = if (zero.zero == a) None else Some(a)
+    def yesnoO[A](a: A)(using sr: SameRuntime[A, Boolean], rs: SameRuntime[Boolean, A]): Option[BSONBoolean] =
+      boolO(sr(a))
 
   val writer = new Writer
 

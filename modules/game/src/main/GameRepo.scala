@@ -2,8 +2,9 @@ package lila.game
 
 import scala.concurrent.duration.*
 
-import chess.format.Fen
 import chess.{ Color, Status }
+import chess.format.Fen
+import chess.format.pgn.SanStr
 import org.joda.time.DateTime
 import reactivemongo.akkastream.{ cursorProducer, AkkaStreamCursor }
 import reactivemongo.api.commands.WriteResult
@@ -28,6 +29,11 @@ final class GameRepo(val coll: Coll)(using scala.concurrent.ExecutionContext):
 
   def gamesFromSecondary(gameIds: Seq[GameId]): Fu[List[Game]] =
     coll.byOrderedIds[Game, GameId](gameIds, readPreference = ReadPreference.secondaryPreferred)(_.id)
+
+  // #TODO FIXME
+  // https://github.com/ReactiveMongo/ReactiveMongo/issues/1185
+  def gamesTemporarilyFromPrimary(gameIds: Seq[GameId]): Fu[List[Game]] =
+    coll.byOrderedIds[Game, GameId](gameIds, readPreference = temporarilyPrimary)(_.id)
 
   def gameOptionsFromSecondary(gameIds: Seq[GameId]): Fu[List[Option[Game]]] =
     coll.optionsByOrderedIds[Game, GameId](gameIds, none, temporarilyPrimary)(_.id)
@@ -87,7 +93,7 @@ final class GameRepo(val coll: Coll)(using scala.concurrent.ExecutionContext):
   def userPovsByGameIds(
       gameIds: List[GameId],
       user: User,
-      readPreference: ReadPreference = ReadPreference.secondaryPreferred
+      readPreference: ReadPreference = temporarilyPrimary
   ): Fu[List[Pov]] =
     coll.byOrderedIds[Game, GameId](gameIds, readPreference = readPreference)(_.id) dmap {
       _.flatMap(g => Pov(g, user))
@@ -135,7 +141,7 @@ final class GameRepo(val coll: Coll)(using scala.concurrent.ExecutionContext):
   def unanalysedGames(gameIds: Seq[GameId], max: config.Max = config.Max(100)): Fu[List[Game]] =
     coll
       .find($inIds(gameIds) ++ Query.analysed(false) ++ Query.turns(30 to 160))
-      .cursor[Game](ReadPreference.secondaryPreferred)
+      .cursor[Game](temporarilyPrimary)
       .list(max.value)
 
   def cursor(
@@ -507,7 +513,7 @@ final class GameRepo(val coll: Coll)(using scala.concurrent.ExecutionContext):
       $doc(s"${F.pgnImport}.h" -> PgnImport.hash(pgn))
     )
 
-  def getOptionPgn(id: GameId): Fu[Option[PgnMoves]] = game(id) dmap2 { _.pgnMoves }
+  def getOptionPgn(id: GameId): Fu[Option[Vector[SanStr]]] = game(id).dmap2(_.sans)
 
   def lastGameBetween(u1: UserId, u2: UserId, since: DateTime): Fu[Option[Game]] =
     coll.one[Game](

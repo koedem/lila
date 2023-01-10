@@ -35,8 +35,6 @@ case class Pref(
     studyInvite: Int,
     submitMove: Int,
     confirmResign: Int,
-    mention: Boolean,
-    corresEmailNotif: Boolean,
     insightShare: Int,
     keyboardMove: Int,
     zen: Int,
@@ -54,11 +52,13 @@ case class Pref(
   inline def id = _id
 
   def realTheme      = Theme(theme)
-  def realPieceSet   = PieceSet(pieceSet)
+  def realPieceSet   = PieceSet.get(pieceSet)
   def realTheme3d    = Theme3d(theme3d)
-  def realPieceSet3d = PieceSet3d(pieceSet3d)
+  def realPieceSet3d = PieceSet3d.get(pieceSet3d)
 
-  def themeColor = if (bg == Bg.LIGHT) "#dbd7d1" else "#2e2a24"
+  val themeColorLight = "#dbd7d1"
+  val themeColorDark  = "#2e2a24"
+  def themeColor      = if (bg == Bg.LIGHT) themeColorLight else themeColorDark
 
   def realSoundSet = SoundSet(soundSet)
 
@@ -153,19 +153,22 @@ object Pref:
     val DARK        = 200
     val DARKBOARD   = 300
     val TRANSPARENT = 400
+    val SYSTEM      = 500
 
     val choices = Seq(
       LIGHT       -> "Light",
       DARK        -> "Dark",
       DARKBOARD   -> "Dark Board",
-      TRANSPARENT -> "Transparent"
+      TRANSPARENT -> "Transparent",
+      SYSTEM      -> "Device theme"
     )
 
     val fromString = Map(
       "light"     -> LIGHT,
       "dark"      -> DARK,
       "darkBoard" -> DARKBOARD,
-      "transp"    -> TRANSPARENT
+      "transp"    -> TRANSPARENT,
+      "system"    -> SYSTEM
     )
 
     val asString = fromString.map(_.swap)
@@ -220,10 +223,6 @@ object Pref:
       FRIENDS   -> "With friends",
       EVERYBODY -> "With everybody"
     )
-
-  object Mention extends BooleanPref
-
-  object CorresEmailNotif extends BooleanPref
 
   object KeyboardMove extends BooleanPref
 
@@ -405,13 +404,17 @@ object Pref:
   object Zen     extends BooleanPref {}
   object Ratings extends BooleanPref {}
 
-  val darkByDefaultSince = new DateTime(2021, 11, 7, 8, 0)
+  val darkByDefaultSince   = new DateTime(2021, 11, 7, 8, 0)
+  val systemByDefaultSince = new DateTime(2022, 12, 23, 8, 0)
 
   def create(id: UserId) = default.copy(_id = id)
 
   def create(user: User) = default.copy(
     _id = user.id,
-    bg = if (user.createdAt isAfter darkByDefaultSince) Bg.DARK else Bg.LIGHT,
+    bg =
+      if user.createdAt.isAfter(systemByDefaultSince) then Bg.SYSTEM
+      else if user.createdAt.isAfter(darkByDefaultSince) then Bg.DARK
+      else Bg.LIGHT,
     agreement = if (user.createdAt isAfter Agreement.changedAt) Agreement.current else 0
   )
 
@@ -446,8 +449,6 @@ object Pref:
     studyInvite = StudyInvite.ALWAYS,
     submitMove = SubmitMove.CORRESPONDENCE_ONLY,
     confirmResign = ConfirmResign.YES,
-    mention = true,
-    corresEmailNotif = false,
     insightShare = InsightShare.FRIENDS,
     keyboardMove = KeyboardMove.NO,
     zen = Zen.NO,

@@ -41,10 +41,11 @@ final case class ApiConfig(
 
 object ApiConfig extends BaseHumanConfig:
 
-  lazy val clockLimitSeconds: Set[Int] = Set(0, 15, 30, 45, 60, 90) ++ (2 to 180).view.map(_ * 60).toSet
+  lazy val clockLimitSeconds =
+    Clock.LimitSeconds.from(Set(0, 15, 30, 45, 60, 90) ++ (2 to 180).view.map(_ * 60).toSet)
 
   def from(
-      v: Option[String],
+      v: Option[Variant.LilaKey],
       cl: Option[Clock.Config],
       d: Option[Days],
       r: Boolean,
@@ -56,7 +57,7 @@ object ApiConfig extends BaseHumanConfig:
       rules: Option[Set[GameRule]]
   ) =
     new ApiConfig(
-      variant = chess.variant.Variant.orDefault(~v),
+      variant = chess.variant.Variant.orDefault(v),
       clock = cl,
       days = d,
       rated = r,

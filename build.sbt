@@ -25,7 +25,7 @@ playDependencyClasspath := (Runtime / externalDependencyClasspath).value
 // playCommonClassloader   := PlayCommands.playCommonClassloaderTask.value
 // playCompileEverything := PlayCommands.playCompileEverythingTask.value.asInstanceOf[Seq[Analysis]]
 ivyLoggingLevel     := UpdateLogging.DownloadOnly
-Compile / mainClass := Some("lila.app.ServerStart")
+Compile / mainClass := Some("lila.app.Lila")
 // Adds the Play application directory to the command line args passed to Play
 bashScriptExtraDefines += "addJava \"-Duser.dir=$(realpath \"$(cd \"${app_home}/..\"; pwd -P)\"  $(is_cygwin && echo \"fix\"))\"\n"
 // by default, compile any routes files in the root named "routes" or "*.routes"
@@ -366,7 +366,7 @@ lazy val playban = module("playban",
 )
 
 lazy val push = module("push",
-  Seq(common, db, user, game, challenge, msg),
+  Seq(common, db, user, game, challenge, msg, pref, notifyModule),
   Seq(googleOAuth) ++ reactivemongo.bundle
 )
 
@@ -381,7 +381,7 @@ lazy val mailer = module("mailer",
 )
 
 lazy val plan = module("plan",
-  Seq(common, user),
+  Seq(common, user, security),
   Seq(play.jsonJoda) ++ specs2.bundle ++ reactivemongo.bundle
 )
 
@@ -451,7 +451,7 @@ lazy val explorer = module("explorer",
 )
 
 lazy val notifyModule = module("notify",
-  Seq(common, db, game, user, hub, relation),
+  Seq(common, db, game, user, hub, relation, pref),
   reactivemongo.bundle
 )
 

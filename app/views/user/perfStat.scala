@@ -42,7 +42,7 @@ object perfStat:
         div(cls := s"page-menu__content box perf-stat ${perfType.key}")(
           boxTop(
             div(cls := "box__top__title")(
-              bits.perfTrophies(user, ranks.view.filterKeys(perfType.==).toMap),
+              bits.perfTrophies(user, ranks.view.filterKeys(perfType == _).toMap),
               h1(
                 a(href := routes.User.show(user.username))(user.username),
                 span(perfStats(perfType.trans))
@@ -83,7 +83,7 @@ object perfStat:
             else decimal(perf.glicko.rating).toString
           )
         ),
-        perf.glicko.provisional option frag(
+        perf.glicko.provisional.yes option frag(
           " ",
           span(
             title := notEnoughRatedGames.txt(),
@@ -91,7 +91,7 @@ object perfStat:
           )("(", provisional(), ")")
         ),
         ". ",
-        percentile.filter(_ != 0.0 && !perf.glicko.provisional).map { percentile =>
+        percentile.filter(_ != 0.0 && perf.glicko.provisional.no).map { percentile =>
           span(cls := "details")(
             if (ctx is u) {
               trans.youAreBetterThanPercentOfPerfTypePlayers(

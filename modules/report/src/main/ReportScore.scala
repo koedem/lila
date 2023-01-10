@@ -14,8 +14,9 @@ final private class ReportScore(
         impl.accuracyScore(accuracy) +
         impl.reporterScore(candidate.reporter) +
         impl.autoScore(candidate)
-    } map impl.fixedAutoScore(candidate) map
-      Report.Score.apply map
+    } map impl.fixedAutoScore(candidate) map {
+      Report.Score(_)
+    } map
       (_.withinBounds) map
       candidate.scored flatMap
       impl.dropScoreIfCheatReportHasNoAnalyzedGames map
@@ -48,9 +49,9 @@ final private class ReportScore(
     def dropScoreIfCheatReportHasNoAnalyzedGames(c: Report.Candidate.Scored): Fu[Report.Candidate.Scored] =
       if (c.candidate.isCheat & !c.candidate.isIrwinCheat & !c.candidate.isKaladinCheat)
         val gameIds = gameRegex.findAllMatchIn(c.candidate.text).toList.take(20).map(m => GameId(m.group(1)))
-        def isUsable(gameId: GameId) = gameRepo analysed gameId map { _.exists(_.turns > 30) }
+        def isUsable(gameId: GameId) = gameRepo analysed gameId map { _.exists(_.ply > 30) }
         lila.common.Future.exists(gameIds)(isUsable) map {
           case true  => c
-          case false => c.withScore(_ / 3)
+          case false => c.withScore(_.map(_ / 3))
         }
       else fuccess(c)

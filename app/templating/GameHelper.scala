@@ -71,7 +71,7 @@ trait GameHelper:
           case chess.variant.Crazyhouse    => "Drop captured pieces on the board"
           case _                           => "Variant ending"
       case _ => "Game is still being played"
-    val moves = s"${(1 + game.chess.turns) / 2} moves"
+    val moves = s"${game.chess.fullMoveNumber} moves"
     s"$p1 plays $p2 in a $mode $speedAndClock game of $variant. $result after $moves. Click to replay, analyse, and discuss the game!"
 
   def shortClockName(clock: Option[Clock.Config])(using lang: Lang): Frag =
@@ -103,7 +103,7 @@ trait GameHelper:
           withRating option frag(
             " (",
             player.rating.fold(frag("?")) { rating =>
-              if (player.provisional) abbr(title := trans.perfStat.notEnoughRatedGames.txt())(rating, "?")
+              if (player.provisional.yes) abbr(title := trans.perfStat.notEnoughRatedGames.txt())(rating, "?")
               else rating
             },
             ")"
@@ -149,8 +149,8 @@ trait GameHelper:
       case Some(user) =>
         frag(
           (if (link) a else span) (
-            cls  := userClass(user.id, cssClass, withOnline),
-            href := s"${routes.User show user.name}${if (mod) "?mod" else ""}"
+            cls                               := userClass(user.id, cssClass, withOnline),
+            (if link then href else dataHref) := s"${routes.User show user.name}${if (mod) "?mod" else ""}"
           )(
             withOnline option frag(lineIcon(user)(using ctx.lang), " "),
             playerUsername(player, withRating && ctx.pref.showRatings)(using ctx.lang),
