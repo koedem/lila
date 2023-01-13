@@ -41,6 +41,7 @@ object opening:
             dataIcon := "",
             cls      := "text"
           ),
+          bits.otherUser(user),
           perfReport.perf.trans,
           ": ",
           report.family.name,
@@ -49,13 +50,11 @@ object opening:
         )
       ),
       bits.mascotSays(
-        report.family.full.map { op =>
-          div(
-            cls              := "lpv lpv--todo",
-            st.data("pgn")   := op.pgn,
-            st.data("title") := op.name
-          )
-        },
+        div(
+          cls              := "lpv lpv--todo",
+          st.data("pgn")   := report.family.anyOpening.pgn,
+          st.data("title") := report.family.name
+        ),
         div(cls := "mascot-says__content__text")(
           p(
             "You played the ",
@@ -68,24 +67,24 @@ object opening:
             as.name,
             "."
           ),
-          div(cls := "button-set")(
-            report.family.full.map { op =>
-              a(
-                cls      := "button button-no-upper text",
-                dataIcon := "",
-                href     := views.html.opening.bits.openingUrl(op)
-              )("Learn about this opening")
-            },
+          div(cls := "mascot-says__buttons")(
+            a(
+              cls      := "button button-no-upper text",
+              dataIcon := "",
+              href     := views.html.opening.bits.openingUrl(report.family.anyOpening)
+            )("Learn about this opening"),
+            a(
+              cls      := "button button-no-upper text",
+              dataIcon := "",
+              href := s"${routes.UserAnalysis
+                  .pgn(report.family.anyOpening.pgn.value.replace(" ", "_"))}#explorer/${user.username}"
+            )("Personal opening explorer"),
             puzzle.map { p =>
               a(
                 cls      := "button button-no-upper text",
                 dataIcon := "",
                 href     := routes.Puzzle.angleAndColor(p.family.key.value, as.name)
-              )(
-                "Train with ",
-                p.family.name.value,
-                " puzzles"
-              )
+              )("Train with puzzles")
             }
           )
         )

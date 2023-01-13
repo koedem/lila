@@ -11,7 +11,7 @@ import { h, VNode } from 'snabbdom';
 import { Step, MaybeVNodes } from '../interfaces';
 
 const scrollMax = 99999,
-  moveTag = 'xau',
+  moveTag = 'kwdb',
   indexTag = 'i5z',
   indexTagUC = indexTag.toUpperCase(),
   movesTag = 'l4x',

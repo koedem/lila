@@ -18,6 +18,7 @@ object skills:
       boxTop(
         h1(
           a(href := routes.Tutor.perf(user.username, report.perf.key), dataIcon := "", cls := "text"),
+          bits.otherUser(user),
           report.perf.trans,
           " skills"
         )
@@ -30,7 +31,7 @@ object skills:
         hr,
         grade.peerGradeWithDetail(concept.tacticalAwareness, report.awareness, InsightPosition.Move),
         hr,
-        grade.peerGradeWithDetail(concept.resourcefulness, report.resourcefulness, InsightPosition.Move),
+        grade.peerGradeWithDetail(concept.resourcefulness, report.resourcefulness, InsightPosition.Game),
         hr,
         grade.peerGradeWithDetail(concept.conversion, report.conversion, InsightPosition.Game)
       )
