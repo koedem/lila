@@ -87,7 +87,7 @@ abstract private[controllers] class LilaController(val env: Env)
     Open(parse.empty)(f)
 
   protected def Open[A](parser: BodyParser[A])(f: Context => Fu[Result]): Action[A] =
-    Action.async(parser)(handleOpen(f, _)) 
+    Action.async(parser)(handleOpen(f, _))
 
   protected def OpenBody(f: BodyContext[?] => Fu[Result]): Action[AnyContent] =
     OpenBody(parse.anyContent)(f)
@@ -95,7 +95,7 @@ abstract private[controllers] class LilaController(val env: Env)
   protected def OpenBody[A](parser: BodyParser[A])(f: BodyContext[A] => Fu[Result]): Action[A] =
     Action.async(parser) { req =>
       CSRF(req) {
-        (reqToCtx(req) flatMap {ctx=>f(ctx) flatMap {case r => anonUserCreated(r, req)}})
+        reqToCtx(req) flatMap f
       }
     }
 
@@ -110,15 +110,21 @@ abstract private[controllers] class LilaController(val env: Env)
 
   private def handleOpen(f: Context => Fu[Result], req: RequestHeader): Fu[Result] =
     CSRF(req) {
-      (reqToCtx(req) flatMap {ctx=>f(ctx) flatMap {case r => anonUserCreated(r, req)}})
+      reqToCtx(req) flatMap f
     }
+  /*
+  protected def OpenBody[A](parser: BodyParser[A])(f: BodyContext[A] => Fu[Result]): Action[A] =
+    Action.async(parser) { req =>
+      CSRF(req) {
+        (reqToCtx(req) flatMap {ctx=>f(ctx) flatMap {case r => anonUserCreated(r, req)}})
+      }
 
   private def anonUserCreated(r:Result, req: RequestHeader): Fu[Result] =
     reqToCtx(req).flatMap { ctx=>
       ctx.me match {
         case Some(u) if env.security.api.reqSessionId(ctx.req).isEmpty =>
           implicit val req2 = req
-          env.security.api.saveAuthentication(u.id, None) map { sessionId =>            
+          env.security.api.saveAuthentication(u.id, None) map { sessionId =>
             Redirect(req.uri).withCookies(
               env.lilaCookie.withSession(true) {
                 _ + (env.security.api.sessionIdKey -> sessionId) - env.security.api.AccessUri - lila.security.EmailConfirm.cookie.name
@@ -127,12 +133,12 @@ abstract private[controllers] class LilaController(val env: Env)
           }
         case Some(_) =>
           fuccess(r)
-        case None => 
+        case None =>
           implicit val req2 = req;
           fuccess(r.withCookies(env.lilaCookie.newSession))
       }
     }
-    
+   */
   // protected def OpenOrScopedBody(selectors: OAuthScope.Selector*)(
   //     open: BodyContext[_] => Fu[Result],
   //     scoped: Request[_] => UserModel => Fu[Result]
@@ -599,10 +605,10 @@ abstract private[controllers] class LilaController(val env: Env)
   type RestoredUser = (Option[FingerPrintedUser], Option[UserModel])
   private def restoreUser(req: RequestHeader): Fu[RestoredUser] =
     env.security.api restoreUser req dmap {
-      //case Some(Left(AppealUser(user))) if HTTPRequest.isClosedLoginPath(req) =>
-      //  FingerPrintedUser(user, true).some
-      case Some(Left(d)) => 
-        Some(FingerPrintedUser(d, true))
+      case Some(Left(AppealUser(user))) if HTTPRequest.isClosedLoginPath(req) =>
+        FingerPrintedUser(user, true).some
+      // case Some(Left(d)) =>
+      //  Some(FingerPrintedUser(d, true))
       case Some(Right(d)) if !env.net.isProd =>
         d.copy(user =
           d.user

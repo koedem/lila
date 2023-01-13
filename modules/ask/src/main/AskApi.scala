@@ -18,13 +18,15 @@ import lila.security.Granter
 
 final class AskApi(
     askDb: lila.db.AsyncColl,
-    //picksDb: lila.db.AsyncColl,
-    //feedbackDb: lila.db.AsyncColl,
+    // picksDb: lila.db.AsyncColl,
+    // feedbackDb: lila.db.AsyncColl,
     timeline: lila.hub.actors.Timeline
 )(using ec: scala.concurrent.ExecutionContext) {
 
   import AskApi._
 
+  given BSONHandler[Ask.Feedback]                = typedMapHandler[UserId, String]
+  given BSONHandler[Ask.Picks]                   = typedMapHandler[UserId, Vector[Int]]
   given AskBSONHandler: BSONDocumentHandler[Ask] = Macros.handler[Ask]
 
   def get(id: Ask.ID): Fu[Option[Ask]] = askDb { coll =>
@@ -43,27 +45,29 @@ final class AskApi(
   def conclude(ask: Ask): Fu[Option[Ask]] = conclude(ask._id)
 
   def conclude(id: Ask.ID): Fu[Option[Ask]] =
-    askDb { coll => 
+    askDb { coll =>
       coll.findAndUpdate($id(id), $addToSet("tags" -> "concluded"), fetchNewObject = true) map {
         _.value flatMap implicitly[BSONDocumentReader[Ask]].readOpt
-      } collect {
-        case Some(ask) =>
-          timeline ! Propagate(AskConcluded(ask.creator, ask.question, ~ask.url))
-            .toUsers(ask.participants.toList)
-            .exceptUser(ask.creator)
-          ask.some
+      } collect { case Some(ask) =>
+        timeline ! Propagate(AskConcluded(ask.creator, ask.question, ~ask.url))
+          .toUsers(ask.participants.toList)
+          .exceptUser(ask.creator)
+        ask.some
       }
     }
 
   def reset(ask: Ask): Fu[Option[Ask]] = reset(ask._id)
 
-  def reset(id: Ask.ID): Fu[Option[Ask]] = 
+  def reset(id: Ask.ID): Fu[Option[Ask]] =
     askDb { coll =>
-      coll.findAndUpdate($id(id), $doc($unset("picks"), $pull("tags"->"concluded")), fetchNewObject = true) map {
+      coll.findAndUpdate(
+        $id(id),
+        $doc($unset("picks"), $pull("tags" -> "concluded")),
+        fetchNewObject = true
+      ) map {
         _.value flatMap implicitly[BSONDocumentReader[Ask]].readOpt
       }
     }
-
 
   def byUser(uid: UserId): Fu[List[Ask]] = askDb { coll =>
     coll.find($doc("creator" -> uid)).sort($sort desc "createdAt").cursor[Ask]().list(1000)
@@ -153,7 +157,7 @@ final class AskApi(
         selector = $and($id(id), $doc("tags" -> $ne("concluded"))),
         update = update,
         fetchNewObject = true
-      )  map {
+      ) map {
         _.value flatMap implicitly[BSONDocumentReader[Ask]].readOpt
       } flatMap {
         case None => get(id) // in case it's concluded, look it up for the xhr response

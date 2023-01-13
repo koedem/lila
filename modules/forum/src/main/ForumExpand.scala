@@ -6,7 +6,10 @@ import lila.base.RawHtml
 import lila.common.config
 import lila.common.String.html.richText
 
-final class ForumTextExpand(using ec: scala.concurrent.ExecutionContext, scheduler: akka.actor.Scheduler):
+final class ForumTextExpand(askApi: lila.ask.AskApi)(using
+    ec: scala.concurrent.ExecutionContext,
+    scheduler: akka.actor.Scheduler
+):
 
   private def one(text: String)(implicit netDomain: config.NetDomain): Fu[Frag] =
     lila.common.Bus.ask("lpv")(lila.hub.actorApi.lpv.LpvLinkRenderFromText(text, _)) map { linkRender =>

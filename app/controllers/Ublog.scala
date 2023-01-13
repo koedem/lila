@@ -132,7 +132,7 @@ final class Ublog(env: Env) extends LilaController(env):
 
   def edit(id: UblogPostId) = AuthBody { implicit ctx => me =>
     NotForKids {
-      env.ublog.api.findByUserBlogOrAdmin(UblogPost.Id(id), me) flatMap {
+      env.ublog.api.findByUserBlogOrAdmin(id, me) flatMap {
         _ ?? { post =>
           if (!lila.ask.AskApi.hasAskId(post.markdown.value))
             Ok(html.ublog.form.edit(post, env.ublog.form.edit(post))).fuccess

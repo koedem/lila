@@ -30,7 +30,7 @@ final class ForumSearchApi(
     }
 
   private def toDoc(view: PostLiteView) = Json.obj(
-    Fields.body    -> view.post.text.cleanTake(10000),
+    Fields.body    -> view.post.cleanTake(10000),
     Fields.topic   -> view.topic.name,
     Fields.author  -> view.post.userId,
     Fields.topicId -> view.topic.id,

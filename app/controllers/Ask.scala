@@ -1,6 +1,6 @@
 package controllers
 
-import lila.app._
+import lila.app.{ given, * }
 import play.api.data.Form
 import play.api.data.Forms.single
 
@@ -51,11 +51,11 @@ final class Ask(env: Env) extends LilaController(env) {
       }
     }
 
-  def byUser(uid: String) =
+  def byUser(username: UserStr) =
     AuthBody { implicit ctx => me =>
       for {
-        user <- env.user.lightUser(uid)
-        asks <- env.ask.api.byUser(uid)
+        user <- env.user.lightUser(username.id)
+        asks <- env.ask.api.byUser(username.id)
         if user.nonEmpty
       } yield Ok(views.html.askAdmin.show(asks, user.get))
     }

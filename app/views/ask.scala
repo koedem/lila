@@ -5,8 +5,8 @@ import scala.util.Random.shuffle
 
 import controllers.routes
 import lila.api.Context
-import lila.app.templating.Environment._
-import lila.app.ui.ScalatagsTemplate._
+import lila.app.templating.Environment.{ given, * }
+import lila.app.ui.ScalatagsTemplate.{ *, given }
 import lila.ask.Ask
 import lila.ask.AskApi
 import lila.security.{ Granter, Permission }
@@ -31,7 +31,8 @@ object ask {
       )
 
   def renderInner(ask: Ask, prevView: Option[List[Int]] = None)(implicit ctx: Context): Frag = {
-    val view = prevView getOrElse (if (ask.isRandom) shuffle(ask.choices.indices.toList) else ask.choices.indices.toList)
+    val view = prevView getOrElse (if (ask.isRandom) shuffle(ask.choices.indices.toList)
+                                   else ask.choices.indices.toList)
     fieldset(cls := "ask", id := ask._id, hasPick(ask) option (value := ""))(
       header(ask, view.nonEmpty ?? view.mkString("-")),
       ask.isConcluded option label(
@@ -39,13 +40,14 @@ object ask {
         else s"${ask.feedback ?? (_ size)} responses"
       ),
       if (ask.choices.isEmpty) emptyFrag
-      else RenderType(ask) match {
-        case POLL    => pollBody(ask, view)
-        case RANK    => rankBody(ask, view)
-        case QUIZ    => quizBody(ask, view)
-        case BAR     => barGraphBody(ask)
-        case RANKBAR => rankGraphBody(ask)
-      },
+      else
+        RenderType(ask) match {
+          case POLL    => pollBody(ask, view)
+          case RANK    => rankBody(ask, view)
+          case QUIZ    => quizBody(ask, view)
+          case BAR     => barGraphBody(ask)
+          case RANKBAR => rankGraphBody(ask)
+        },
       footer(ask)
     )
   }
@@ -55,7 +57,7 @@ object ask {
       span(cls := "ask__header")(
         label(ask.question),
         button(
-          cls := s"action unset${(hasPick(ask) && !ask.isConcluded) ?? " visible"}",
+          cls        := s"action unset${(hasPick(ask) && !ask.isConcluded) ?? " visible"}",
           formmethod := "POST",
           formaction := s"${routes.Ask.unset(ask._id, viewParam.some)}",
           title      := trans.delete.txt()
@@ -74,16 +76,18 @@ object ask {
       // TODO jesus christ fix this boolean nightmare
       (ask.footer.nonEmpty && (!ask.isQuiz || getPick(ask).nonEmpty)) option ask.footer map (label(_)),
       ask.isFeedback && !ask.isConcluded option ctx.me.fold(emptyFrag) { u =>
-        Seq(
-          input(
-            cls         := "feedback-text",
-            tpe         := "text",
-            maxlength   := 80,
-            placeholder := "80 characters max",
-            value       := ask.feedbackFor(u.id)
-          ),
-          div(cls := "feedback-submit")(input(cls := "button", tpe := "button", value := "Submit"))
-        )
+        frag {
+          Seq(
+            input(
+              cls         := "feedback-text",
+              tpe         := "text",
+              maxlength   := 80,
+              placeholder := "80 characters max",
+              value       := ~ask.feedbackFor(u.id)
+            ),
+            div(cls := "feedback-submit")(input(cls := "button", tpe := "button", value := "Submit"))
+          )
+        }
       },
       ask.isConcluded && ask.feedback.exists(_.size > 0) option frag {
         ask.feedback map { fbmap =>
@@ -241,7 +245,8 @@ object ask {
   }
 
   private def validRanking(ask: Ask)(implicit ctx: Context): Vector[Int] = {
-    val initialOrder = if (ask.isRandom) shuffle((0 until ask.choices.size).toVector) else (0 until ask.choices.size).toVector
+    val initialOrder =
+      if (ask.isRandom) shuffle((0 until ask.choices.size).toVector) else (0 until ask.choices.size).toVector
     getRanking(ask).fold(initialOrder) { r =>
       if (r == Nil || r.distinct.sorted != initialOrder.sorted) {
         // it's late to be doing this but i think it beats counting the choices in an
