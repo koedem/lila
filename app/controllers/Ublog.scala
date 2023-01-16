@@ -135,7 +135,7 @@ final class Ublog(env: Env) extends LilaController(env):
       env.ublog.api.findByUserBlogOrAdmin(id, me) flatMap {
         _ ?? { post =>
           if (!lila.ask.AskApi.hasAskId(post.markdown.value))
-            Ok(html.ublog.form.edit(post, env.ublog.form.edit(post))).fuccess
+            fuccess(Ok(html.ublog.form.edit(post, env.ublog.form.edit(post))))
           else // avoid copying post unless we have to
             env.ask.api.unfreezeAsync(post.markdown.value) map { text =>
               val editable = post.copy(markdown = lila.common.Markdown(text))
