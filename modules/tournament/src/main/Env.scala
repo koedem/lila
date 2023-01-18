@@ -38,7 +38,8 @@ final class Env(
     historyApi: lila.history.HistoryApi,
     trophyApi: lila.user.TrophyApi,
     remoteSocketApi: lila.socket.RemoteSocket,
-    settingStore: lila.memo.SettingStore.Builder
+    settingStore: lila.memo.SettingStore.Builder,
+    notifyApi: lila.notify.NotifyApi
 )(using
     ec: scala.concurrent.ExecutionContext,
     system: ActorSystem,

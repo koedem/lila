@@ -12,6 +12,7 @@ private object BSONHandlers:
   private given BSONDocumentHandler[TeamJoined]                        = Macros.handler
   private given BSONDocumentHandler[GameEnd]                           = Macros.handler
   private given BSONDocumentHandler[TitledTournamentInvitation]        = Macros.handler
+  private given BSONDocumentHandler[TournamentGameStart]               = Macros.handler
   private given BSONDocumentHandler[PlanStart]                         = Macros.handler
   private given BSONDocumentHandler[PlanExpire]                        = Macros.handler
   private given BSONDocumentHandler[RatingRefund]                      = Macros.handler
@@ -31,6 +32,7 @@ private object BSONHandlers:
         case x: StreamStart                => summon[BSONHandler[StreamStart]].writeTry(x).get
         case x: TeamJoined                 => summon[BSONHandler[TeamJoined]].writeTry(x).get
         case x: TitledTournamentInvitation => summon[BSONHandler[TitledTournamentInvitation]].writeTry(x).get
+        case x: TournamentGameStart        => summon[BSONHandler[TournamentGameStart]].writeTry(x).get
         case x: GameEnd                    => summon[BSONHandler[GameEnd]].writeTry(x).get
         case x: PlanStart                  => summon[BSONHandler[PlanStart]].writeTry(x).get
         case x: PlanExpire                 => summon[BSONHandler[PlanExpire]].writeTry(x).get

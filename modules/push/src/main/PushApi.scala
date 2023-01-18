@@ -38,6 +38,8 @@ final private class PushApi(
       streamStart(to, streamerId, streamerName)
     case InvitedToStudy(invitedBy, studyName, studyId) =>
       lightUser(invitedBy).flatMap(luser => invitedToStudy(to.head, luser.titleName, studyName, studyId))
+    case TournamentGameStart(gameId, color, tourName, opponentId) =>
+      lightUser(opponentId).flatMap(luser => tournamentGameStart(to.head, gameId, color, tourName, luser))
     case _ => funit
 
   def finish(game: Game): Funit =
@@ -340,6 +342,30 @@ final private class PushApi(
         )
       )
     }
+
+  def tournamentGameStart(
+      to: NotifyAllows,
+      gameId: GameFullId,
+      color: chess.Color,
+      tourName: String,
+      opponent: LightUser
+  ): Funit =
+    filterPush(
+      to,
+      _.tournamentGameStart,
+      PushApi.Data(
+        title = s"Playing as $color vs ${opponent.titleName}",
+        body = s"Tournament $tourName",
+        stacking = Stacking.ChallengeAccept,
+        payload = Json.obj(
+          "userId" -> to.userId,
+          "userData" -> Json.obj(
+            "type" -> "tournamentGameStart",
+            "url"  -> s"https://lichess.org/$gameId"
+          )
+        )
+      )
+    )
 
   def streamStart(recips: Iterable[NotifyAllows], streamerId: UserId, streamerName: String): Funit = {
     val pushData = PushApi.Data(

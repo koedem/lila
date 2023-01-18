@@ -42,6 +42,13 @@ case class TitledTournamentInvitation(
     text: String
 ) extends NotificationContent("titledTourney")
 
+case class TournamentGameStart(
+    gameId: GameFullId,
+    color: chess.Color,
+    tourName: String,
+    opponentId: UserId
+) extends NotificationContent("tournamentGameStart")
+
 case class GameEnd(
     gameId: GameFullId,
     opponentId: Option[UserId],

@@ -16,6 +16,7 @@ import lila.common.{ Bus, Debouncer, LightUser }
 import lila.game.{ Game, GameRepo, LightPov, Pov }
 import lila.hub.LeaderTeam
 import lila.hub.LightTeam.*
+import lila.notify.{ NotifyApi, TournamentGameStart }
 import lila.round.actorApi.round.{ AbortForce, GoBerserk }
 import lila.user.{ User, UserRepo }
 
@@ -42,7 +43,8 @@ final class TournamentApi(
     waitingUsers: WaitingUsersApi,
     cacheApi: lila.memo.CacheApi,
     lightUserApi: lila.user.LightUserApi,
-    proxyRepo: lila.round.GameProxyRepo
+    proxyRepo: lila.round.GameProxyRepo,
+    notifyApi: lila.notify.NotifyApi
 )(using
     scala.concurrent.ExecutionContext,
     akka.actor.ActorSystem,
@@ -127,6 +129,16 @@ final class TournamentApi(
 
   private val hadPairings = lila.memo.ExpireSetMemo[TourId](1 hour)
 
+  private def notifyPlayers(game: Game, tourName: String): Game =
+    game.players foreach { p =>
+      p.userId foreach { uid =>
+        game.players.filter(_ != p).flatMap(_.userId).foreach { oppId =>
+          notifyApi.notifyOne(uid, TournamentGameStart(game fullIdOf p.color, p.color, tourName, oppId))
+        }
+      }
+    }
+    game
+
   private[tournament] def makePairings(
       forTour: Tournament,
       users: WaitingUsers,
@@ -153,6 +165,7 @@ final class TournamentApi(
                       .map { pairing =>
                         autoPairing(tour, pairing, ranking.ranking)
                           .mon(_.tournament.pairing.createAutoPairing)
+                          .map { notifyPlayers(_, tour.name) }
                           .map { socket.startGame(tour.id, _) }
                       }
                       .sequenceFu

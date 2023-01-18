@@ -6,6 +6,7 @@ import scala.util.chaining.*
 
 import lila.db.dsl.{ *, given }
 import lila.game.Game
+import lila.notify.{ NotifyApi, TournamentGameStart }
 import lila.user.User
 
 final private class SwissDirector(
@@ -13,6 +14,7 @@ final private class SwissDirector(
     pairingSystem: PairingSystem,
     manualPairing: SwissManualPairing,
     gameRepo: lila.game.GameRepo,
+    notifyApi: NotifyApi,
     onStart: GameId => Unit
 )(using
     ec: scala.concurrent.ExecutionContext,
@@ -68,7 +70,8 @@ final private class SwissDirector(
             _ <- mongo.pairing.insert.many(pairings).void
             games = pairings.map(makeGame(swiss, players.mapBy(_.userId)))
             _ <- lila.common.Future.applySequentially(games) { game =>
-              gameRepo.insertDenormalized(game) >>- onStart(game.id)
+              gameRepo.insertDenormalized(game) >>- onStart(game.id) >>-
+                notifyPlayers(game, swiss.name)
             }
           } yield swiss.some
       }
@@ -104,6 +107,15 @@ final private class SwissDirector(
       .withId(pairing.gameId)
       .withSwissId(swiss.id)
       .start
+
+  private def notifyPlayers(game: Game, tourName: String) =
+    game.players foreach { p =>
+      p.userId foreach { uid =>
+        game.players.filter(_ != p).flatMap(_.userId).foreach { oppId =>
+          notifyApi.notifyOne(uid, TournamentGameStart(game fullIdOf p.color, p.color, tourName, oppId))
+        }
+      }
+    }
 
   private def makePlayer(color: Color, player: SwissPlayer) =
     lila.game.Player.make(color, player.userId, player.rating, player.provisional)

@@ -4,6 +4,7 @@ package account
 import lila.api.{ Context, given }
 import lila.app.templating.Environment.{ given, * }
 import lila.app.ui.ScalatagsTemplate.{ *, given }
+import lila.notify.NotificationPref
 import controllers.routes
 
 object notification {
@@ -35,7 +36,8 @@ object notification {
                   notifyInboxMsg()                                        -> "privateMessage",
                   notifyChallenge()                                       -> "challenge",
                   notifyTournamentSoon()                                  -> "tournamentSoon",
-                  notifyGameEvent()                                       -> "gameEvent"
+                  notifyGameEvent()                                       -> "gameEvent",
+                  notifyTournamentGameStart()                             -> "tournamentGameStart"
                 ).map(makeRow(form))
               )
             ),
@@ -57,8 +59,11 @@ object notification {
     tr(
       td(transFrag),
       Seq("bell", "push") map { allow =>
-        val name    = s"$filterName.$allow"
-        val checked = form.data(name).contains("true")
+        val name = s"$filterName.$allow"
+        val checked = form.data.get(name) match {
+          case Some(s) => s.contains("true")
+          case None    => NotificationPref.default(filterName).get(allow)
+        }
         td(
           if (!hiddenFields(s"$filterName.$allow"))
             div(cls := "toggle", form3.cmnToggle(name, name, checked))
@@ -81,6 +86,7 @@ object notification {
   private val hiddenFields = Set(
     "privateMessage.bell",
     "tournamentSoon.bell",
+    "tournamentGameStart.bell",
     "gameEvent.bell",
     "challenge.bell"
   )

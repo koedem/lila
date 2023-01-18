@@ -11,6 +11,13 @@ case class Allows(value: Int) extends AnyVal with IntValue:
   def device: Boolean = (value & NotificationPref.DEVICE) != 0
   def bell: Boolean   = (value & NotificationPref.BELL) != 0
   def any: Boolean    = value != 0
+  def get(value: String): Boolean = value match {
+    case "push"   => push
+    case "web"    => web
+    case "device" => device
+    case "bell"   => bell
+    case "any"    => any
+  }
 
 object Allows:
   given Zero[Allows] = Zero(Allows(0))
@@ -36,18 +43,20 @@ case class NotificationPref(
     tournamentSoon: Allows,
     gameEvent: Allows,
     invitedStudy: Allows,
-    correspondenceEmail: Boolean
+    correspondenceEmail: Boolean,
+    tournamentGameStart: Option[Allows]
 ):
   // def allows(key: String): Allows =
   //   NotificationPref.Event.byKey.get(key) ?? allows
   def allows(event: Event): Allows = event match
-    case PrivateMessage => privateMessage
-    case Challenge      => challenge
-    case Mention        => mention
-    case StreamStart    => streamStart
-    case TournamentSoon => tournamentSoon
-    case GameEvent      => gameEvent
-    case InvitedStudy   => invitedStudy
+    case PrivateMessage      => privateMessage
+    case Challenge           => challenge
+    case Mention             => mention
+    case StreamStart         => streamStart
+    case TournamentSoon      => tournamentSoon
+    case GameEvent           => gameEvent
+    case InvitedStudy        => invitedStudy
+    case TournamentGameStart => tournamentGameStart.getOrElse(default.tournamentGameStart.get)
 
 object NotificationPref:
   val BELL   = 1
@@ -63,6 +72,7 @@ object NotificationPref:
     case TournamentSoon
     case GameEvent
     case InvitedStudy
+    case TournamentGameStart
 
     def key = lila.common.String.lcfirst(this.toString)
 
@@ -79,8 +89,11 @@ object NotificationPref:
     tournamentSoon = Allows(PUSH),
     gameEvent = Allows(PUSH),
     invitedStudy = Allows(BELL | PUSH),
-    correspondenceEmail = false
+    correspondenceEmail = false,
+    tournamentGameStart = Allows(0).some
   )
+
+  def default(key: String): Allows = default.allows(Event.byKey(key))
 
   object form:
     import play.api.data.*
@@ -98,7 +111,8 @@ object NotificationPref:
         "tournamentSoon"      -> allowsMapping,
         "gameEvent"           -> allowsMapping,
         "invitedStudy"        -> allowsMapping,
-        "correspondenceEmail" -> boolean
+        "correspondenceEmail" -> boolean,
+        "tournamentGameStart" -> optional(allowsMapping)
       )(NotificationPref.apply)(lila.notify.unapply)
     )
 

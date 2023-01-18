@@ -41,6 +41,7 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync):
           "id"   -> id,
           "text" -> text
         )
+      case _: TournamentGameStart => Json.obj()
       case GameEnd(gameId, opponentId, win) =>
         Json.obj(
           "id"       -> gameId.value,

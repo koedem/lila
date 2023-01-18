@@ -24,7 +24,8 @@ final class Env(
     gameProxyRepo: lila.round.GameProxyRepo,
     roundSocket: lila.round.RoundSocket,
     mongoCache: lila.memo.MongoCache.Api,
-    baseUrl: lila.common.config.BaseUrl
+    baseUrl: lila.common.config.BaseUrl,
+    notifyApi: lila.notify.NotifyApi
 )(using
     ec: scala.concurrent.ExecutionContext,
     system: akka.actor.ActorSystem,
