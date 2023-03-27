@@ -3,7 +3,6 @@
 import * as ab from 'ab';
 import * as round from './round';
 import * as game from 'game';
-import { game as gameRoute } from 'game/router';
 import * as status from 'game/status';
 import * as ground from './ground';
 import notify from 'common/notification';
@@ -24,7 +23,6 @@ import * as util from './util';
 import * as xhr from './xhr';
 import { valid as crazyValid, init as crazyInit, onEnd as crazyEndHook } from './crazy/crazyCtrl';
 import { ctrl as makeKeyboardMove, KeyboardMove } from 'keyboardMove';
-import { makeVoiceMove, VoiceMove } from 'voice';
 import * as renderUser from './view/user';
 import * as cevalSub from './cevalSub';
 import * as keyboard from './keyboard';
@@ -63,7 +61,6 @@ export default class RoundController {
   trans: Trans;
   noarg: TransNoArg;
   keyboardMove?: KeyboardMove;
-  voiceMove?: VoiceMove;
   moveOn: MoveOn;
   promotion: PromotionCtrl;
 
@@ -89,6 +86,7 @@ export default class RoundController {
   nvui?: NvuiPlugin;
   sign: string = Math.random().toString(36);
   keyboardHelp: boolean = location.hash === '#keyboard';
+
   private music?: any;
 
   constructor(readonly opts: RoundOpts, readonly redraw: Redraw) {
@@ -174,7 +172,7 @@ export default class RoundController {
   };
 
   private onUserMove = (orig: cg.Key, dest: cg.Key, meta: cg.MoveMetadata) => {
-    if (!this.keyboardMove?.usedSan) ab.move(this, meta);
+    if (!this.keyboardMove || !this.keyboardMove.usedSan) ab.move(this, meta);
     if (
       !this.promotion.start(
         orig,
@@ -209,7 +207,7 @@ export default class RoundController {
       dest,
       (orig, dest, role) => this.sendMove(orig, dest, role, meta),
       meta,
-      this.keyboardMove?.justSelected() //this.voiceMove?.justSelected()
+      this.keyboardMove?.justSelected()
     );
   };
 
@@ -289,8 +287,7 @@ export default class RoundController {
       if (/[+#]/.test(s.san)) sound.check();
     }
     this.autoScroll();
-    this.voiceMove?.update(s);
-    this.keyboardMove?.update(s);
+    if (this.keyboardMove) this.keyboardMove.update(s);
     lichess.pubsub.emit('ply', ply);
     return true;
   };
@@ -498,8 +495,7 @@ export default class RoundController {
     }
     this.autoScroll();
     this.onChange();
-    this.keyboardMove?.update(step, playedColor != d.player.color);
-    this.voiceMove?.update(step, playedColor != d.player.color);
+    if (this.keyboardMove) this.keyboardMove.update(step, playedColor != d.player.color);
     if (this.music) this.music.jump(o);
     speech.step(step);
     return true; // prevents default socket pubsub
@@ -535,8 +531,7 @@ export default class RoundController {
     this.autoScroll();
     this.onChange();
     this.setLoading(false);
-    this.keyboardMove?.update(d.steps[d.steps.length - 1]);
-    this.voiceMove?.update(d.steps[d.steps.length - 1]);
+    if (this.keyboardMove) this.keyboardMove.update(d.steps[d.steps.length - 1]);
   };
 
   endWithData = (o: ApiEnd): void => {
@@ -729,22 +724,6 @@ export default class RoundController {
     return d.opponent.gone !== false && !game.isPlayerTurn(d) && game.resignable(d) && d.opponent.gone;
   };
 
-  rematch(accept?: boolean): boolean {
-    if (accept === undefined)
-      return this.data.opponent.offeringRematch === true || this.data.player.offeringRematch === true;
-    else if (accept) {
-      if (this.data.game.rematch) location.href = gameRoute(this.data.game.rematch, this.data.opponent.color);
-      if (!game.rematchable(this.data)) return false;
-      if (!this.data.opponent.offeringRematch) this.data.player.offeringRematch = true;
-      this.socket.send('rematch-yes');
-    } else {
-      if (!this.data.opponent.offeringRematch) return false;
-      this.socket.send('rematch-no');
-    }
-    this.redraw();
-    return true;
-  }
-
   canOfferDraw = (): boolean => game.drawable(this.data) && (this.lastDrawOfferAtPly || -99) < this.ply - 20;
 
   offerDraw = (v: boolean, immediately?: boolean): void => {
@@ -771,9 +750,10 @@ export default class RoundController {
 
   setChessground = (cg: CgApi) => {
     this.chessground = cg;
-    if (this.data.pref.keyboardMove) this.keyboardMove = makeKeyboardMove(this, this.stepAt(this.ply));
-    if (this.data.pref.voiceMove) this.voiceMove = makeVoiceMove(this, this.stepAt(this.ply));
-    requestAnimationFrame(() => this.redraw());
+    if (this.data.pref.keyboardMove) {
+      this.keyboardMove = makeKeyboardMove(this, this.stepAt(this.ply));
+      requestAnimationFrame(() => this.redraw());
+    }
   };
 
   stepAt = (ply: Ply) => round.plyStep(this.data, ply);

@@ -12,6 +12,7 @@ object LilaScheduler:
       timeout: config.type => config.AtMost,
       initialDelay: config.type => config.Delay
   )(f: => Funit)(using ec: Executor, scheduler: Scheduler): Unit =
+
     val run = () => f
 
     def runAndScheduleNext(): Unit =

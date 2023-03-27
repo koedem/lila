@@ -186,14 +186,9 @@ Allow: /
 
   def keyboardMoveHelp =
     Open { implicit ctx =>
-      Ok(html.site.helpModal.keyboardMove).toFuccess
+      Ok(html.site.keyboardHelpModal.keyboardMove).toFuccess
     }
 
-  def voiceMoveHelp =
-    Open { implicit ctx =>
-      Ok(html.site.helpModal.voiceMove).toFuccess
-    }
-    
   def movedPermanently(to: String) =
     Action {
       MovedPermanently(to)

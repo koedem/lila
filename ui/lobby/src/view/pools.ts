@@ -22,16 +22,15 @@ export function render(ctrl: LobbyController) {
   return ctrl.pools
     .map(pool => {
       const active = !!member && member.id === pool.id,
-        transp = !!member && !active,
-        allowed = pool.id === '5+0' || pool.id === '10+5';
+        transp = !!member && !active;
       return h(
         'div',
         {
           class: {
             active,
-            transp: !allowed || (!active && transp),
+            transp: !active && transp,
           },
-          attrs: { 'data-id': pool.id, style: allowed ? '' : 'pointer-events: none' },
+          attrs: { 'data-id': pool.id },
         },
         [
           h('div.clock', `${pool.lim}+${pool.inc}`),

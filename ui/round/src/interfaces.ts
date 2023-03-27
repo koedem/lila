@@ -177,7 +177,6 @@ export interface Pref {
   highlight: boolean;
   is3d: boolean;
   keyboardMove: boolean;
-  voiceMove: boolean;
   moveEvent: Prefs.MoveEvent;
   ratings: boolean;
   replay: Prefs.Replay;

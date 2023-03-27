@@ -5,13 +5,12 @@ import play.api.i18n.Lang
 import lila.app.templating.Environment.{ given, * }
 import lila.app.ui.ScalatagsTemplate.{ *, given }
 
-object helpModal:
+object keyboardHelpModal:
 
   private def header(text: Frag)          = tr(th(colspan := 2)(p(text)))
   private def row(keys: Frag, desc: Frag) = tr(td(cls := "keys")(keys), td(cls := "desc")(desc))
   private val or                          = tag("or")
   private val kbd                         = tag("kbd")
-  private def voice(text: String)         = tag("voice")(s"\"$text\"")
 
   private def navigateMoves(implicit lang: Lang) = frag(
     header(trans.navigateMoveTree()),
@@ -139,95 +138,6 @@ object helpModal:
                 li(capitalizationOnlyMattersInAmbiguousSituations()),
                 li(toPremoveSimplyTypeTheDesiredPremove())
               )
-            )
-          )
-        )
-      )
-    )
-  def voiceMove(implicit lang: Lang) =
-    import trans.keyboardMove.*
-    frag(
-      h2("Voice commands"),
-      table(
-        tbody(
-          tr(th(p("Instructions"))),
-          tr(
-            td(cls := "tips")(
-              ul(
-                li(
-                  "Click the microphone to enable voice moves. It glows red when listening."
-                ),
-                li(
-                  "Your voice audio never leaves your device. Moves are sent as plain text just like those made by mouse or touch."
-                ),
-                li(
-                  "You may speak UCI, SAN, piece names, board squares, or phrases like ",
-                  strong("\"pawn takes rook\""),
-                  " and ",
-                  strong("\"takes\""),
-                  ". Click ",
-                  strong("Show me everything"),
-                  " for a full list."
-                ),
-                li(
-                  "Ambiguous commands show colored or numbered arrows. Speak the color or number to choose one, or say ",
-                  strong("\"clear\""),
-                  " to cancel. Set your arrow style using the hamburger menu."
-                ),
-                li(
-                  "Higher values for the confidence slider result in less ambiguity but an increased chance of mishearing."
-                ),
-                li(
-                  "Up to 8 arrows are shown. At lower confidence settings we include additional moves that sound alike."
-                ),
-                li(
-                  "At present, voice control is only available with standard chess in puzzles and unrated games."
-                ),
-                li(
-                  "The phonetic alphabet is ",
-                  strong(
-                    "alfa, bravo, charlie, delta, echo, foxtrot, golf, hotel."
-                  )
-                )
-              )
-            )
-          )
-        )
-      ),
-      div(cls := "commands")(
-        table(
-          tbody(
-            header(performAMove()),
-            row(frag(voice("e4"), voice("echo 4")), "Move to e4 or select a piece there"),
-            row(voice("knight"), "Move my knight or capture a knight"),
-            row(frag(voice("bishop h6"), voice("bishop hotel 6")), "Move bishop to h6"),
-            row(voice("queen takes rook"), "Take rook with queen"),
-            row(
-              frag(voice("c8 promote knight"), voice("charlie 8 knight")),
-              "Move c8 promote to knight"
-            ),
-            row(voice("castle"), "Kingside castle"),
-            row(frag(voice("long castle"), voice("queenside castle")), "Queenside castle"),
-            row(frag(voice("a7g1"), voice("alfa 7 golf 1")), "Full UCI works too")
-          )
-        ),
-        table(
-          tbody(
-            header(otherCommands()),
-            row(voice("draw"), offerOrAcceptDraw()),
-            row(voice("resign"), trans.resignTheGame()),
-            row(voice("ooops"), "Request a takeback"),
-            row(
-              frag(voice("clear"), voice("no")),
-              "Clear arrows, selection, or this dialog"
-            ),
-            row(frag(voice("yes"), voice("confirm")), "Confirm single arrow"),
-            row(voice("stop"), "Stop listening"),
-            row(voice("next"), trans.puzzle.nextPuzzle()),
-            row(voice("help"), trans.showHelpDialog()),
-            tr(
-              td,
-              td(button(cls := "button", id := "all-phrases-button")("Show me everything"))
             )
           )
         )

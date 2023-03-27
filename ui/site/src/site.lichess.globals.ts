@@ -24,7 +24,6 @@ import { unload, redirect, reload } from './component/reload';
 import announce from './component/announce';
 import { trans } from './component/trans';
 import sound from './component/sound';
-import { mic } from './component/mic';
 import * as miniBoard from 'common/mini-board';
 import * as miniGame from './component/mini-game';
 import { format as timeago, formatter as dateFormat } from './component/timeago';
@@ -61,7 +60,6 @@ export default () => {
   l.announce = announce;
   l.trans = trans;
   l.sound = sound;
-  l.mic = mic;
   l.miniBoard = miniBoard;
   l.miniGame = miniGame;
   l.timeago = timeago;

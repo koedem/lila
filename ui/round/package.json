@@ -20,7 +20,6 @@
     "common": "workspace:*",
     "game": "workspace:*",
     "keyboardMove": "workspace:*",
-    "voice": "workspace:*",
     "nvui": "workspace:*",
     "snabbdom": "^3.5.1"
   },

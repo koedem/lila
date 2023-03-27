@@ -3,7 +3,8 @@
   <conversionRule conversionWord="coloredLevel" converterClass="play.api.libs.logback.ColoredLevel"/>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder><pattern>%d{HH:mm:ss.SSS} %coloredLevel %logger{25} - %message%n%xException{10}</pattern></encoder>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter"><level>INFO</level></filter>
+    <encoder><pattern>%date{M/dd/yy HH:mm:ss.SSS} %coloredLevel - %message %logger %n%xException{10}</pattern></encoder>
   </appender>
 
   <appender name="ALL_FILE" class="ch.qos.logback.core.FileAppender">
