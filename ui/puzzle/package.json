@@ -21,6 +21,7 @@
     "chessops": "^0.12.5",
     "common": "workspace:*",
     "keyboardMove": "workspace:*",
+    "voice": "workspace:*",
     "nvui": "workspace:*",
     "snabbdom": "^3.5.1",
     "tree": "workspace:*"
