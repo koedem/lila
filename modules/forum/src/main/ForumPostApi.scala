@@ -84,7 +84,7 @@ final class ForumPostApi(
           fufail("Post can no longer be edited")
         case (_, post) =>
           askApi.freezeAsync(spam replace newText, user) flatMap { frozen =>
-            val newPost = post.editPost(DateTime.now, frozen.text)
+            val newPost = post.editPost(org.joda.time.DateTime.now, frozen.text)
             (newPost.text != post.text).?? {
               postRepo.coll.update.one($id(post.id), newPost) >> newPost.isAnonModPost.?? {
                 logAnonPost(user.id, newPost, edit = true)

@@ -6,7 +6,7 @@ import lila.base.RawHtml
 import lila.common.config
 import lila.common.String.html.richText
 
-final class ForumTextExpand(using Executor, Scheduler):
+final class ForumTextExpand(askApi: lila.ask.AskApi)(using Executor, Scheduler):
 
   private def one(text: String)(using config.NetDomain): Fu[Frag] =
     lila.common.Bus.ask("lpv")(lila.hub.actorApi.lpv.LpvLinkRenderFromText(text, _)) map { linkRender =>
@@ -26,5 +26,5 @@ final class ForumTextExpand(using Executor, Scheduler):
         askApi.asksIn(post.text) map { asks =>
           ForumPost.WithFrag(post, body, asks)
         }
-      }.sequenceFu
+      }.parallel
     }

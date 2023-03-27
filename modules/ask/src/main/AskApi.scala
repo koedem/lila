@@ -101,7 +101,7 @@ final class AskApi(
   def commit(frozen: Frozen, url: Option[String] = None): Fu[Iterable[Ask]] = {
     frozen.asks map { ask =>
       upsert(ask.copy(url = url))
-    } sequenceFu
+    } parallel
   }
 
   // freezeAsync is freeze & commit together without the url.  call setUrl once you know it
@@ -112,7 +112,7 @@ final class AskApi(
       upsert(
         textToAsk(text.substring(start, end), creator)
       )
-    }.sequenceFu map { asks =>
+    }.parallel map { asks =>
       val it = asks.iterator
       val sb = new java.lang.StringBuilder(text.length)
       intervalClosure(askIntervals, text.length) map { seg =>
