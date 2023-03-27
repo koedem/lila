@@ -254,7 +254,7 @@ object layout:
           metaThemeColor,
           st.headTitle(
             if (netConfig.isProd) fullTitle | s"$title • lichess.org"
-            else s"${ctx.me.fold("anon")(_.username)}@${netConfig.domain} ${fullTitle | s"$title • lichess.dev"}"
+            else s"${ctx.me.fold("anon")(_.username)} ${fullTitle | s"$title • lichess.dev"}"
           ),
           cssTag("site"),
           ctx.pref.is3d option cssTag("board-3d"),
