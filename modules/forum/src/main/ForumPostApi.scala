@@ -1,6 +1,5 @@
 package lila.forum
 
-import org.joda.time.DateTime
 import reactivemongo.akkastream.{ cursorProducer, AkkaStreamCursor }
 import reactivemongo.api.ReadPreference
 import scala.util.chaining.*
@@ -26,7 +25,7 @@ final class ForumPostApi(
     shutup: lila.hub.actors.Shutup,
     detectLanguage: DetectLanguage,
     askApi: AskApi
-)(using ec: scala.concurrent.ExecutionContext):
+)(using Executor):
 
   import BSONHandlers.given
 
@@ -107,10 +106,8 @@ final class ForumPostApi(
     }
 
   def get(postId: ForumPostId): Fu[Option[(ForumTopic, ForumPost)]] =
-    getPost(postId) flatMap {
-      _ ?? { post =>
-        topicRepo.byId(post.topicId) dmap2 { _ -> post }
-      }
+    getPost(postId) flatMapz { post =>
+      topicRepo.byId(post.topicId) dmap2 { _ -> post }
     }
 
   def getPost(postId: ForumPostId): Fu[Option[ForumPost]] =
@@ -198,7 +195,7 @@ final class ForumPostApi(
             forUser
           )
         }
-      }.sequenceFu
+      }.parallel
     } yield views
 
   private def recentUserIds(topic: ForumTopic, newPostNumber: Int) =
@@ -208,7 +205,7 @@ final class ForumPostApi(
         $doc(
           "topicId" -> topic.id,
           "number" $gt (newPostNumber - 10),
-          "createdAt" $gt DateTime.now.minusDays(5)
+          "createdAt" $gt nowDate.minusDays(5)
         ),
         ReadPreference.secondaryPreferred
       )
@@ -225,10 +222,8 @@ final class ForumPostApi(
       }
 
   def teamIdOfPostId(postId: ForumPostId): Fu[Option[TeamId]] =
-    postRepo.coll.byId[ForumPost](postId) flatMap {
-      _ ?? { post =>
-        categRepo.coll.primitiveOne[TeamId]($id(post.categId), "team")
-      }
+    postRepo.coll.byId[ForumPost](postId) flatMapz { post =>
+      categRepo.coll.primitiveOne[TeamId]($id(post.categId), "team")
     }
 
   private def logAnonPost(userId: UserId, post: ForumPost, edit: Boolean): Funit =

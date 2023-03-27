@@ -2,8 +2,6 @@ package lila.tutor
 
 import cats.data.NonEmptyList
 import chess.Color
-import scala.concurrent.duration.*
-import scala.concurrent.ExecutionContext
 
 import lila.analyse.AccuracyPercent
 import lila.common.Heapsort.given
@@ -80,8 +78,9 @@ case class TutorPerfReport(
 
   val clockCompares = List(globalPressureCompare, timeUsageCompare)
 
-  def openingCompares: List[TutorCompare[LilaOpeningFamily, ?]] = openings.all.toList.flatMap { op =>
-    List(op.accuracyCompare, op.awarenessCompare, op.performanceCompare)
+  def openingCompares: List[TutorCompare[LilaOpeningFamily, ?]] = Color.all.flatMap { color =>
+    val op = openings(color)
+    List(op.accuracyCompare, op.awarenessCompare, op.performanceCompare).map(_ as color)
   }
 
   lazy val allCompares: List[TutorCompare[?, ?]] = openingCompares ::: phaseCompares
@@ -104,6 +103,9 @@ case class TutorPerfReport(
 
 private object TutorPerfReport:
 
+  case class PeerMatch(report: TutorPerfReport):
+    export report.*
+
   import TutorBuilder.*
 
   private val accuracyQuestion  = Question(InsightDimension.Perf, InsightMetric.MeanAccuracy)
@@ -115,7 +117,7 @@ private object TutorPerfReport:
   )
   private def hasClock(p: PerfType) = p != PerfType.Correspondence
 
-  def compute(users: NonEmptyList[TutorUser])(using InsightApi, ExecutionContext): Fu[List[TutorPerfReport]] =
+  def compute(users: NonEmptyList[TutorUser])(using InsightApi, Executor): Fu[List[TutorPerfReport]] =
     for
       accuracy        <- answerManyPerfs(accuracyQuestion, users)
       awareness       <- answerManyPerfs(awarenessQuestion, users)
@@ -124,7 +126,7 @@ private object TutorPerfReport:
       clockUsers = users.filter(_.perfType != PerfType.Correspondence).toNel
       globalClock <- clockUsers.?? { answerManyPerfs(globalClockQuestion, _).dmap(some) }
       clockUsage  <- clockUsers.?? { TutorClockUsage.compute(_).dmap(some) }
-      perfReports <- scala.concurrent.Future sequence users.toList.map { user =>
+      perfReports <- Future sequence users.toList.map { user =>
         for
           openings <- TutorOpening compute user
           phases   <- TutorPhases compute user

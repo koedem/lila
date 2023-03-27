@@ -16,14 +16,14 @@ object index:
       div(cls := "account oauth box")(
         boxTop(
           h1(title),
-          st.form(cls        := "box-top__actions", action   := routes.OAuthToken.create)(
+          st.form(cls := "box-top__actions", action := routes.OAuthToken.create)(
             submitButton(cls := "button frameless", st.title := "New access token", dataIcon := "")
           )
         ),
-        standardFlash(cls := "box__pad"),
+        standardFlash.map(div(cls := "box__pad")(_)),
         p(cls := "box__pad force-ltr")(
           "You can make OAuth requests without going through the ",
-          a(href := s"${routes.Api.index}#section/Authentication")("authorization code flow"),
+          a(href := s"${routes.Api.index}#section/Introduction/Authentication")("authorization code flow"),
           ".",
           br,
           br,

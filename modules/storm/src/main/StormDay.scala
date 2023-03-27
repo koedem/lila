@@ -1,7 +1,5 @@
 package lila.storm
 
-import scala.concurrent.ExecutionContext
-
 import lila.common.config.MaxPerPage
 import lila.common.{ Bus, LichessDay }
 import lila.common.paginator.Paginator
@@ -51,16 +49,20 @@ object StormDay:
   def empty(id: Id) = StormDay(id, 0, 0, 0, 0, 0, IntRating(0), 0)
 
 final class StormDayApi(coll: Coll, highApi: StormHighApi, userRepo: UserRepo, sign: StormSign)(using
-    ExecutionContext
+    Executor
 ):
 
   import StormDay.*
   import StormBsonHandlers.given
 
-  def addRun(data: StormForm.RunData, user: Option[User]): Fu[Option[StormHigh.NewHigh]] =
+  def addRun(
+      data: StormForm.RunData,
+      user: Option[User],
+      mobile: Boolean
+  ): Fu[Option[StormHigh.NewHigh]] =
     lila.mon.storm.run.score(user.isDefined).record(data.score).unit
     user ?? { u =>
-      if (sign.check(u, ~data.signed))
+      if (mobile || sign.check(u, ~data.signed))
         Bus.publish(lila.hub.actorApi.puzzle.StormRun(u.id, data.score), "stormRun")
         highApi get u.id flatMap { prevHigh =>
           val todayId = Id today u.id

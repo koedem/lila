@@ -33,7 +33,7 @@ final class JsonView(isOnline: lila.socket.IsOnline):
 
   def roundPlayer(u: User, onlyPerf: Option[PerfType], withRating: Boolean) =
     if (u.enabled.no) disabled(u.light)
-    else base(u, onlyPerf, withRating = withRating).add("online" -> isOnline.value(u.id))
+    else base(u, onlyPerf, withRating = withRating).add("online" -> isOnline(u.id))
 
   private def base(u: User, onlyPerf: Option[PerfType], withRating: Boolean) =
     Json
@@ -49,7 +49,9 @@ final class JsonView(isOnline: lila.socket.IsOnline):
       .add("verified" -> u.isVerified)
 
   def lightPerfIsOnline(lp: LightPerf) =
-    lightPerfWrites.writes(lp).add("online" -> isOnline.value(lp.user.id))
+    lightPerfWrites.writes(lp).add("online" -> isOnline(lp.user.id))
+
+  given lightPerfIsOnlineWrites: OWrites[User.LightPerf] = OWrites(lightPerfIsOnline)
 
   def disabled(u: LightUser) = Json.obj(
     "id"       -> u.id,
@@ -170,5 +172,16 @@ object JsonView:
         "atomic"        -> leaderboards.atomic,
         "horde"         -> leaderboards.horde,
         "racingKings"   -> leaderboards.racingKings
+      )
+    }
+
+  given leaderboardStandardTopOneWrites(using OWrites[User.LightPerf]): OWrites[Perfs.Leaderboards] =
+    OWrites { leaderboards =>
+      Json.obj(
+        "bullet"      -> leaderboards.bullet.headOption,
+        "blitz"       -> leaderboards.blitz.headOption,
+        "rapid"       -> leaderboards.rapid.headOption,
+        "classical"   -> leaderboards.classical.headOption,
+        "ultraBullet" -> leaderboards.ultraBullet.headOption
       )
     }

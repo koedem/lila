@@ -33,10 +33,15 @@ object login:
           action := addReferrer(routes.Auth.authenticate.url)
         )(
           div(cls := "one-factor")(
-            form3.globalError(form),
+            if form.globalError.exists(_.messages.contains("blankedPassword")) then
+              div(cls := "auth-login__blanked")(
+                p(trans.blankedPassword()),
+                a(href := routes.Auth.passwordReset, cls := "button button-no-upper")(trans.passwordReset())
+              )
+            else form3.globalError(form),
             auth.bits.formFields(form("username"), form("password"), none, register = false),
             form3.submit(trans.signIn(), icon = none),
-            label(cls    := "login-remember")(
+            label(cls := "login-remember")(
               input(name := "remember", value := "true", tpe := "checkbox", checked),
               trans.rememberMe()
             )

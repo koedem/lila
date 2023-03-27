@@ -1,7 +1,5 @@
 package lila.pref
 
-import org.joda.time.DateTime
-
 import lila.user.User
 
 case class Pref(
@@ -399,7 +397,7 @@ object Pref:
   object Agreement:
     val current    = 2
     val changedAt  = new DateTime(2021, 12, 28, 8, 0)
-    val showPrompt = changedAt.isAfter(DateTime.now minusMonths 6)
+    val showPrompt = changedAt.isAfter(nowDate minusMonths 6)
 
   object Zen     extends BooleanPref {}
   object Ratings extends BooleanPref {}
@@ -427,7 +425,7 @@ object Pref:
     pieceSet = PieceSet.default.name,
     theme3d = Theme3d.default.name,
     pieceSet3d = PieceSet3d.default.name,
-    soundSet = SoundSet.default.name,
+    soundSet = SoundSet.default.key,
     blindfold = Blindfold.NO,
     autoQueen = AutoQueen.PREMOVE,
     autoThreefold = AutoThreefold.ALWAYS,
@@ -462,4 +460,4 @@ object Pref:
   )
 
   import alleycats.Zero
-  implicit def PrefZero: Zero[Pref] = Zero(default)
+  given PrefZero: Zero[Pref] = Zero(default)

@@ -10,7 +10,6 @@ import lila.common.Json.given
 import lila.game.actorApi.MoveGameEvent
 import lila.game.Game
 import lila.socket.Socket
-import scala.concurrent.ExecutionContext
 
 final private class TvBroadcast(
     userJsonView: lila.user.JsonView,
@@ -25,7 +24,7 @@ final private class TvBroadcast(
 
   Bus.subscribe(self, "changeFeaturedGame")
 
-  given ExecutionContext = context.system.dispatcher
+  given Executor = context.system.dispatcher
 
   override def postStop() =
     super.postStop()
@@ -68,7 +67,7 @@ final private class TvBroadcast(
               .add("seconds" -> pov.game.clock.map(_.remainingTime(pov.color).roundSeconds))
           }
         ),
-        fen = Fen writeBoard pov.game.chess.board
+        fen = Fen write pov.game.situation
       )
       clients.foreach { client =>
         client.queue offer {
@@ -83,7 +82,7 @@ final private class TvBroadcast(
         "fen",
         Json
           .obj(
-            "fen" -> fen.andColor(game.turnColor),
+            "fen" -> fen,
             "lm"  -> move
           )
           .add("wc" -> game.clock.map(_.remainingTime(chess.White).roundSeconds))
@@ -104,7 +103,7 @@ object TvBroadcast:
   type SourceType = Source[JsValue, ?]
   type Queue      = SourceQueueWithComplete[JsValue]
 
-  case class Featured(id: GameId, data: JsObject, fen: BoardFen):
+  case class Featured(id: GameId, data: JsObject, fen: Fen.Epd):
     def dataWithFen = data ++ Json.obj("fen" -> fen)
     def socketMsg   = Socket.makeMessage("featured", dataWithFen)
 

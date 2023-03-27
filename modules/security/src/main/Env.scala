@@ -4,7 +4,6 @@ import akka.actor.*
 import com.softwaremill.macwire.*
 import play.api.Configuration
 import play.api.libs.ws.StandaloneWSClient
-import scala.concurrent.duration.*
 
 import lila.common.config.*
 import lila.common.Strings
@@ -29,7 +28,7 @@ final class Env(
     mongoCache: lila.memo.MongoCache.Api,
     db: lila.db.Db
 )(using
-    ec: scala.concurrent.ExecutionContext,
+    ec: Executor,
     system: ActorSystem,
     scheduler: Scheduler,
     mode: play.api.Mode
@@ -40,7 +39,7 @@ final class Env(
 
   private def hcaptchaPublicConfig = config.hcaptcha.public
 
-  lazy val firewall = new Firewall(
+  lazy val firewall = Firewall(
     coll = db(config.collection.firewall),
     scheduler = scheduler
   )
@@ -58,6 +57,7 @@ final class Env(
   lazy val userLogins = wire[UserLoginsApi]
 
   lazy val store = new Store(db(config.collection.security), db(CollName("userhack")), userRepo, cacheApi)
+  // lazy val store = Store(db(config.collection.security), cacheApi)
 
   lazy val ip2proxy: Ip2Proxy =
     if (config.ip2Proxy.enabled && config.ip2Proxy.url.nonEmpty)
@@ -71,7 +71,7 @@ final class Env(
     text = "Enable the user garbage collector".some
   )
 
-  lazy val printBan = new PrintBan(db(config.collection.printBan))
+  lazy val printBan = PrintBan(db(config.collection.printBan))
 
   lazy val garbageCollector =
     def mk: (() => Boolean) => GarbageCollector = isArmed => wire[GarbageCollector]
@@ -79,7 +79,7 @@ final class Env(
 
   lazy val emailConfirm: EmailConfirm =
     if (config.emailConfirm.enabled)
-      new EmailConfirmMailer(
+      EmailConfirmMailer(
         userRepo = userRepo,
         mailer = mailer,
         baseUrl = baseUrl,
@@ -103,7 +103,7 @@ final class Env(
     def mk = (s: Secret) => wire[EmailChange]
     mk(config.emailChangeSecret)
 
-  lazy val loginToken = new LoginToken(config.loginTokenSecret, userRepo)
+  lazy val loginToken = LoginToken(config.loginTokenSecret, userRepo)
 
   lazy val disposableEmailAttempt = wire[DisposableEmailAttempt]
 
@@ -115,7 +115,7 @@ final class Env(
 
   lazy val emailAddressValidator = wire[EmailAddressValidator]
 
-  private lazy val disposableEmailDomain = new DisposableEmailDomain(
+  private lazy val disposableEmailDomain = DisposableEmailDomain(
     ws = ws,
     providerUrl = config.disposableEmail.providerUrl,
     checkMailBlocked = () => checkMail.fetchAllBlocked
@@ -127,7 +127,7 @@ final class Env(
     text = "Spam keywords separated by a comma".some
   )
 
-  lazy val spam = new Spam((() => spamKeywordsSetting.get()))
+  lazy val spam = Spam(spamKeywordsSetting.get)
 
   lazy val promotion = wire[PromotionApi]
 
@@ -150,6 +150,8 @@ final class Env(
     }
 
   lazy val ipTrust: IpTrust = wire[IpTrust]
+
+  lazy val pwned: Pwned = Pwned(ws, config.pwnedUrl)
 
   lazy val api = wire[SecurityApi]
 

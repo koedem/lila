@@ -12,7 +12,7 @@ final class JsonView(rematches: Rematches):
 
   import JsonView.{ *, given }
 
-  def apply(game: Game, initialFen: Option[Fen.Epd]) =
+  def base(game: Game, initialFen: Option[Fen.Epd]) =
     Json
       .obj(
         "id"            -> game.id,
@@ -40,13 +40,13 @@ final class JsonView(rematches: Rematches):
       .add("drawOffers" -> (!game.drawOffers.isEmpty).option(game.drawOffers.normalizedPlies))
       .add("rules" -> game.metadata.nonEmptyRules)
 
-  def ownerPreview(pov: Pov)(lightUserSync: LightUser.GetterSync) =
+  def ownerPreview(pov: Pov)(using LightUser.GetterSync) =
     Json
       .obj(
         "fullId"   -> pov.fullId,
         "gameId"   -> pov.gameId,
         "fen"      -> (Fen write pov.game.chess),
-        "color"    -> (if (pov.game.variant.racingKings) chess.White else pov.color).name,
+        "color"    -> pov.color.name,
         "lastMove" -> (pov.game.lastMoveKeys | ""),
         "source"   -> pov.game.source,
         "variant" -> Json.obj(
@@ -61,7 +61,7 @@ final class JsonView(rematches: Rematches):
           .obj(
             "id" -> pov.opponent.userId,
             "username" -> lila.game.Namer
-              .playerTextBlocking(pov.opponent, withRating = false)(using lightUserSync)
+              .playerTextBlocking(pov.opponent, withRating = false)
           )
           .add("rating" -> pov.opponent.rating)
           .add("ai" -> pov.opponent.aiLevel),
@@ -70,6 +70,17 @@ final class JsonView(rematches: Rematches):
       .add("secondsLeft" -> pov.remainingSeconds)
       .add("tournamentId" -> pov.game.tournamentId)
       .add("swissId" -> pov.game.swissId)
+      .add("orientation" -> pov.game.variant.racingKings.option(chess.White))
+
+  def player(p: Player, user: Option[LightUser]) =
+    Json
+      .obj()
+      .add("user", user)
+      .add("rating", p.rating)
+      .add("ratingDiff", p.ratingDiff)
+      .add("name", p.name)
+      .add("provisional" -> p.provisional)
+      .add("aiLevel" -> p.aiLevel)
 
 object JsonView:
 

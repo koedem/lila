@@ -34,7 +34,7 @@ final class Env(
     ircApi: lila.irc.IrcApi,
     msgApi: lila.msg.MsgApi
 )(using
-    ec: scala.concurrent.ExecutionContext,
+    ec: Executor,
     system: ActorSystem,
     scheduler: Scheduler
 ):
@@ -78,7 +78,7 @@ final class Env(
   lila.common.Bus.subscribeFuns(
     "finishGame" -> {
       case lila.game.actorApi.FinishGame(game, whiteUserOption, blackUserOption) if !game.aborted =>
-        import cats.implicits.*
+        import cats.syntax.all.*
         (whiteUserOption.filter(_.enabled.yes), blackUserOption.filter(_.enabled.yes)) mapN {
           (whiteUser, blackUser) =>
             sandbagWatch(game)
@@ -115,5 +115,7 @@ final class Env(
     },
     "chatTimeout" -> { case lila.hub.actorApi.mod.ChatTimeout(mod, user, reason, text) =>
       logApi.chatTimeout(mod into ModId, user, reason, text).unit
-    }
+    },
+    "loginWithWeakPassword"    -> { case u: lila.user.User => logApi.loginWithWeakPassword(u.id) },
+    "loginWithBlankedPassword" -> { case u: lila.user.User => logApi.loginWithBlankedPassword(u.id) }
   )

@@ -42,8 +42,8 @@ final class Env(
     ws: StandaloneWSClient,
     askApi: AskApi
 )(using
-    ec: scala.concurrent.ExecutionContext,
-    scheduler: akka.actor.Scheduler,
+    ec: Executor,
+    scheduler: Scheduler,
     mat: akka.stream.Materializer
 ):
 

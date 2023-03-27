@@ -1,6 +1,5 @@
 package controllers
 
-import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
 import play.api.mvc.*
 import scala.util.chaining.*
@@ -129,7 +128,7 @@ final class Game(
       }
     }
 
-  private def fileDate = DateTimeFormat forPattern "yyyy-MM-dd" print DateTime.now
+  private def fileDate = DateTimeFormat forPattern "yyyy-MM-dd" print nowDate
 
   def apiExportByUserImportedGames(username: UserStr) =
     AuthOrScoped()(
@@ -154,16 +153,14 @@ final class Game(
   def exportByIds =
     Action.async(parse.tolerantText) { req =>
       val config = GameApiV2.ByIdsConfig(
-        ids = req.body.split(',').view.take(300).toSeq map { GameId(_) },
+        ids = GameId from req.body.split(',').view.take(300).toSeq,
         format = GameApiV2.Format byRequest req,
         flags = requestPgnFlags(req, extended = false),
         perSecond = MaxPerSecond(30),
         playerFile = get("players", req)
       )
-      apiC
-        .GlobalConcurrencyLimitPerIP(HTTPRequest ipAddress req)(
-          env.api.gameApiV2.exportByIds(config)
-        ) { source =>
+      apiC.GlobalConcurrencyLimitPerIP
+        .download(req.ipAddress)(env.api.gameApiV2.exportByIds(config)) { source =>
           noProxyBuffer(Ok.chunked(source)).as(gameContentType(config))
         }
         .toFuccess
@@ -185,9 +182,11 @@ final class Game(
       clocks = getBoolOpt("clocks", req) | extended,
       evals = getBoolOpt("evals", req) | extended,
       opening = getBoolOpt("opening", req) | extended,
-      literate = getBoolOpt("literate", req) | false,
-      pgnInJson = getBoolOpt("pgnInJson", req) | false,
-      delayMoves = delayMovesFromReq(req)
+      literate = getBool("literate", req),
+      pgnInJson = getBool("pgnInJson", req),
+      delayMoves = delayMovesFromReq(req),
+      lastFen = getBool("lastFen", req),
+      accuracy = getBool("accuracy", req)
     )
 
   private[controllers] def delayMovesFromReq(req: RequestHeader) =

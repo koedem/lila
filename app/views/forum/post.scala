@@ -13,7 +13,7 @@ import lila.forum.ForumPost
 
 object post:
 
-  def recent(posts: List[lila.forum.MiniForumPost])(implicit ctx: Context) =
+  def recent(posts: List[lila.forum.MiniForumPost])(using Context) =
     ol(
       posts map { p =>
         li(
@@ -22,9 +22,7 @@ object post:
             cls      := "post_link text",
             href     := routes.ForumPost.redirect(p.postId),
             title    := p.topicName
-          )(
-            shorten(p.topicName, 30)
-          ),
+          )(shorten(p.topicName, 30)),
           " ",
           userIdLink(p.userId, withOnline = false),
           " ",
@@ -135,7 +133,7 @@ object post:
           )
       )
 
-  def reactions(post: ForumPost, canReact: Boolean)(implicit ctx: Context) =
+  def reactions(post: ForumPost, canReact: Boolean)(using ctx: Context) =
     val mine             = ctx.me ?? { ForumPost.Reaction.of(~post.reactions, _) }
     val canActuallyReact = canReact && ctx.me.exists(me => !me.isBot && !post.isBy(me))
     div(cls := List("reactions" -> true, "reactions-auth" -> canActuallyReact))(

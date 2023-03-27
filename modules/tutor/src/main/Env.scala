@@ -2,7 +2,6 @@ package lila.tutor
 
 import com.softwaremill.macwire.*
 import com.softwaremill.tagging.*
-import scala.concurrent.duration.*
 
 import lila.common.config
 import lila.db.dsl.Coll
@@ -22,8 +21,8 @@ final class Env(
     cacheApi: CacheApi,
     lightUserApi: lila.user.LightUserApi
 )(using
-    ec: scala.concurrent.ExecutionContext,
-    scheduler: akka.actor.Scheduler,
+    ec: Executor,
+    scheduler: Scheduler,
     mode: play.api.Mode,
     mat: akka.stream.Materializer
 ):
@@ -36,6 +35,12 @@ final class Env(
     text = "Number of fishnet analysis per tutor build".some
   ).taggedWith[NbAnalysis]
 
+  lazy val parallelismSetting = settingStore[Int](
+    "tutorParallelism",
+    default = 3,
+    text = "Number of tutor reports to build in parallel".some
+  ).taggedWith[Parallelism]
+
   private lazy val fishnet = wire[TutorFishnet]
   private lazy val builder = wire[TutorBuilder]
   lazy val queue           = wire[TutorQueue]
@@ -44,3 +49,4 @@ final class Env(
 
 final private class TutorColls(val report: Coll, val queue: Coll)
 trait NbAnalysis
+trait Parallelism

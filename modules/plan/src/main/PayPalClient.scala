@@ -7,7 +7,6 @@ import play.api.libs.ws.JsonBodyReadables.*
 import play.api.libs.ws.JsonBodyWritables.*
 import play.api.libs.ws.WSAuthScheme
 import play.api.libs.ws.{ StandaloneWSClient, StandaloneWSResponse }
-import scala.concurrent.duration.*
 
 import lila.common.config
 import lila.common.WebService
@@ -23,7 +22,7 @@ final private class PayPalClient(
     ws: StandaloneWSClient,
     config: PayPalClient.Config,
     cacheApi: CacheApi
-)(using ec: scala.concurrent.ExecutionContext):
+)(using Executor):
 
   import PayPalClient.*
   import JsonHandlers.given
@@ -204,7 +203,7 @@ final private class PayPalClient(
   private def response[A: Reads](res: StandaloneWSResponse): Fu[A] =
     res.status match
       case 200 | 201 | 204 =>
-        (implicitly[Reads[A]] reads res.body[JsValue]).fold(
+        (summon[Reads[A]] reads res.body[JsValue]).fold(
           errs => fufail(new CantParseException(res.body[JsValue], JsError(errs))),
           fuccess
         )

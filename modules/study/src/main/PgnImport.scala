@@ -1,9 +1,10 @@
 package lila.study
 
 import cats.data.Validated
-import chess.Centis
-import chess.format.pgn.{ Dumper, Glyphs, ParsedPgn, San, Tags }
+import chess.{ Centis, ErrorStr }
+import chess.format.pgn.{ Dumper, Glyphs, ParsedPgn, San, Tags, PgnStr, Comment as ChessComment }
 import chess.format.{ Fen, Uci, UciCharPair }
+import chess.MoveOrDrop.*
 
 import lila.common.LightUser
 import lila.importer.{ ImportData, Preprocessed }
@@ -25,7 +26,7 @@ object PgnImport:
       statusText: String
   )
 
-  def apply(pgn: String, contributors: List[LightUser]): Validated[String, Result] =
+  def apply(pgn: PgnStr, contributors: List[LightUser]): Validated[ErrorStr, Result] =
     ImportData(pgn, analyse = none).preprocess(user = none).map {
       case Preprocessed(game, replay, initialFen, parsedPgn) =>
         val annotator = findAnnotator(parsedPgn, contributors)
@@ -91,12 +92,12 @@ object PgnImport:
   private def makeVariations(sans: List[San], game: chess.Game, annotator: Option[Comment.Author]) =
     sans.headOption.?? {
       _.metas.variations.flatMap { variation =>
-        makeNode(game, variation.value, annotator)
+        makeNode(game, variation.sans.value, annotator)
       }
     }
 
   private def parseComments(
-      comments: List[String],
+      comments: List[ChessComment],
       annotator: Option[Comment.Author]
   ): (Shapes, Option[Centis], Comments) =
     comments.foldLeft((Shapes(Nil), none[Centis], Comments(Nil))) { case ((shapes, clock, comments), txt) =>

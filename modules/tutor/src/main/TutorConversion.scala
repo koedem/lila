@@ -1,7 +1,6 @@
 package lila.tutor
 
 import cats.data.NonEmptyList
-import scala.concurrent.ExecutionContext
 
 import lila.insight.*
 import lila.rating.PerfType
@@ -18,7 +17,7 @@ object TutorConversion:
 
   private[tutor] def compute(
       users: NonEmptyList[TutorUser]
-  )(using insightApi: InsightApi, ec: ExecutionContext): Fu[TutorBuilder.Answers[PerfType]] =
+  )(using insightApi: InsightApi, ec: Executor): Fu[TutorBuilder.Answers[PerfType]] =
     val perfs = users.toList.map(_.perfType)
     val question = Question(
       InsightDimension.Perf,
@@ -27,7 +26,7 @@ object TutorConversion:
     )
     val select =
       $doc(F.analysed -> true, F.moves -> $doc("$elemMatch" -> $doc("w" $gt WinPercent(66.6), "i" $gt 1)))
-    val compute = TutorCustomInsight(users, question, "conversion") { docs =>
+    val compute = TutorCustomInsight(users, question, "conversion", _.conversion) { docs =>
       for
         doc  <- docs
         perf <- doc.getAsOpt[PerfType]("_id")

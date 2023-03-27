@@ -7,17 +7,19 @@ import { Clock } from 'puz/clock';
 import { Combo } from 'puz/combo';
 import { getNow, puzzlePov, sound } from 'puz/util';
 import { makeCgOpts } from 'puz/run';
+import { makeSan } from 'chessops/san';
 import { parseUci } from 'chessops/util';
 import { PromotionCtrl } from 'chess/promotion';
 import { prop, Prop } from 'common';
 import { PuzCtrl, Run } from 'puz/interfaces';
 import { PuzFilters } from 'puz/filters';
 import { Role } from 'chessground/types';
-import { StormOpts, StormData, StormVm, StormRecap, StormPrefs } from './interfaces';
+import { StormOpts, StormVm, StormRecap, StormPrefs, StormData } from './interfaces';
 
 export default class StormCtrl implements PuzCtrl {
   private data: StormData;
   private redraw: () => void;
+  private music?: any;
   pref: StormPrefs;
   run: Run;
   vm: StormVm;
@@ -28,7 +30,7 @@ export default class StormCtrl implements PuzCtrl {
   flipped = false;
 
   constructor(opts: StormOpts, redraw: (data: StormData) => void) {
-    this.data = opts.data;
+    this.data = { puzzles: opts.puzzles, key: opts.key };
     this.pref = opts.pref;
     this.redraw = () => redraw(this.data);
     this.filters = new PuzFilters(this.redraw, false);
@@ -63,12 +65,17 @@ export default class StormCtrl implements PuzCtrl {
         this.redraw();
       }
     }, config.timeToStart + 1000);
+    lichess.pubsub.on('sound_set', (set: string) => {
+      if (!this.music && set === 'music')
+        lichess.loadScript('javascripts/music/play.js').then(() => {
+          this.music = lichess.playMusic();
+        });
+      if (this.music && set !== 'music') this.music = undefined;
+    });
     lichess.pubsub.on('zen', () => {
-      if (!this.run.endAt) {
-        const zen = $('body').toggleClass('zen').hasClass('zen');
-        window.dispatchEvent(new Event('resize'));
-        xhr.setZen(zen);
-      }
+      const zen = $('body').toggleClass('zen').hasClass('zen');
+      window.dispatchEvent(new Event('resize'));
+      xhr.setZen(zen);
     });
     $('#zentog').on('click', this.toggleZen);
   }
@@ -80,7 +87,7 @@ export default class StormCtrl implements PuzCtrl {
     this.ground(false);
     this.redraw();
     sound.end();
-    xhr.record(this.runStats(), this.data.notAnExploit).then(res => {
+    xhr.record(this.runStats()).then(res => {
       this.vm.response = res;
       this.redraw();
     });
@@ -142,6 +149,7 @@ export default class StormCtrl implements PuzCtrl {
         if (this.run.clock.flag()) this.end();
         else if (!this.incPuzzle()) this.end();
       }
+      if (this.music) this.music.jump({ san: makeSan(pos, move), uci });
       this.redraw();
       this.redrawQuick();
       this.redrawSlow();

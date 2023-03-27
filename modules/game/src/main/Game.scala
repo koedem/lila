@@ -18,7 +18,8 @@ import chess.{
   Speed,
   Status
 }
-import org.joda.time.DateTime
+
+import chess.MoveOrDrop.fold
 
 import lila.common.{ Days, Sequence }
 import lila.db.ByteArray
@@ -37,8 +38,8 @@ case class Game(
     binaryMoveTimes: Option[ByteArray] = None,
     mode: Mode = Mode.default,
     bookmarks: Int = 0,
-    createdAt: DateTime = DateTime.now,
-    movedAt: DateTime = DateTime.now,
+    createdAt: DateTime = nowDate,
+    movedAt: DateTime = nowDate,
     metadata: Metadata
 ):
 
@@ -48,7 +49,7 @@ case class Game(
 
   lazy val clockHistory = chess.clock flatMap loadClockHistory
 
-  val players = List[Player](whitePlayer, blackPlayer)
+  def players = List(whitePlayer, blackPlayer)
 
   def player(color: Color): Player = color.fold(whitePlayer, blackPlayer)
 
@@ -199,7 +200,7 @@ case class Game(
       },
       loadClockHistory = _ => newClockHistory,
       status = game.situation.status | status,
-      movedAt = DateTime.now
+      movedAt = nowDate
     )
 
     val state = Event.State(
@@ -219,7 +220,7 @@ case class Game(
       Event.Drop(_, game.situation, state, clockEvent, updated.board.crazyData)
     ) :: {
       // abstraction leak, I know.
-      (updated.board.variant.threeCheck && game.situation.check) ?? List(
+      (updated.board.variant.threeCheck && game.situation.check.yes) ?? List(
         Event.CheckCount(
           white = updated.history.checkCount.white,
           black = updated.history.checkCount.black
@@ -483,7 +484,7 @@ case class Game(
 
   def withClock(c: Clock) = Progress(this, copy(chess = chess.copy(clock = Some(c))))
 
-  def correspondenceGiveTime = Progress(this, copy(movedAt = DateTime.now))
+  def correspondenceGiveTime = Progress(this, copy(movedAt = nowDate))
 
   def estimateClockTotalTime = clock.map(_.estimateTotalSeconds)
 
@@ -521,10 +522,11 @@ case class Game(
       Centis.ofMillis(movedAt.getMillis - nowMillis + timeForFirstMove.millis).nonNeg
     }
 
-  def playerWhoDidNotMove: Option[Player] =
+  def playerWhoDidNotMove: Option[Player] = {
     if playedTurns == Ply(0) then player(startColor).some
     else if playedTurns == Ply(1) then player(!startColor).some
     else none
+  } filterNot { player => winnerColor contains player.color }
 
   def onePlayerHasMoved    = playedTurns > 0
   def bothPlayersHaveMoved = playedTurns > 1
@@ -543,9 +545,9 @@ case class Game(
 
   def isBeingPlayed = !isPgnImport && !finishedOrAborted
 
-  def olderThan(seconds: Int) = movedAt isBefore DateTime.now.minusSeconds(seconds)
+  def olderThan(seconds: Int) = movedAt isBefore nowDate.minusSeconds(seconds)
 
-  def justCreated = createdAt isAfter DateTime.now.minusSeconds(1)
+  def justCreated = createdAt isAfter nowDate.minusSeconds(1)
 
   def unplayed = !bothPlayersHaveMoved && (createdAt isBefore Game.unplayedDate)
 
@@ -690,10 +692,10 @@ object Game:
   val tokenSize    = 4
 
   val unplayedHours = 24
-  def unplayedDate  = DateTime.now minusHours unplayedHours
+  def unplayedDate  = nowDate minusHours unplayedHours
 
   val abandonedDays = Days(21)
-  def abandonedDate = DateTime.now minusDays abandonedDays.value
+  def abandonedDate = nowDate minusDays abandonedDays.value
 
   def strToIdOpt(str: String): Option[GameId]        = strToId(str).some.filter(validId)
   inline def strToId(str: String): GameId            = GameId(str take gameIdSize)
@@ -736,7 +738,7 @@ object Game:
       daysPerTurn: Option[Days] = None,
       rules: Set[GameRule] = Set.empty
   ): NewGame =
-    val createdAt = DateTime.now
+    val createdAt = nowDate
     NewGame(
       Game(
         id = IdGenerator.uncheckedGame,

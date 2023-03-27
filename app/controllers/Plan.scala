@@ -3,11 +3,10 @@ package controllers
 import java.util.Currency
 import play.api.libs.json.*
 import play.api.mvc.*
-import scala.concurrent.duration.*
 
 import lila.api.Context
 import lila.app.{ given, * }
-import lila.common.{ EmailAddress, HTTPRequest }
+import lila.common.EmailAddress
 import lila.plan.{
   CreateStripeSession,
   Freq,
@@ -82,8 +81,7 @@ final class Plan(env: Env)(implicit system: akka.actor.ActorSystem) extends Lila
         patron = patron,
         recentIds = recentIds,
         bestIds = bestIds,
-        pricing = pricing,
-        methods = env.plan.stripePaymentMethods(StripeMode.payment, pricing.currency)
+        pricing = pricing
       )
     )
 
@@ -148,7 +146,7 @@ final class Plan(env: Env)(implicit system: akka.actor.ActorSystem) extends Lila
   def thanks =
     Open { implicit ctx =>
       // wait for the payment data from stripe or paypal
-      lila.common.Future.delay(2.seconds) {
+      lila.common.LilaFuture.delay(2.seconds) {
         for {
           patron   <- ctx.me ?? env.plan.api.userPatron
           customer <- patron ?? env.plan.api.stripe.patronCustomer
@@ -256,7 +254,7 @@ final class Plan(env: Env)(implicit system: akka.actor.ActorSystem) extends Lila
       given play.api.mvc.Request[?] = ctx.body
       CaptureRateLimit(ctx.ip) {
         env.plan.api.stripe.userCustomer(me) flatMap {
-          _.flatMap(_.firstSubscription) ?? { sub =>
+          _.flatMap(_.firstSubscription).map(_.copy(ip = ctx.ip.some)) ?? { sub =>
             env.plan.api.stripe
               .createPaymentUpdateSession(
                 sub,
@@ -343,7 +341,7 @@ final class Plan(env: Env)(implicit system: akka.actor.ActorSystem) extends Lila
           ipn =>
             env.plan.api.payPal.onLegacyCharge(
               ipn,
-              ip = HTTPRequest ipAddress req,
+              ip = req.ipAddress,
               key = get("key", req) | "N/A"
             ) inject Ok
         )

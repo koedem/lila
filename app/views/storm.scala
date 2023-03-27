@@ -15,18 +15,14 @@ import lila.user.User
 
 object storm:
 
-  def home(data: JsObject, pref: JsObject, high: Option[StormHigh])(implicit ctx: Context) =
+  def home(data: JsObject, high: Option[StormHigh])(implicit ctx: Context) =
     views.html.base.layout(
       moreCss = frag(cssTag("storm")),
       moreJs = frag(
         jsModule("storm"),
         embedJsUnsafeLoadThen(
           s"""LichessStorm.start(${safeJsonValue(
-              Json.obj(
-                "data" -> data,
-                "pref" -> pref,
-                "i18n" -> i18nJsObject(i18nKeys)
-              )
+              data ++ Json.obj("i18n" -> i18nJsObject(i18nKeys))
             )})"""
         )
       ),
@@ -37,7 +33,7 @@ object storm:
       withHrefLangs = LangPath(routes.Storm.home).some
     ) {
       main(
-        div(cls   := "storm storm-app storm--play")(
+        div(cls := "storm storm-app storm--play")(
           div(cls := "storm__board main-board"),
           div(cls := "storm__side")
         ),

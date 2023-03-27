@@ -1,8 +1,6 @@
 package lila.notify
 
 import play.api.libs.json.Json
-import scala.concurrent.duration.*
-import scala.concurrent.Future
 
 import lila.common.Bus
 import lila.common.config.MaxPerPage
@@ -22,7 +20,7 @@ final class NotifyApi(
     cacheApi: lila.memo.CacheApi,
     maxPerPage: MaxPerPage,
     prefApi: lila.pref.PrefApi
-)(using scala.concurrent.ExecutionContext):
+)(using Executor):
 
   import Notification.*
   import BSONHandlers.given
@@ -53,8 +51,8 @@ final class NotifyApi(
         val customAllows = for
           doc    <- docs
           userId <- doc.getAsOpt[UserId]("_id")
-          allows <- doc.int(event.key)
-        yield NotifyAllows(userId, Allows.fromCode(allows))
+          allows <- doc.getAsOpt[Allows](event.key)
+        yield NotifyAllows(userId, allows)
         val customIds = customAllows.view.map(_.userId).toSet
         val defaultAllows = userIds.filterNot(customIds.contains).map {
           NotifyAllows(_, NotificationPref.default.allows(event))
@@ -107,7 +105,7 @@ final class NotifyApi(
 
   def notifyOne[U: UserIdOf](to: U, content: NotificationContent): Funit =
     val note = Notification.make(to, content)
-    !shouldSkip(note) ifThen {
+    !shouldSkip(note) flatMapz {
       NotificationPref.Event.byKey.get(content.key) match {
         case None => bellOne(note)
         case Some(event) =>

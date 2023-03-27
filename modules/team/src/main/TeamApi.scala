@@ -1,6 +1,5 @@
 package lila.team
 
-import org.joda.time.DateTime
 import org.joda.time.Period
 import play.api.libs.json.{ JsSuccess, Json, Reads }
 import reactivemongo.api.{ Cursor, ReadPreference }
@@ -29,7 +28,7 @@ final class TeamApi(
     indexer: lila.hub.actors.TeamSearch,
     modLog: ModlogApi,
     chatApi: ChatApi
-)(using scala.concurrent.ExecutionContext):
+)(using Executor):
 
   import BSONHandlers.given
 
@@ -128,17 +127,16 @@ final class TeamApi(
     teamRepo.countCreatedSince(me.id, Period weeks 1)
 
   def requestsWithUsers(team: Team): Fu[List[RequestWithUser]] =
-    for {
-      requests  <- requestRepo.findActiveByTeam(team.id, 50)
-      withUsers <- requestsWithUsers(requests)
-    } yield withUsers
+    requestRepo.findActiveByTeam(team.id, 50) flatMap requestsWithUsers
 
-  def requestsWithUsers(user: User): Fu[List[RequestWithUser]] =
-    for {
-      teamIds   <- teamRepo enabledTeamIdsByLeader user.id
-      requests  <- requestRepo findActiveByTeams teamIds
-      withUsers <- requestsWithUsers(requests)
-    } yield withUsers
+  def declinedRequestsWithUsers(team: Team): Fu[List[RequestWithUser]] =
+    requestRepo.findDeclinedByTeam(team.id, 50) flatMap requestsWithUsers
+
+  def requestsWithUsers(user: User): Fu[List[RequestWithUser]] = for
+    teamIds   <- teamRepo enabledTeamIdsByLeader user.id
+    requests  <- requestRepo findActiveByTeams teamIds
+    withUsers <- requestsWithUsers(requests)
+  yield withUsers
 
   private def requestsWithUsers(requests: List[Request]): Fu[List[RequestWithUser]] =
     userRepo optionsByIds requests.map(_.user) map { users =>
@@ -171,15 +169,13 @@ final class TeamApi(
     } yield !belongs && !requested
 
   def createRequest(team: Team, user: User, msg: String): Funit =
-    requestable(team, user) flatMap {
-      _ ?? {
-        val request = Request.make(
-          team = team.id,
-          user = user.id,
-          message = if (user.marks.troll) Request.defaultMessage else msg
-        )
-        requestRepo.coll.insert.one(request).void >>- (cached.nbRequests invalidate team.createdBy)
-      }
+    requestable(team, user) flatMapz {
+      val request = Request.make(
+        team = team.id,
+        user = user.id,
+        message = if (user.marks.troll) Request.defaultMessage else msg
+      )
+      requestRepo.coll.insert.one(request).void >>- (cached.nbRequests invalidate team.createdBy)
     }
 
   def cancelRequestOrQuit(team: Team, user: User): Funit =
@@ -190,12 +186,12 @@ final class TeamApi(
 
   def processRequest(team: Team, request: Request, decision: String): Funit = {
     if (decision == "decline") requestRepo.coll.updateField($id(request.id), "declined", true).void
-    else if (decision == "accept") for {
+    else if (decision == "accept") for
       _          <- requestRepo.remove(request.id)
       userOption <- userRepo byId request.user
       _ <-
         userOption.??(user => doJoin(team, user) >> notifier.acceptRequest(team, request))
-    } yield ()
+    yield ()
     else funit
   } addEffect { _ =>
     cached.nbRequests invalidate team.createdBy
@@ -208,20 +204,19 @@ final class TeamApi(
           teamRepo.leadersOf(request.team).map {
             _ foreach cached.nbRequests.invalidate
           }
-      }.sequenceFu
+      }.parallel
     }
 
-  def doJoin(team: Team, user: User): Funit =
-    !belongsTo(team.id, user.id) flatMap {
-      _ ?? {
-        memberRepo.add(team.id, user.id) >>
-          teamRepo.incMembers(team.id, +1) >>- {
-            cached invalidateTeamIds user.id
-            timeline ! Propagate(TeamJoin(user.id, team.id)).toFollowersOf(user.id)
-            Bus.publish(JoinTeam(id = team.id, userId = user.id), "team")
-          }
-      } recover lila.db.ignoreDuplicateKey
+  def doJoin(team: Team, user: User): Funit = {
+    !belongsTo(team.id, user.id) flatMapz {
+      memberRepo.add(team.id, user.id) >>
+        teamRepo.incMembers(team.id, +1) >>- {
+          cached invalidateTeamIds user.id
+          timeline ! Propagate(TeamJoin(user.id, team.id)).toFollowersOf(user.id)
+          Bus.publish(JoinTeam(id = team.id, userId = user.id), "team")
+        }
     }
+  } recover lila.db.ignoreDuplicateKey
 
   def teamsOf(username: UserStr) =
     cached.teamIdsList(username.id) flatMap {
@@ -243,7 +238,7 @@ final class TeamApi(
     cached.teamIdsList(userId) flatMap { teamIds =>
       memberRepo.removeByUser(userId) >>
         requestRepo.removeByUser(userId) >>
-        teamIds.map { teamRepo.incMembers(_, -1) }.sequenceFu.void >>-
+        teamIds.map { teamRepo.incMembers(_, -1) }.parallel.void >>-
         cached.invalidateTeamIds(userId) inject teamIds
     }
 

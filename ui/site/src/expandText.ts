@@ -45,6 +45,7 @@ lichess.load.then(() => {
     studyRegex = new RegExp(domain + '/study/(?:embed/)?(\\w{8})(#\\d+)?\\b');
 
   function parseLink(a: HTMLAnchorElement): Parsed | undefined {
+    if (a.href.replace(/^https?:\/\//, '') !== a.textContent?.replace(/^https?:\/\//, '')) return;
     const tw = toTwitterEmbedUrl(a.href);
     if (tw)
       return {
@@ -58,13 +59,13 @@ lichess.load.then(() => {
         src: yt,
       };
     let matches = a.href.match(chapterRegex);
-    if (matches && matches[2] && a.text.match(chapterRegex))
+    if (matches && matches[2])
       return {
         type: 'study',
         src: `/study/embed/${matches[1]}/${matches[2]}${matches[3] || ''}`,
       };
     matches = a.href.match(studyRegex);
-    if (matches && matches[1] && a.text.match(studyRegex))
+    if (matches && matches[1])
       return {
         type: 'study',
         src: `/study/embed/${matches[1]}/autochap${matches[2] || ''}`,
@@ -101,11 +102,11 @@ lichess.load.then(() => {
     }
   }
 
-  function expand(a: Candidate) {
+  function expandStudy(a: Candidate) {
     const $iframe: any = $('<iframe>')
       .addClass('analyse ' + a.type)
       .attr('src', a.src);
-    $(a.element).replaceWith($('<div class="embed embed--game">').prepend($iframe));
+    $(a.element).replaceWith($('<div class="embed embed--study">').prepend($iframe));
     return $iframe
       .on('load', function (this: HTMLIFrameElement) {
         if (this.contentDocument?.title.startsWith('404')) this.style.height = '100px';
@@ -119,7 +120,7 @@ lichess.load.then(() => {
     const a = as.shift();
     wait = Math.min(1500, wait);
     if (a)
-      expand(a).on('load', () => {
+      expandStudy(a).on('load', () => {
         setTimeout(() => expandStudies(as, wait + 200), wait);
       });
   }

@@ -35,18 +35,14 @@ object racer:
       )
     }
 
-  def show(race: RacerRace, data: JsObject, pref: JsObject)(implicit ctx: Context) =
+  def show(race: RacerRace, data: JsObject)(implicit ctx: Context) =
     views.html.base.layout(
       moreCss = frag(cssTag("racer")),
       moreJs = frag(
         jsModule("racer"),
         embedJsUnsafeLoadThen(
           s"""LichessRacer.start(${safeJsonValue(
-              Json.obj(
-                "data" -> data,
-                "pref" -> pref,
-                "i18n" -> i18nJsObject(i18nKeys)
-              )
+              data ++ Json.obj("i18n" -> i18nJsObject(i18nKeys))
             )})"""
         )
       ),
@@ -56,7 +52,7 @@ object racer:
       chessground = false
     ) {
       main(
-        div(cls   := "racer racer-app racer--play")(
+        div(cls := "racer racer-app racer--play")(
           div(cls := "racer__board main-board"),
           div(cls := "racer__side")
         )

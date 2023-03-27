@@ -9,7 +9,6 @@ import lila.rating.{ PerfType, UserRankMap }
 import play.api.i18n.Lang
 import lila.common.Json.given
 import lila.security.Granter
-import org.joda.time.DateTime
 
 final class UserApi(
     jsonView: lila.user.JsonView,
@@ -27,7 +26,7 @@ final class UserApi(
     shieldApi: lila.tournament.TournamentShieldApi,
     revolutionApi: lila.tournament.RevolutionApi,
     net: NetConfig
-)(using scala.concurrent.ExecutionContext):
+)(using Executor):
 
   def one(u: User, joinedAt: Option[DateTime] = None): JsObject = {
     addStreaming(jsonView.full(u, withRating = true, withProfile = true), u.id) ++
@@ -40,8 +39,8 @@ final class UserApi(
       withFollows: Boolean,
       withTrophies: Boolean
   )(using Lang): Fu[Option[JsObject]] =
-    userRepo byId username flatMap {
-      _ ?? { extended(_, as, withFollows, withTrophies) dmap some }
+    userRepo byId username flatMapz {
+      extended(_, as, withFollows, withTrophies) dmap some
     }
 
   def extended(
@@ -53,9 +52,7 @@ final class UserApi(
     if (u.enabled.no) fuccess(jsonView disabled u.light)
     else
       gameProxyRepo.urgentGames(u).dmap(_.headOption) zip
-        (as.filter(u !=) ?? { me =>
-          crosstableApi.nbGames(me.id, u.id)
-        }) zip
+        as.filter(u !=).?? { me => crosstableApi.nbGames(me.id, u.id) } zip
         withFollows.??(relationApi.countFollowing(u.id) dmap some) zip
         withFollows.??(relationApi.countFollowers(u.id) dmap some) zip
         as.isDefined.?? { prefApi followable u.id } zip

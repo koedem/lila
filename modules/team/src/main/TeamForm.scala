@@ -3,7 +3,6 @@ package lila.team
 import play.api.data.*
 import play.api.data.Forms.*
 import play.api.data.validation.Constraints
-import scala.concurrent.duration.*
 
 import lila.common.Form.{
   cleanNonEmptyText,
@@ -20,7 +19,7 @@ final private[team] class TeamForm(
     teamRepo: TeamRepo,
     lightUserApi: lila.user.LightUserApi,
     val captcher: lila.hub.actors.Captcher
-)(using ec: scala.concurrent.ExecutionContext)
+)(using Executor)
     extends lila.hub.CaptchedForm:
 
   private object Fields:

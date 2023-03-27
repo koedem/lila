@@ -15,7 +15,7 @@
   <string name="pgnLetter">Bokstav (K, Q, R, B, N)</string>
   <string name="zenMode" comment="zenMode&#10;&#10;This is not the religious meaning. Turning this option on takes away make elements of the user interface.&#10;&#10;Can also translate as 'Focus mode' as one example.">Zen-läge</string>
   <string name="showPlayerRatings">Visa spelarens rating</string>
-  <string name="explainShowPlayerRatings">Detta gör det möjligt att dölja all rating från webbplatsen, för att fokusera på schackspelet. Partiet kan fortfarande vara med rating, detta handlar bara om vad du får se.</string>
+  <string name="explainShowPlayerRatings" comment="explainShowPlayerRatings&#10;&#10;A site-wide setting: https://lichess.org/account/preferences/display">Detta gör det möjligt att dölja all rating från webbplatsen, för att fokusera på schackspelet. Partiet kan fortfarande vara med rating, detta handlar bara om vad du får se.</string>
   <string name="displayBoardResizeHandle">Visa handtag för att ändra brädets storlek</string>
   <string name="onlyOnInitialPosition">Endast vid ursprunglig position</string>
   <string name="blindfoldChess">Blindschack (Osynliga pjäser)</string>
@@ -54,9 +54,12 @@
   <string name="notifyStreamStart">Strömmen går igång</string>
   <string name="notifyInboxMsg">Nytt meddelande i inkorgen</string>
   <string name="notifyForumMention">Forumkommentar nämner dig</string>
+  <string name="notifyInvitedStudy">Inbjudan till studier</string>
   <string name="notifyGameEvent">Korrespondensspelsuppdateringar</string>
   <string name="notifyChallenge">Utmaningar</string>
   <string name="notifyTournamentSoon">Turneringen startar snart</string>
+  <string name="notifyTimeAlarm">Korrespondensklockans tid tar slut</string>
+  <string name="notifyBell">Spela upp ett klockljud vid ny avisering</string>
   <string name="notifyPush">Enhetsnotifiering när du inte använder Lichess</string>
   <string name="notifyWeb">Webbläsare</string>
   <string name="notifyDevice">Enhet</string>

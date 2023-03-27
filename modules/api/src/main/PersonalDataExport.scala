@@ -2,12 +2,9 @@ package lila.api
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.*
-import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
 import reactivemongo.akkastream.cursorProducer
 import reactivemongo.api.ReadPreference
-import scala.concurrent.duration.*
-import scala.concurrent.ExecutionContext
 
 import lila.chat.Chat
 import lila.db.dsl.{ *, given }
@@ -30,7 +27,7 @@ final class PersonalDataExport(
     coachApi: lila.coach.CoachApi,
     picfitUrl: lila.memo.PicfitUrl,
     mongoCacheApi: lila.memo.MongoCache.Api
-)(using ec: ExecutionContext, mat: Materializer):
+)(using Executor, Materializer):
 
   private val lightPerSecond = 60
   private val heavyPerSecond = 30
@@ -132,7 +129,7 @@ final class PersonalDataExport(
 
     def gameChatsLookup(lookup: Bdoc) =
       gameEnv.gameRepo.coll
-        .aggregateWith[Bdoc](readPreference = ReadPreference.secondaryPreferred) { framework =>
+        .aggregateWith[Bdoc](readPreference = temporarilyPrimary) { framework =>
           import framework.*
           List(
             Match($doc(Game.BSONFields.playerUids -> user.id)),
@@ -175,7 +172,7 @@ final class PersonalDataExport(
       Source(List(textTitle("Game notes"))) concat
         gameEnv.gameRepo.coll
           .aggregateWith[Bdoc](
-            readPreference = ReadPreference.secondaryPreferred
+            readPreference = temporarilyPrimary
           ) { framework =>
             import framework.*
             List(

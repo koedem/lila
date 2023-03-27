@@ -1,8 +1,6 @@
 package lila.puzzle
 
 import chess.Color
-import scala.concurrent.duration.*
-import scala.concurrent.ExecutionContext
 import ornicar.scalalib.ThreadLocalRandom
 
 import lila.db.dsl.{ *, given }
@@ -13,7 +11,7 @@ final class PuzzleAnon(
     cacheApi: CacheApi,
     pathApi: PuzzlePathApi,
     countApi: PuzzleCountApi
-)(using ec: ExecutionContext):
+)(using Executor):
 
   import BsonHandlers.given
 
@@ -47,9 +45,9 @@ final class PuzzleAnon(
         .buildAsyncFuture { angle =>
           countApi byAngle angle flatMap { count =>
             val tier =
-              if (count > 5000) PuzzleTier.Top
-              else if (count > 2000) PuzzleTier.Good
-              else PuzzleTier.All
+              if (count > 5000) PuzzleTier.top
+              else if (count > 2000) PuzzleTier.good
+              else PuzzleTier.all
             val ratingRange: Range =
               if (count > 9000) 1300 to 1600
               else if (count > 5000) 1100 to 1800

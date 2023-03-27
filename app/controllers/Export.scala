@@ -6,22 +6,21 @@ import chess.Color
 import chess.format.{ Fen, Uci }
 import chess.variant.{ Standard, Variant }
 import play.api.mvc.{ RequestHeader, Result }
-import scala.concurrent.duration.*
 import scala.util.chaining.*
 
 import lila.app.{ given, * }
-import lila.common.{ HTTPRequest, IpAddress }
+import lila.common.IpAddress
 import lila.game.Pov
 import lila.pref.{ PieceSet, Theme }
 
 final class Export(env: Env) extends LilaController(env):
 
-  private val ExportImageRateLimitGlobal = new lila.memo.RateLimit[String](
+  private val ExportImageRateLimitGlobal = lila.memo.RateLimit[String](
     credits = 600,
     duration = 1.minute,
     key = "export.image.global"
   )
-  private val ExportImageRateLimitByIp = new lila.memo.RateLimit[IpAddress](
+  private val ExportImageRateLimitByIp = lila.memo.RateLimit[IpAddress](
     credits = 15,
     duration = 1.minute,
     key = "export.image.ip"
@@ -31,7 +30,7 @@ final class Export(env: Env) extends LilaController(env):
     Action.async { implicit req =>
       fetch flatMap {
         _.fold(notFoundJson()) { res =>
-          ExportImageRateLimitByIp(HTTPRequest ipAddress req) {
+          ExportImageRateLimitByIp(req.ipAddress) {
             ExportImageRateLimitGlobal("-") {
               convert(res)
             }(rateLimitedFu)
@@ -64,12 +63,12 @@ final class Export(env: Env) extends LilaController(env):
   def puzzleThumbnail(id: PuzzleId, theme: Option[String], piece: Option[String]) =
     exportImageOf(env.puzzle.api.puzzle find id) { puzzle =>
       env.game.gifExport.thumbnail(
-        fen = puzzle.fenAfterInitialMove,
+        situation = puzzle.situationAfterInitialMove err s"invalid puzzle ${puzzle.id}",
         lastMove = puzzle.line.head.some,
         orientation = puzzle.color,
-        variant = Standard,
-        Theme(theme).name,
-        PieceSet.get(piece).name
+        theme = Theme(theme).name,
+        piece = PieceSet.get(piece).name,
+        description = s"puzzleThumbnail ${puzzle.id}"
       ) pipe stream()
     }
 
@@ -81,14 +80,14 @@ final class Export(env: Env) extends LilaController(env):
       theme: Option[String],
       piece: Option[String]
   ) =
-    exportImageOf(fuccess(Fen read Fen.Epd.clean(fen))) { _ =>
+    exportImageOf(fuccess(Fen.read(Variant.orDefault(variant), Fen.Epd.clean(fen)))) { situation =>
       env.game.gifExport.thumbnail(
-        fen = Fen.Epd.clean(fen),
+        situation = situation,
         lastMove = lastMove,
         orientation = Color.fromName(color) | Color.White,
-        variant = Variant.orDefault(variant),
-        Theme(theme).name,
-        PieceSet.get(piece).name
+        theme = Theme(theme).name,
+        piece = PieceSet.get(piece).name,
+        description = s"fenThumbnail $fen"
       ) pipe stream()
     }
 

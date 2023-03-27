@@ -14,7 +14,7 @@ import lila.user.User
 final class JsonView(
     gameJson: GameJson,
     gameRepo: GameRepo
-)(using scala.concurrent.ExecutionContext):
+)(using Executor):
 
   import JsonView.{ *, given }
 
@@ -62,25 +62,28 @@ final class JsonView(
         "id"     -> u.id,
         "rating" -> u.perfs.puzzle.intRating
       )
-      .add(
-        "provisional" -> u.perfs.puzzle.provisional
-      )
+      .add("provisional" -> u.perfs.puzzle.provisional)
 
   private def replayJson(r: PuzzleReplay) =
     Json.obj("days" -> r.days, "i" -> r.i, "of" -> r.nb)
 
-  def roundJson(u: User, round: PuzzleRound, perf: Perf) =
-    Json
-      .obj(
-        "win"        -> round.win,
-        "ratingDiff" -> (perf.intRating.value - u.perfs.puzzle.intRating.value)
-      )
-      .add("vote" -> round.vote)
-      .add("themes" -> round.nonEmptyThemes.map { rt =>
-        JsObject(rt.map { t =>
-          t.theme.value -> JsBoolean(t.vote)
+  object roundJson {
+    def web(u: User, round: PuzzleRound, perf: Perf) =
+      base(round, IntRatingDiff(perf.intRating.value - u.perfs.puzzle.intRating.value))
+        .add("vote" -> round.vote)
+        .add("themes" -> round.nonEmptyThemes.map { rt =>
+          JsObject(rt.map { t =>
+            t.theme.value -> JsBoolean(t.vote)
+          })
         })
-      })
+
+    def api = base _
+    private def base(round: PuzzleRound, ratingDiff: IntRatingDiff) = Json.obj(
+      "id"         -> round.id.puzzleId,
+      "win"        -> round.win,
+      "ratingDiff" -> ratingDiff
+    )
+  }
 
   def pref(p: lila.pref.Pref) =
     Json.obj(
@@ -114,7 +117,7 @@ final class JsonView(
     "performance"     -> res.performance
   )
 
-  def batch(puzzles: Seq[Puzzle]): Fu[JsObject] = for {
+  def batch(user: Option[User])(puzzles: Seq[Puzzle]): Fu[JsObject] = for
     games <- gameRepo.gameOptionsFromSecondary(puzzles.map(_.gameId))
     jsons <- (puzzles zip games).collect { case (puzzle, Some(game)) =>
       gameJson.noCache(game, puzzle.initialPly) map { gameJson =>
@@ -123,8 +126,10 @@ final class JsonView(
           "puzzle" -> puzzleJson(puzzle)
         )
       }
-    }.sequenceFu
-  } yield Json.obj("puzzles" -> jsons)
+    }.parallel
+  yield
+    import lila.rating.Glicko.given
+    Json.obj("puzzles" -> jsons).add("glicko" -> user.map(_.perfs.puzzle.glicko))
 
   object bc:
 
@@ -151,7 +156,7 @@ final class JsonView(
             "puzzle" -> puzzleJson(puzzle)
           )
         }
-      }.sequenceFu
+      }.parallel
     } yield Json
       .obj("puzzles" -> jsons)
       .add("user" -> user.map(_.perfs.puzzle.intRating).map(userJson))

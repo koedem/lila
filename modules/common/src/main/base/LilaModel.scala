@@ -1,7 +1,6 @@
 package lila.base
 
 import alleycats.Zero
-import cats.Show
 import org.joda.time.DateTime
 import ornicar.scalalib.newtypes.*
 
@@ -121,5 +120,14 @@ trait LilaModel:
   opaque type UserAgent = String
   object UserAgent extends OpaqueString[UserAgent]
 
-  opaque type PgnStr = String
-  object PgnStr extends OpaqueString[PgnStr]
+  opaque type MultiPv = Int
+  object MultiPv extends OpaqueInt[MultiPv]
+
+  opaque type Depth = Int
+  object Depth extends OpaqueInt[Depth]
+
+  opaque type JsonStr = String
+  object JsonStr extends OpaqueString[JsonStr]
+
+  opaque type Crawler = Boolean
+  object Crawler extends YesNo[Crawler]

@@ -2,8 +2,6 @@ package lila.ublog
 
 import reactivemongo.akkastream.{ cursorProducer, AkkaStreamCursor }
 import reactivemongo.api.*
-import scala.concurrent.duration.*
-import scala.concurrent.ExecutionContext
 
 import lila.ask.AskApi
 import lila.common.Markdown
@@ -20,8 +18,8 @@ final class UblogApi(
     picfitApi: PicfitApi,
     timeline: lila.hub.actors.Timeline,
     irc: lila.irc.IrcApi,
-    askApi: AskApi
-)(using ec: ExecutionContext):
+    askApi: lila.ask.AskApi
+)(using Executor):
 
   import UblogBsonHandlers.{ *, given }
 
@@ -85,8 +83,10 @@ final class UblogApi(
   def userBlogPreviewFor(user: User, nb: Int, forUser: Option[User]): Fu[Option[UblogPost.BlogPreview]] =
     val blogId = UblogBlog.Id.User(user.id)
     val canView = fuccess(forUser exists { user.is(_) }) >>|
-      colls.blog.primitiveOne[UblogBlog.Tier]($id(blogId.full), "tier").dmap(~_ >= UblogBlog.Tier.VISIBLE)
-    canView flatMap { _ ?? blogPreview(blogId, nb).dmap(some) }
+      colls.blog
+        .primitiveOne[UblogBlog.Tier]($id(blogId.full), "tier")
+        .dmap(_.exists(_ >= UblogBlog.Tier.VISIBLE))
+    canView flatMapz { blogPreview(blogId, nb).dmap(some) }
 
   def blogPreview(blogId: UblogBlog.Id, nb: Int): Fu[UblogPost.BlogPreview] =
     colls.post.countSel($doc("blog" -> blogId, "live" -> true)) zip
@@ -143,13 +143,13 @@ final class UblogApi(
       picfitApi.deleteByRel(imageRel(post)) >>
       askApi.deleteAll(post.markdown.value)
 
-  def setTier(blog: UblogBlog.Id, tier: Int): Funit =
+  def setTier(blog: UblogBlog.Id, tier: UblogBlog.Tier): Funit =
     colls.blog.update
       .one($id(blog), $set("modTier" -> tier, "tier" -> tier), upsert = true)
       .void
 
   def postCursor(user: User): AkkaStreamCursor[UblogPost] =
-    colls.post.find($doc("blog" -> s"user:${user.id}")).cursor[UblogPost](ReadPreference.secondaryPreferred)
+    colls.post.find($doc("blog" -> s"user:${user.id}")).cursor[UblogPost](temporarilyPrimary)
 
   private[ublog] def setShadowban(userId: UserId, v: Boolean) = {
     if (v) fuccess(UblogBlog.Tier.HIDDEN)

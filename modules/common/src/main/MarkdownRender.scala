@@ -29,10 +29,10 @@ import scala.collection.JavaConverters
 import java.util.Arrays
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import chess.format.pgn.Pgn
 import com.vladsch.flexmark.util.misc.Extension
 import lila.base.RawHtml
 import com.vladsch.flexmark.html.renderer.ResolvedLink
+import chess.format.pgn.PgnStr
 
 final class MarkdownRender(
     autoLink: Boolean = true,
@@ -85,7 +85,7 @@ final class MarkdownRender(
     tooManyUnderscoreRegex.replaceAllIn(text.value, "_" * 3)
   )
 
-  def apply(key: Key, pgns: Map[String, Pgn] = Map.empty)(text: Markdown): Html = Html {
+  def apply(key: Key)(text: Markdown): Html = Html {
     Chronometer
       .sync {
         try renderer.render(parser.parse(mentionsToLinks(preventStackOverflow(text)).value))
@@ -103,7 +103,7 @@ object MarkdownRender:
 
   type Key = String
 
-  case class GameExpand(domain: config.NetDomain, getPgn: GameId => Option[String])
+  case class GameExpand(domain: config.NetDomain, getPgn: GameId => Option[PgnStr])
 
   private val rel = "nofollow noopener noreferrer"
 
@@ -246,12 +246,12 @@ object MarkdownRender:
         node: LinkNode,
         html: HtmlWriter,
         link: ResolvedLink,
-        pgn: String,
+        pgn: PgnStr,
         color: String,
         ply: String
     ) =
       html
-        .attr("data-pgn", pgn)
+        .attr("data-pgn", pgn.value)
         .attr("data-orientation", Option(color) | "white")
         .attr("data-ply", Option(ply) | "")
         .attr("class", "lpv--autostart")

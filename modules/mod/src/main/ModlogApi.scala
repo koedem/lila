@@ -1,6 +1,5 @@
 package lila.mod
 
-import org.joda.time.DateTime
 import reactivemongo.api.*
 import reactivemongo.api.bson.*
 
@@ -13,7 +12,7 @@ import lila.security.Permission
 import lila.user.{ Holder, User, UserRepo }
 
 final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(using
-    scala.concurrent.ExecutionContext
+    Executor
 ):
 
   private def coll = repo.coll
@@ -73,6 +72,14 @@ final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(usin
     add {
       Modlog(mod, kid.some, Modlog.setKidMode)
     }
+
+  def loginWithBlankedPassword(user: UserId) = add {
+    Modlog(User.lichessId into ModId, user.some, Modlog.blankedPassword)
+  }
+
+  def loginWithWeakPassword(user: UserId) = add {
+    Modlog(User.lichessId into ModId, user.some, Modlog.weakPassword)
+  }
 
   def disableTwoFactor(mod: ModId, user: UserId) =
     add {
@@ -317,7 +324,7 @@ final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(usin
       $doc(
         "user"   -> userId,
         "action" -> Modlog.cheatDetected,
-        "date" $gte DateTime.now.minusMonths(6)
+        "date" $gte nowDate.minusMonths(6)
       )
     )
 
@@ -327,7 +334,7 @@ final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(usin
         "user"   -> userId,
         "action" -> Modlog.modMessage,
         $or($doc("details" -> MsgPreset.sandbagAuto.name), $doc("details" -> MsgPreset.boostAuto.name)),
-        "date" $gte DateTime.now.minusMonths(6)
+        "date" $gte nowDate.minusMonths(6)
       )
     )
 
@@ -389,21 +396,18 @@ final class ModlogApi(repo: ModlogRepo, userRepo: UserRepo, ircApi: IrcApi)(usin
       case M.blogTier | M.blogPostEdit                                      => "note"
       case _                                                                => "gear"
     val text = s"""${m.showAction.capitalize} ${m.user.??(u => s"@$u")} ${~m.details}"""
-    userRepo.isMonitoredMod(m.mod) flatMap {
-      _ ?? {
-        val monitorType = m.action match
-          case M.closeAccount | M.alt => None
-          case M.engine | M.unengine | M.reopenAccount | M.unalt =>
-            Some(IrcApi.ModDomain.Cheat)
-          case M.booster | M.unbooster => Some(IrcApi.ModDomain.Boost)
-          case M.troll | M.untroll | M.chatTimeout | M.closeTopic | M.openTopic | M.disableTeam |
-              M.enableTeam | M.setKidMode | M.deletePost | M.postAsAnonMod | M.editAsAnonMod | M.blogTier |
-              M.blogPostEdit =>
-            Some(IrcApi.ModDomain.Comm)
-          case _ => Some(IrcApi.ModDomain.Other)
-        monitorType ?? {
-          ircApi.monitorMod(m.mod.id, icon = icon, text = text, _)
-        }
+    userRepo.isMonitoredMod(m.mod) flatMapz {
+      val monitorType = m.action match
+        case M.closeAccount | M.alt => None
+        case M.engine | M.unengine | M.reopenAccount | M.unalt =>
+          Some(IrcApi.ModDomain.Cheat)
+        case M.booster | M.unbooster => Some(IrcApi.ModDomain.Boost)
+        case M.troll | M.untroll | M.chatTimeout | M.closeTopic | M.openTopic | M.disableTeam | M.enableTeam |
+            M.setKidMode | M.deletePost | M.postAsAnonMod | M.editAsAnonMod | M.blogTier | M.blogPostEdit =>
+          Some(IrcApi.ModDomain.Comm)
+        case _ => Some(IrcApi.ModDomain.Other)
+      monitorType ?? {
+        ircApi.monitorMod(m.mod.id, icon = icon, text = text, _)
       }
     }
     ircApi.logMod(m.mod.id, icon = icon, text = text)

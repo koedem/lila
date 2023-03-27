@@ -1,28 +1,28 @@
 package lila.tutor
 
-import org.joda.time.DateTime
 import reactivemongo.api.*
 import reactivemongo.api.bson.*
-import scala.concurrent.duration.*
-import scala.concurrent.ExecutionContext
+import com.softwaremill.tagging.*
 
 import lila.common.IpAddress
 import lila.db.dsl.{ *, given }
-import lila.memo.CacheApi
 import lila.user.{ User, LightUserApi }
 import lila.common.config.Max
 import lila.game.Pov
+import lila.memo.{ SettingStore, CacheApi }
+import chess.format.pgn.PgnStr
 
 final private class TutorQueue(
     colls: TutorColls,
     gameRepo: lila.game.GameRepo,
     cacheApi: CacheApi,
-    lightUserApi: LightUserApi
-)(using ExecutionContext, akka.actor.Scheduler):
+    lightUserApi: LightUserApi,
+    parallelism: SettingStore[Int] @@ Parallelism
+)(using Executor, Scheduler):
 
   import TutorQueue.*
 
-  private val workQueue = lila.hub.AsyncActorSequencer(maxSize = Max(64), timeout = 5 seconds, "tutorQueue")
+  private val workQueue = lila.hub.AsyncActorSequencer(maxSize = Max(64), timeout = 5.seconds, "tutorQueue")
 
   private val durationCache = cacheApi.unit[FiniteDuration] {
     _.refreshAfterWrite(1 minutes)
@@ -36,9 +36,9 @@ final private class TutorQueue(
             )
           }
           .map {
-            ~_.flatMap(_.getAsOpt[Int](TutorFullReport.F.millis))
+            ~_.flatMap(_.getAsOpt[Double](TutorFullReport.F.millis))
           }
-          .map(_.millis)
+          .map(_.toInt.millis)
       }
   }
 
@@ -46,18 +46,18 @@ final private class TutorQueue(
 
   def enqueue(user: User): Fu[Status] = workQueue {
     colls.queue.insert
-      .one($doc(F.id -> user.id, F.requestedAt -> DateTime.now))
+      .one($doc(F.id -> user.id, F.requestedAt -> nowDate))
       .recover(lila.db.ignoreDuplicateKey)
       .void >> fetchStatus(user)
   }
 
-  private given BSONDocumentReader[Next] = Macros.reader
-  def next: Fu[Option[Next]]             = colls.queue.find($empty).sort($sort asc F.requestedAt).one[Next]
-  def start(userId: UserId): Funit  = colls.queue.updateField($id(userId), F.startedAt, DateTime.now).void
+  def next: Fu[List[Next]] =
+    colls.queue.find($empty).sort($sort asc F.requestedAt).cursor[Next]().list(parallelism.get())
+  def start(userId: UserId): Funit  = colls.queue.updateField($id(userId), F.startedAt, nowDate).void
   def remove(userId: UserId): Funit = colls.queue.delete.one($id(userId)).void
 
   def waitingGames(user: User): Fu[List[(Pov, PgnStr)]] = for
-    all <- gameRepo.recentPovsByUserFromSecondary(user, 60)
+    all <- gameRepo.recentPovsByUserFromSecondary(user, 60, $doc(lila.game.Game.BSONFields.turns $gt 10))
     (rated, casual) = all.partition(_.game.rated)
     many            = rated ::: casual.take(30 - rated.size)
     povs            = ornicar.scalalib.ThreadLocalRandom.shuffle(many).take(30)
@@ -72,12 +72,12 @@ final private class TutorQueue(
 
   private def fetchStatus(user: User): Fu[Status] =
     colls.queue.primitiveOne[DateTime]($id(user.id), F.requestedAt) flatMap {
-      case None => fuccess(NotInQueue)
-      case Some(at) =>
+      _.fold(fuccess(NotInQueue)) { at =>
         for
           position    <- colls.queue.countSel($doc(F.requestedAt $lte at))
           avgDuration <- durationCache.get({})
         yield InQueue(position, avgDuration)
+      }
     }
 
 object TutorQueue:
@@ -87,8 +87,10 @@ object TutorQueue:
   case class InQueue(position: Int, avgDuration: FiniteDuration) extends Status:
     def eta = avgDuration * position
 
-  private[tutor] case class Next(_id: UserId, startedAt: Option[DateTime]):
+  case class Next(_id: UserId, startedAt: Option[DateTime]):
     def userId = _id
+  object Next:
+    given BSONDocumentReader[Next] = Macros.reader
 
   object F:
     val id          = "_id"

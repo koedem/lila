@@ -1,7 +1,6 @@
 package lila.tutor
 
 import cats.data.NonEmptyList
-import scala.concurrent.ExecutionContext
 
 import lila.insight.*
 import lila.rating.PerfType
@@ -17,7 +16,7 @@ object TutorClockUsage:
 
   private[tutor] def compute(
       users: NonEmptyList[TutorUser]
-  )(using insightApi: InsightApi, ec: ExecutionContext): Fu[TutorBuilder.Answers[PerfType]] =
+  )(using insightApi: InsightApi, ec: Executor): Fu[TutorBuilder.Answers[PerfType]] =
     val perfs = users.toList.map(_.perfType)
     val question = Question(
       InsightDimension.Perf,
@@ -25,7 +24,7 @@ object TutorClockUsage:
       List(Filter(InsightDimension.Perf, perfs.filter(_ != PerfType.Correspondence)))
     )
     val select = $doc(F.result -> Result.Loss.id)
-    val compute = TutorCustomInsight(users, question, "clock_usage") { docs =>
+    val compute = TutorCustomInsight(users, question, "clock_usage", _.clockUsage) { docs =>
       for
         doc          <- docs
         perf         <- doc.getAsOpt[PerfType]("_id")

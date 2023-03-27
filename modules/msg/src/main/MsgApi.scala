@@ -1,7 +1,6 @@
 package lila.msg
 
 import akka.stream.scaladsl.*
-import org.joda.time.DateTime
 import reactivemongo.akkastream.{ cursorProducer, AkkaStreamCursor }
 import reactivemongo.api.ReadPreference
 import scala.util.Try
@@ -23,7 +22,7 @@ final class MsgApi(
     security: MsgSecurity,
     shutup: lila.hub.actors.Shutup,
     spam: lila.security.Spam
-)(using scala.concurrent.ExecutionContext, akka.stream.Materializer):
+)(using Executor, akka.stream.Materializer):
 
   val msgsPerPage = MaxPerPage(100)
   val inboxSize   = 50
@@ -43,8 +42,7 @@ final class MsgApi(
   // maybeSortAgain maintains usable inbox thread ordering for team leaders after PM alls.
   private def maybeSortAgain(me: User, threads: List[MsgThread]): Fu[List[MsgThread]] =
     val candidates = threads.filter(_.maskFor.contains(me.id))
-    val distinct   = candidates.distinctBy(_.lastMsg)
-    if (candidates.sizeIs <= 1 || distinct.sizeCompare(candidates) == 0)
+    if candidates.isEmpty then
       // we're done
       fuccess(threads)
     else
@@ -80,15 +78,13 @@ final class MsgApi(
     val before = beforeMillis flatMap { millis =>
       Try(new DateTime(millis)).toOption
     }
-    (userId != me.id) ?? lightUserApi.async(userId).flatMap {
-      _ ?? { contact =>
-        for {
-          _         <- setReadBy(threadId, me, userId)
-          msgs      <- threadMsgsFor(threadId, me, before)
-          relations <- relationApi.fetchRelations(me.id, userId)
-          postable  <- security.may.post(me.id, userId, isNew = msgs.headOption.isEmpty)
-        } yield MsgConvo(contact, msgs, relations, postable).some
-      }
+    (userId != me.id) ?? lightUserApi.async(userId).flatMapz { contact =>
+      for
+        _         <- setReadBy(threadId, me, userId)
+        msgs      <- threadMsgsFor(threadId, me, before)
+        relations <- relationApi.fetchRelations(me.id, userId)
+        postable  <- security.may.post(me.id, userId, isNew = msgs.headOption.isEmpty)
+      yield MsgConvo(contact, msgs, relations, postable).some
     }
 
   def delete(me: User, username: UserStr): Funit =
@@ -104,12 +100,12 @@ final class MsgApi(
       dest: UserId,
       text: String,
       multi: Boolean = false,
-      date: DateTime = DateTime.now,
+      date: DateTime = nowDate,
       ignoreSecurity: Boolean = false
   ): Fu[PostResult] =
     Msg.make(text, orig, date).fold[Fu[PostResult]](fuccess(PostResult.Invalid)) { msgPre =>
       val threadId = MsgThread.id(orig, dest)
-      for {
+      for
         contacts <- userRepo.contacts(orig, dest) orFail s"Missing convo contact user $orig->$dest"
         isNew    <- !colls.thread.exists($id(threadId))
         verdict <-
@@ -124,17 +120,18 @@ final class MsgApi(
           case _: MsgSecurity.Reject => fuccess(PostResult.Bounced)
           case send: MsgSecurity.Send =>
             val msg =
-              if (verdict == MsgSecurity.Spam) msgPre.copy(text = spam.replace(msgPre.text)) else msgPre
+              if verdict == MsgSecurity.Spam
+              then
+                logger.branch("spam").warn(s"$orig->$dest $msgPre.text")
+                msgPre.copy(text = spam.replace(msgPre.text))
+              else msgPre
             val msgWrite = colls.msg.insert.one(writeMsg(msg, threadId))
             val threadWrite =
               if (isNew)
                 colls.thread.insert.one {
                   writeThread(
                     MsgThread.make(orig, dest, msg, maskFor, maskWith),
-                    List(
-                      multi option orig,
-                      send.mute option dest
-                    ).flatten
+                    List(multi option orig, send.mute option dest).flatten
                   )
                 }.void
               else
@@ -142,7 +139,7 @@ final class MsgApi(
                   .one(
                     $id(threadId),
                     if (multi) {
-                      $set("lastMsg"   -> msg.asLast, "maskFor" -> maskFor, "maskWith" -> maskWith)
+                      $set("lastMsg" -> msg.asLast, "maskFor" -> maskFor, "maskWith" -> maskWith)
                         ++ $pull("del" -> List(orig))
                     } else {
                       $set("lastMsg" -> msg.asLast, "maskWith.date" -> msg.date)
@@ -165,7 +162,7 @@ final class MsgApi(
                 )
                 shutup ! lila.hub.actorApi.shutup.RecordPrivateMessage(orig, dest, text)
             } inject PostResult.Success
-      } yield res
+      yield res
     }
 
   def lastDirectMsg(threadId: MsgThread.Id, maskFor: UserId): Fu[Option[Msg.Last]] =
@@ -195,7 +192,7 @@ final class MsgApi(
     post(User.lichessId, destId, text, multi = true, ignoreSecurity = true)
 
   def multiPost(orig: Holder, destSource: Source[UserId, ?], text: String): Fu[Int] =
-    val now = DateTime.now // same timestamp on all
+    val now = nowDate // same timestamp on all
     destSource
       .filter(orig.id !=)
       .mapAsync(4) {
@@ -243,13 +240,13 @@ final class MsgApi(
           UnwindField("contact")
         )
       } flatMap { docs =>
-      (for {
+      (for
         doc     <- docs
         msgs    <- doc.getAsOpt[List[Msg]]("msgs")
         contact <- doc.getAsOpt[User]("contact")
-      } yield relationApi.fetchRelation(contact.id, user.id) map { relation =>
+      yield relationApi.fetchRelation(contact.id, user.id) map { relation =>
         ModMsgConvo(contact, msgs take 10, Relations(relation, none), msgs.length == 11)
-      }).sequenceFu
+      }).parallel
     }
 
   def deleteAllBy(user: User): Funit =
@@ -297,7 +294,7 @@ final class MsgApi(
   def allMessagesOf(userId: UserId): Source[(String, DateTime), ?] =
     colls.thread
       .aggregateWith[Bdoc](
-        readPreference = ReadPreference.secondaryPreferred
+        readPreference = temporarilyPrimary
       ) { framework =>
         import framework.*
         List(
@@ -335,11 +332,11 @@ final class MsgApi(
       }
       .documentSource()
       .mapConcat { doc =>
-        (for {
+        (for
           msg  <- doc child "msg"
           text <- msg string "text"
           date <- msg.getAsOpt[DateTime]("date")
-        } yield (text, date)).toList
+        yield (text, date)).toList
       }
 
 object MsgApi:

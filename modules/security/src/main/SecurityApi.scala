@@ -1,6 +1,5 @@
 package lila.security
 
-import org.joda.time.DateTime
 import play.api.data.*
 import play.api.data.Forms.*
 import play.api.data.validation.{ Constraint, Invalid, Valid as FormValid, ValidationError }
@@ -9,14 +8,13 @@ import play.api.mvc.RequestHeader
 import reactivemongo.api.bson.*
 import reactivemongo.api.ReadPreference
 import scala.annotation.nowarn
-import scala.concurrent.duration.*
 import ornicar.scalalib.SecureRandom
 
 import lila.common.{ ApiVersion, Bearer, EmailAddress, HTTPRequest, IpAddress }
 import lila.common.Form.into
 import lila.db.dsl.{ *, given }
 import lila.oauth.{ AccessToken, OAuthScope, OAuthServer }
-import lila.user.User.LoginCandidate
+import lila.user.User.{ ClearPassword, LoginCandidate }
 import lila.user.{ User, UserRepo }
 
 final class SecurityApi(
@@ -29,45 +27,46 @@ final class SecurityApi(
     emailValidator: EmailAddressValidator,
     oAuthServer: lila.oauth.OAuthServer,
     tor: Tor
-)(using
-    ec: scala.concurrent.ExecutionContext,
-    system: akka.actor.ActorSystem,
-    mode: Mode
-):
+)(using ec: Executor, system: akka.actor.ActorSystem, mode: Mode):
 
   val AccessUri = "access_uri"
 
   private val usernameOrEmailMapping =
     lila.common.Form.cleanText(minLength = 2, maxLength = EmailAddress.maxLength).into[UserStrOrEmail]
+  private val loginPasswordMapping = nonEmptyText.transform(ClearPassword(_), _.value)
 
-  lazy val usernameOrEmailForm = Form(
-    single("username" -> usernameOrEmailMapping)
-  )
-
-  lazy val loginForm = Form(
+  lazy val loginForm = Form {
     tuple(
       "username" -> usernameOrEmailMapping, // can also be an email
-      "password" -> nonEmptyText
+      "password" -> loginPasswordMapping
     )
-  )
+  }
+  def loginFormFilled(login: UserStrOrEmail) = loginForm.fill(login -> ClearPassword(""))
+
   lazy val rememberForm = Form(single("remember" -> boolean))
 
   private def loadedLoginForm(candidate: Option[LoginCandidate]) =
+    import LoginCandidate.Result.*
     Form(
       mapping(
         "username" -> usernameOrEmailMapping, // can also be an email
-        "password" -> nonEmptyText,
+        "password" -> loginPasswordMapping,
         "token"    -> optional(nonEmptyText)
       )(authenticateCandidate(candidate)) {
-        case LoginCandidate.Success(user) => (user.username into UserStrOrEmail, "", none).some
-        case _                            => none
+        case Success(user) => (user.username into UserStrOrEmail, ClearPassword(""), none).some
+        case _             => none
       }.verifying(Constraint { (t: LoginCandidate.Result) =>
-        t match {
-          case LoginCandidate.Success(_) => FormValid
-          case LoginCandidate.InvalidUsernameOrPassword =>
+        t match
+          case Success(_) => FormValid
+          case InvalidUsernameOrPassword =>
             Invalid(Seq(ValidationError("invalidUsernameOrPassword")))
+          case BlankedPassword =>
+            Invalid(Seq(ValidationError("blankedPassword")))
+          case WeakPassword =>
+            Invalid(
+              Seq(ValidationError("This password is too easy to guess. Request a password reset email."))
+            )
           case err => Invalid(Seq(ValidationError(err.toString)))
-        }
       })
     )
 
@@ -78,12 +77,20 @@ final class SecurityApi(
   } map loadedLoginForm
 
   private def authenticateCandidate(candidate: Option[LoginCandidate])(
-      _str: UserStrOrEmail,
-      password: String,
+      login: UserStrOrEmail,
+      password: ClearPassword,
       token: Option[String]
   ): LoginCandidate.Result =
-    candidate.fold[LoginCandidate.Result](LoginCandidate.InvalidUsernameOrPassword) {
-      _(User.PasswordAndToken(User.ClearPassword(password), token map User.TotpToken.apply))
+    import LoginCandidate.Result.*
+    candidate.fold[LoginCandidate.Result](InvalidUsernameOrPassword) { c =>
+      val result = c(User.PasswordAndToken(password, token map User.TotpToken.apply))
+      if result == BlankedPassword then
+        lila.common.Bus.publish(c.user, "loginWithBlankedPassword")
+        BlankedPassword
+      else if mode == Mode.Prod && result.success && PasswordCheck.isWeak(password, login.value) then
+        lila.common.Bus.publish(c.user, "loginWithWeakPassword")
+        WeakPassword
+      else result
     }
 
   def saveAuthentication(userId: UserId, apiVersion: Option[ApiVersion])(using
@@ -107,12 +114,12 @@ final class SecurityApi(
   def restoreUser(req: RequestHeader): Fu[Option[AppealOrUser]] =
     firewall.accepts(req) ?? reqSessionId(req) ?? { sessionId =>
       appeal.authenticate(sessionId) match {
+        // case Some(userId) => userRepo byId userId map2 { u => Left(AppealUser(u)) }
+        // case None =>
         case _ =>
-          store.authInfo(sessionId) flatMap {
-            _ ?? { d =>
-              userRepo byId d.user dmap {
-                _ map { u => Right(FingerPrintedUser(stripRolesOfCookieUser(u), d.hasFp)) }
-              }
+          store.authInfo(sessionId) flatMapz { d =>
+            userRepo byId d.user dmap {
+              _ map { u => Right(FingerPrintedUser(stripRolesOfCookieUser(u), d.hasFp)) }
             }
           }
       }: Fu[Option[AppealOrUser]]
@@ -120,10 +127,10 @@ final class SecurityApi(
 
   def ipToUser(req: RequestHeader): Fu[Option[Either[User, FingerPrintedUser]]] =
     store.ipToUser(HTTPRequest.ipAddress(req).toString) map {
-      case Some(u) => 
-        //saveAuthentication(u.id, None) map { sessionId =>
-          //result.withCookies(env.lilaCookie.session(env.security.api.sessionIdKey, sessionId))
-        //}
+      case Some(u) =>
+        // saveAuthentication(u.id, None) map { sessionId =>
+        // result.withCookies(env.lilaCookie.session(env.security.api.sessionIdKey, sessionId))
+        // }
         Left(u).some
       case None => None
     }
@@ -181,7 +188,7 @@ final class SecurityApi(
       "user",
       $doc(
         field -> value,
-        "date" $gt DateTime.now.minusYears(1)
+        "date" $gt nowDate.minusYears(1)
       ),
       ReadPreference.secondaryPreferred
     )

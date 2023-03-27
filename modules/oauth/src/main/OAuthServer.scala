@@ -1,6 +1,5 @@
 package lila.oauth
 
-import org.joda.time.DateTime
 import play.api.mvc.{ RequestHeader, Result }
 
 import lila.common.{ Bearer, HTTPRequest, Strings }
@@ -13,7 +12,7 @@ final class OAuthServer(
     userRepo: UserRepo,
     cacheApi: lila.memo.CacheApi,
     originBlocklist: SettingStore[Strings]
-)(using ec: scala.concurrent.ExecutionContext):
+)(using Executor):
 
   import OAuthServer.*
 
@@ -52,14 +51,14 @@ final class OAuthServer(
   def authBoth(scopes: List[OAuthScope], req: RequestHeader)(
       token1: Bearer,
       token2: Bearer
-  ): Fu[Either[AuthError, (User, User)]] = for {
+  ): Fu[Either[AuthError, (User, User)]] = for
     auth1 <- auth(token1, scopes, req.some)
     auth2 <- auth(token2, scopes, req.some)
-  } yield for {
+  yield for
     user1  <- auth1
     user2  <- auth2
     result <- if (user1.user is user2.user) Left(OneUserWithTwoTokens) else Right(user1.user -> user2.user)
-  } yield result
+  yield result
 
 object OAuthServer:
 

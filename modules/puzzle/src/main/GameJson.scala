@@ -3,7 +3,6 @@ package lila.puzzle
 import chess.format.{ Fen, UciCharPair }
 import chess.Ply
 import play.api.libs.json.*
-import scala.concurrent.duration.*
 
 import lila.game.{ Game, GameRepo, PerfPicker }
 import lila.i18n.defaultLang
@@ -13,7 +12,7 @@ final private class GameJson(
     gameRepo: GameRepo,
     cacheApi: lila.memo.CacheApi,
     lightUserApi: lila.user.LightUserApi
-)(using scala.concurrent.ExecutionContext):
+)(using Executor):
 
   def apply(gameId: GameId, plies: Ply, bc: Boolean): Fu[JsObject] =
     (if (bc) bcCache else cache) get writeKey(gameId, plies)

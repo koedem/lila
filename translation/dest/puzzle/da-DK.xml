@@ -21,11 +21,12 @@
   <string name="toGetPersonalizedPuzzles">For at få personlige opgaver:</string>
   <string name="puzzleId">Opgave %s</string>
   <string name="puzzleOfTheDay">Dagens opgave</string>
+  <string name="dailyPuzzle">Daglig opgave</string>
   <string name="clickToSolve">Klik for at løse</string>
   <string name="goodMove">Godt træk</string>
   <string name="bestMove">Bedste træk!</string>
   <string name="keepGoing">Bliv ved…</string>
-  <string name="puzzleSuccess">Succes!</string>
+  <string name="puzzleSuccess">Korrekt!</string>
   <string name="puzzleComplete">Opgave løst!</string>
   <string name="notTheMove">Ikke det rigtige træk!</string>
   <string name="trySomethingElse">Prøv noget andet.</string>

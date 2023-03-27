@@ -163,10 +163,10 @@ export default class AnalyseCtrl {
 
     lichess.pubsub.on('sound_set', (set: string) => {
       if (!this.music && set === 'music')
-        lichess.loadScript('javascripts/music/replay.js').then(() => {
-          this.music = window.lichessReplayMusic();
+        lichess.loadScript('javascripts/music/play.js').then(() => {
+          this.music = lichess.playMusic();
         });
-      if (this.music && set !== 'music') this.music = null;
+      if (this.music && set !== 'music') this.music = undefined;
     });
 
     lichess.pubsub.on('ply.trigger', () =>
@@ -291,7 +291,7 @@ export default class AnalyseCtrl {
     });
   }
 
-  getDests: () => void = throttle(800, () => {
+  private getDests: () => void = throttle(800, () => {
     if (!this.embed && !defined(this.node.dests))
       this.socket.sendAnaDests({
         variant: this.data.game.variant.key,
@@ -449,7 +449,6 @@ export default class AnalyseCtrl {
         ...pgnImport(pgn),
         orientation: this.bottomColor(),
         pref: this.data.pref,
-        evalPut: this.data.evalPut,
       } as AnalyseData;
       if (andReload) {
         this.reloadData(data, false);
@@ -875,7 +874,6 @@ export default class AnalyseCtrl {
       canPut: () =>
         !!(
           this.ceval?.cachable &&
-          this.data.evalPut &&
           this.canEvalGet() &&
           // if not in study, only put decent opening moves
           (this.opts.study || (!this.node.ceval!.mate && Math.abs(this.node.ceval!.cp!) < 99))
@@ -889,8 +887,9 @@ export default class AnalyseCtrl {
   closeTools = () => {
     if (this.retro) this.retro = undefined;
     if (this.practice) this.togglePractice();
-    if (this.explorer.enabled()) this.toggleExplorer();
+    if (this.explorer.enabled()) this.explorer.toggle();
     this.persistence?.toggleOpen(false);
+    this.actionMenu(false);
   };
 
   toggleRetro = (): void => {
@@ -903,11 +902,9 @@ export default class AnalyseCtrl {
   };
 
   toggleExplorer = (): void => {
-    if (this.explorer.enabled()) this.explorer.toggle();
-    else if (this.explorer.allowed()) {
-      this.closeTools();
-      this.explorer.toggle();
-    }
+    const wasOpen = this.explorer.enabled() && !this.actionMenu();
+    this.closeTools();
+    if (!wasOpen && this.explorer.allowed()) this.explorer.toggle();
   };
 
   togglePractice = () => {

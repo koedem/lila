@@ -2,7 +2,6 @@ package lila.ublog
 
 import java.util.regex.Matcher
 import play.api.Mode
-import scala.concurrent.duration.*
 
 import lila.common.config
 import lila.common.{ Bus, Chronometer, Markdown, MarkdownRender }
@@ -15,15 +14,15 @@ final class UblogMarkup(
     assetBaseUrl: config.AssetBaseUrl,
     cacheApi: CacheApi,
     netDomain: config.NetDomain
-)(using ec: scala.concurrent.ExecutionContext, scheduler: akka.actor.Scheduler, mode: Mode):
+)(using ec: Executor, scheduler: Scheduler, mode: Mode):
 
   import UblogMarkup.*
 
-  private val pgnCache = cacheApi.notLoadingSync[GameId, String](256, "ublogMarkup.pgn") {
+  private val pgnCache = cacheApi.notLoadingSync[GameId, chess.format.pgn.PgnStr](256, "ublogMarkup.pgn") {
     _.expireAfterWrite(1 second).build()
   }
 
-  private val renderer = new MarkdownRender(
+  private val renderer = MarkdownRender(
     autoLink = true,
     list = true,
     strikeThrough = true,
@@ -41,7 +40,7 @@ final class UblogMarkup(
   private val cache = cacheApi[(UblogPostId, Markdown), Html](2048, "ublog.markup") {
     _.maximumSize(2048)
       .expireAfterWrite(if (mode == Mode.Prod) 15 minutes else 1 second)
-      .buildAsyncFuture { case (id, markdown) =>
+      .buildAsyncFuture { (id, markdown) =>
         Bus.ask("lpv")(GamePgnsFromText(markdown.value, _)) andThen { case scala.util.Success(pgns) =>
           pgnCache.putAll(pgns)
         } inject process(id)(markdown)
@@ -70,8 +69,8 @@ private[ublog] object UblogMarkup:
   // https://github.com/lichess-org/lila/issues/9767
   // toastui editor escapes `_` as `\_` and it breaks autolinks
   object unescapeUnderscoreInLinks:
-    private val hrefRegex    = """href="([^"]+)"""".r
-    private val contentRegex = """>([^<]+)</a>""".r
+    private val hrefRegex    = """href="([^"]++)"""".r
+    private val contentRegex = """>([^<]++)</a>""".r
     def apply(markup: Html) = Html {
       contentRegex.replaceAllIn(
         hrefRegex

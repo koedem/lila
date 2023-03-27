@@ -17,7 +17,6 @@ import lila.mod.{ ModPresets, UserWithModlog }
 import lila.playban.RageSit
 import lila.security.{ Granter, Permission, UserLogins, Dated, UserClient, userAgentParser }
 import lila.user.{ Holder, User }
-import org.joda.time.DateTime
 
 object mod:
   private def mzSection(key: String) =
@@ -34,9 +33,12 @@ object mod:
       a(href := "#identification_screen")("Identification")
     )
 
-  def actions(u: User, emails: User.Emails, erased: User.Erased, pmPresets: ModPresets)(using
-      ctx: Context
-  ): Frag =
+  def actions(
+      u: User,
+      emails: User.Emails,
+      erased: User.Erased,
+      pmPresets: ModPresets
+  )(using ctx: Context): Frag =
     mzSection("actions")(
       div(cls := "btn-rack")(
         isGranted(_.ModMessage) option {
@@ -354,7 +356,7 @@ object mod:
         reports.by.map { r =>
           r.atomBy(lila.report.ReporterId(u.id)).map { atom =>
             postForm(action := reportRoutes.inquiry(r.id))(
-              submitButton(reportScore(r.score), " ", strong(r.reason.name)),
+              reportSubmitButton(r),
               " ",
               userIdLink(r.user.some),
               " ",
@@ -372,7 +374,7 @@ object mod:
         ),
         reports.about.map { r =>
           postForm(action := reportRoutes.inquiry(r.id))(
-            submitButton(reportScore(r.score), " ", strong(r.reason.name)),
+            reportSubmitButton(r),
             div(cls := "atoms")(
               r.bestAtoms(3).map { atom =>
                 div(cls := "atom")(
@@ -549,7 +551,7 @@ object mod:
   private val reportban       = iconTag("")
   private val notesText       = iconTag("")
   private def markTd(nb: Int, content: => Frag, date: Option[DateTime] = None) =
-    if (nb > 0) td(cls := "i", dataSort := nb, title := date.map(momentFromNowServerText))(content)
+    if (nb > 0) td(cls := "i", dataSort := nb, title := date.map(momentFromNowServerText(_, false)))(content)
     else td
 
   def otherUsers(mod: Holder, u: User, data: UserLogins.TableData[UserWithModlog], appeals: List[Appeal])(
@@ -810,6 +812,14 @@ object mod:
       case (nb, tag) if nb > 4 => frag(List.fill(3)(tag), "+", nb - 3)
       case (nb, tag) if nb > 0 => frag(List.fill(nb)(tag))
     }
+
+  private def reportSubmitButton(r: lila.report.Report)(using Lang) =
+    submitButton(
+      title := {
+        if r.open then "open"
+        else s"closed: ${r.done.fold("no data")(done => s"by ${done.by} at ${showDateTimeUTC(done.at)}")}"
+      }
+    )(reportScore(r.score), " ", strong(r.reason.name))
 
   def userMarks(o: User, playbans: Option[Int]) =
     div(cls := "user_marks")(

@@ -1,7 +1,6 @@
 package lila.user
 
 import reactivemongo.api.bson.*
-import scala.concurrent.duration.*
 import scala.util.Success
 
 import lila.common.LightUser
@@ -9,10 +8,7 @@ import lila.db.dsl.{ given, * }
 import lila.memo.{ CacheApi, Syncache }
 import User.BSONFields as F
 
-final class LightUserApi(
-    repo: UserRepo,
-    cacheApi: CacheApi
-)(using scala.concurrent.ExecutionContext):
+final class LightUserApi(repo: UserRepo, cacheApi: CacheApi)(using Executor):
 
   val async = LightUser.Getter(id => if (User isGhost id) fuccess(LightUser.ghost.some) else cache.async(id))
   val asyncFallback = LightUser.GetterFallback(id =>
@@ -24,19 +20,18 @@ final class LightUserApi(
     if (User isGhost id) LightUser.ghost else cache.sync(id) | LightUser.fallback(id into UserName)
   )
 
+  export cache.{ asyncMany, invalidate, preloadOne, preloadMany }
+
   def asyncFallbackName(name: UserName) = async(name.id).dmap(_ | LightUser.fallback(name))
 
-  def asyncMany = cache.asyncMany
-
   def asyncManyFallback(ids: Seq[UserId]): Fu[Seq[LightUser]] =
-    ids.map(asyncFallback).sequenceFu
+    ids.map(asyncFallback).parallel
+
+  def asyncManyOptions(ids: Seq[Option[UserId]]): Fu[Seq[Option[LightUser]]] =
+    ids.map(_ ?? async).parallel
 
   val isBotSync: LightUser.IsBotSync = LightUser.IsBotSync(id => sync(id).exists(_.isBot))
 
-  def invalidate = cache.invalidate
-
-  def preloadOne                     = cache.preloadOne
-  def preloadMany                    = cache.preloadMany
   def preloadUser(user: User)        = cache.set(user.id, user.light.some)
   def preloadUsers(users: Seq[User]) = users.foreach(preloadUser)
 

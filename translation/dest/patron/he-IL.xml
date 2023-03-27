@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="donate">תרמו</string>
-  <string name="donateAsX">תרמו כ%s</string>
+  <string name="donateAsX">תרומה כ־%s</string>
   <string name="lichessPatron">תומך/ת ליצ\'ס</string>
   <string name="freeAccount">חשבון חינמי</string>
   <string name="becomePatron">הפכו לתומך/ת של ליצ\'ס</string>
@@ -45,9 +45,9 @@
 או שאפשר %s.</string>
   <string name="contactSupport">ליצור קשר עם התמיכה שלנו</string>
   <string name="otherMethods">האם יש אמצעים אחרים לתרום?</string>
-  <string name="lichessIsRegisteredWith">ליצ׳ס רשום ל-%s.</string>
+  <string name="lichessIsRegisteredWith" comment="lichessIsRegisteredWith&#10;&#10;%s is Benevity (a non-profit matching programme).&#10;The text links to Lichess's Benevity page, https://causes.benevity.org/causes/250-5789375887401_bf01">ליצ׳ס רשום ל-%s.</string>
   <string name="bankTransfers">אנחנו מקבלים גם העברות בנקאיות</string>
-  <string name="onlyDonationFromAbove">לידיעתכם: רק טופס התרומה שלעיל מקנה את כנפי התורם/ת.</string>
+  <string name="onlyDonationFromAbove" comment="onlyDonationFromAbove&#10;&#10;Explains to players that if they want to have the Patron wings on their profile, they need to donate through lichess.org/patron directly and not through the other methods available (Benevity and bank transfers, as of the time of writing).">לידיעתכם: רק טופס התרומה שלעיל מקנה את כנפי התורם/ת.</string>
   <string name="patronFeatures">האם יש יתרונות ששמורים רק עבור תומכים?</string>
   <string name="noPatronFeatures">לא, מכיוון שלִיצֶ\'ס חינמי לחלוטין, לנצח, לכולם. זאת הבטחה. 
 מה שכן, תומכים מקבלים סמליל חדש ומגניב לפרופיל ויכולות רברוב.</string>
@@ -58,13 +58,13 @@
     <item quantity="many">תומך ליצ\'ס ל%s חודשים</item>
     <item quantity="other">תומך ליצ\'ס ל%s חודשים</item>
   </plurals>
-  <string name="youSupportWith">אתה תומך ב־lichess.org עם %s בחודש.</string>
+  <string name="youSupportWith">את/ה תומכ/ת ב־lichess.org עם תרומה של %s בחודש.</string>
   <string name="tyvm">תודה רבה מאוד על העזרה שלך. את/ה תותח/ית!</string>
   <string name="currentStatus">סטטוס נוכחי</string>
   <string name="nextPayment">התשלום הבא</string>
   <string name="youWillBeChargedXOnY">את/ה תחויב/י ב%1$s ב%2$s.</string>
   <string name="makeAdditionalDonation">תרמו תרומה נוספת עכשיו</string>
-  <string name="giftPatronWings">תנו במתנה כנפי תורם לשחקן/ית</string>
+  <string name="giftPatronWings">מתן כנפי תורם/ת לשחקן/ית</string>
   <string name="update">עדכן</string>
   <string name="changeMonthlyAmount">שנה את הסכום החודשי (%s)</string>
   <string name="cancelSupport">בטלו את תמיכתכם</string>

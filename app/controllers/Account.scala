@@ -9,7 +9,6 @@ import views.html
 import lila.api.AnnounceStore
 import lila.api.Context
 import lila.app.{ given, * }
-import lila.common.HTTPRequest
 import lila.security.SecurityForm.Reopen
 import lila.user.{ Holder, TotpSecret, User as UserModel }
 import lila.i18n.I18nLangPicker
@@ -32,7 +31,7 @@ final class Account(
 
   def profileApply =
     AuthBody { implicit ctx => me =>
-      implicit val req: Request[?] = ctx.body
+      given play.api.mvc.Request[?] = ctx.body
       FormFuResult(env.user.forms.profile) { err =>
         fuccess(html.account.profile(me, err))
       } { profile =>
@@ -53,7 +52,7 @@ final class Account(
 
   def usernameApply =
     AuthBody { implicit ctx => me =>
-      implicit val req: Request[?] = ctx.body
+      given play.api.mvc.Request[?] = ctx.body
       FormFuResult(env.user.forms.username(me)) { err =>
         fuccess(html.account.username(me, err))
       } { username =>
@@ -100,14 +99,21 @@ final class Account(
       )
     }
 
-  def apiMe =
+  val apiMe =
+    val rateLimit = lila.memo.RateLimit[UserId](30, 10.minutes, "api.account.user")
     Scoped() { req => me =>
-      env.api.userApi.extended(
-        me,
-        me.some,
-        withFollows = apiC.userWithFollows(req),
-        withTrophies = false
-      )(using I18nLangPicker(req, me.lang)) dmap { JsonOk(_) }
+      rateLimit(me.id) {
+        env.api.userApi.extended(
+          me,
+          me.some,
+          withFollows = apiC.userWithFollows(req),
+          withTrophies = false
+        )(using I18nLangPicker(req, me.lang)) dmap { JsonOk(_) }
+      }(
+        rateLimitedFu(
+          "Please don't poll this endpoint. Stream https://lichess.org/api#tag/Board/operation/apiStreamEvent instead."
+        )
+      )
     }
 
   def apiNowPlaying =
@@ -140,16 +146,16 @@ final class Account(
 
   def passwd =
     Auth { implicit ctx => me =>
-      env.user.forms passwd me map { form =>
+      env.security.forms passwdChange me map { form =>
         Ok(html.account.passwd(form))
       }
     }
 
   def passwdApply =
     AuthBody { implicit ctx => me =>
-      auth.HasherRateLimit(me.id, ctx.req) { _ =>
+      auth.HasherRateLimit(me.id, ctx.req) {
         given play.api.mvc.Request[?] = ctx.body
-        env.user.forms passwd me flatMap { form =>
+        env.security.forms passwdChange me flatMap { form =>
           FormFuResult(form) { err =>
             fuccess(html.account.passwd(err))
           } { data =>
@@ -160,7 +166,7 @@ final class Account(
       }
     }
 
-  private def refreshSessionId(me: UserModel, result: Result)(implicit ctx: Context): Fu[Result] =
+  private def refreshSessionId(me: UserModel, result: Result)(using ctx: Context): Fu[Result] =
     env.security.store.closeAllSessionsOf(me.id) >>
       env.push.webSubscriptionApi.unsubscribeByUser(me) >>
       env.push.unregisterDevices(me) >>
@@ -184,10 +190,8 @@ final class Account(
 
   def apiEmail =
     Scoped(_.Email.Read) { _ => me =>
-      env.user.repo email me.id map {
-        _ ?? { email =>
-          JsonOk(Json.obj("email" -> email.value))
-        }
+      env.user.repo email me.id mapz { email =>
+        JsonOk(Json.obj("email" -> email.value))
       }
     }
 
@@ -196,7 +200,7 @@ final class Account(
 
   def emailApply =
     AuthBody { implicit ctx => me =>
-      auth.HasherRateLimit(me.id, ctx.req) { _ =>
+      auth.HasherRateLimit(me.id, ctx.req) {
         given play.api.mvc.Request[?] = ctx.body
         env.security.forms.preloadEmailDns() >> emailForm(me).flatMap { form =>
           FormFuResult(form) { err =>
@@ -216,19 +220,17 @@ final class Account(
 
   def emailConfirm(token: String) =
     Open { implicit ctx =>
-      env.security.emailChange.confirm(token) flatMap {
-        _ ?? { case (user, prevEmail) =>
-          (prevEmail.exists(_.isNoReply) ?? env.clas.api.student.release(user)) >>
-            auth.authenticateUser(
-              user,
-              remember = true,
-              result =
-                if (prevEmail.exists(_.isNoReply))
-                  Some(_ => Redirect(routes.User.show(user.username)).flashSuccess)
-                else
-                  Some(_ => Redirect(routes.Account.email).flashSuccess)
-            )
-        }
+      env.security.emailChange.confirm(token) flatMapz { (user, prevEmail) =>
+        (prevEmail.exists(_.isNoReply) ?? env.clas.api.student.release(user)) >>
+          auth.authenticateUser(
+            user,
+            remember = true,
+            result =
+              if (prevEmail.exists(_.isNoReply))
+                Some(_ => Redirect(routes.User.show(user.username)).flashSuccess)
+              else
+                Some(_ => Redirect(routes.Account.email).flashSuccess)
+          )
       }
     }
 
@@ -267,7 +269,7 @@ final class Account(
 
   def setupTwoFactor =
     AuthBody { implicit ctx => me =>
-      auth.HasherRateLimit(me.id, ctx.req) { _ =>
+      auth.HasherRateLimit(me.id, ctx.req) {
         given play.api.mvc.Request[?] = ctx.body
         env.security.forms.setupTwoFactor(me) flatMap { form =>
           FormFuResult(form) { err =>
@@ -282,7 +284,7 @@ final class Account(
 
   def disableTwoFactor =
     AuthBody { implicit ctx => me =>
-      auth.HasherRateLimit(me.id, ctx.req) { _ =>
+      auth.HasherRateLimit(me.id, ctx.req) {
         given play.api.mvc.Request[?] = ctx.body
         env.security.forms.disableTwoFactor(me) flatMap { form =>
           FormFuResult(form) { err =>
@@ -308,7 +310,7 @@ final class Account(
     AuthBody { implicit ctx => me =>
       NotManaged {
         given play.api.mvc.Request[?] = ctx.body
-        auth.HasherRateLimit(me.id, ctx.req) { _ =>
+        auth.HasherRateLimit(me.id, ctx.req) {
           env.security.forms closeAccount me flatMap { form =>
             FormFuResult(form) { err =>
               fuccess(html.account.close(me, err, managed = false))
@@ -463,16 +465,14 @@ final class Account(
     val userId: UserId = getUserStr("user")
       .map(_.id)
       .filter(id => me == id || isGranted(_.Impersonate)) | me.id
-    env.user.repo byId userId map {
-      _ ?? { user =>
-        if (getBool("text"))
-          apiC.GlobalConcurrencyLimitUser(me.id)(
-            env.api.personalDataExport(user)
-          ) { source =>
-            Ok.chunked(source.map(_ + "\n"))
-              .pipe(asAttachmentStream(s"lichess_${user.username}.txt"))
-          }
-        else Ok(html.account.bits.data(user))
-      }
+    env.user.repo byId userId mapz { user =>
+      if (getBool("text"))
+        apiC.GlobalConcurrencyLimitUser(me.id)(
+          env.api.personalDataExport(user)
+        ) { source =>
+          Ok.chunked(source.map(_ + "\n"))
+            .pipe(asAttachmentStream(s"lichess_${user.username}.txt"))
+        }
+      else Ok(html.account.bits.data(user))
     }
   }
