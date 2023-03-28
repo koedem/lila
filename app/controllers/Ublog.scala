@@ -129,16 +129,14 @@ final class Ublog(env: Env) extends LilaController(env):
 
   def edit(id: UblogPostId) = AuthBody { implicit ctx => me =>
     NotForKids {
-      env.ublog.api.findByUserBlogOrAdmin(id, me) flatMap {
-        _ ?? { post =>
-          if (!lila.ask.AskApi.hasAskId(post.markdown.value))
-            fuccess(Ok(html.ublog.form.edit(post, env.ublog.form.edit(post))))
-          else // avoid copying post unless we have to
-            env.ask.api.unfreezeAsync(post.markdown.value) map { text =>
-              val editable = post.copy(markdown = lila.common.Markdown(text))
-              Ok(html.ublog.form.edit(editable, env.ublog.form.edit(editable)))
-            }
-        }
+      env.ublog.api.findByUserBlogOrAdmin(id, me) flatMapz { post =>
+        if (!lila.ask.AskApi.hasAskId(post.markdown.value))
+          fuccess(Ok(html.ublog.form.edit(post, env.ublog.form.edit(post))))
+        else // avoid copying post unless we have to
+          env.ask.api.unfreezeAsync(post.markdown.value) map { text =>
+            val editable = post.copy(markdown = lila.common.Markdown(text))
+            Ok(html.ublog.form.edit(editable, env.ublog.form.edit(editable)))
+          }
       }
     }
   }

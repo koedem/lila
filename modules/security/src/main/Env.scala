@@ -56,8 +56,7 @@ final class Env(
 
   lazy val userLogins = wire[UserLoginsApi]
 
-  lazy val store = new Store(db(config.collection.security), db(CollName("userhack")), userRepo, cacheApi)
-  // lazy val store = Store(db(config.collection.security), cacheApi)
+  lazy val store = Store(db(config.collection.security), cacheApi)
 
   lazy val ip2proxy: Ip2Proxy =
     if (config.ip2Proxy.enabled && config.ip2Proxy.url.nonEmpty)

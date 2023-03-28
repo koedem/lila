@@ -654,7 +654,7 @@ GET    /stat/rating/distribution/:perf controllers.User.ratingDistribution(perf,
 
 # API
 GET   /api                             controllers.Api.index
-#POST  /api/users                       controllers.Api.usersByIds
+POST  /api/users                       controllers.Api.usersByIds
 GET   /api/user/puzzle-activity        controllers.Puzzle.activity
 GET   /api/puzzle/daily                controllers.Puzzle.apiDaily
 GET   /api/puzzle/activity             controllers.Puzzle.activity

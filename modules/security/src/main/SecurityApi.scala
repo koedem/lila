@@ -99,7 +99,7 @@ final class SecurityApi(
     userRepo mustConfirmEmail userId flatMap {
       case true => fufail(SecurityApi MustConfirmEmail userId)
       case false =>
-        val sessionId = (SecureRandom nextString 22)
+        val sessionId = SecureRandom nextString 22
         if (tor isExitNode HTTPRequest.ipAddress(req)) logger.info(s"Tor login $userId")
         store.save(sessionId, userId, req, apiVersion, up = true, fp = none) inject sessionId
     }
@@ -114,25 +114,14 @@ final class SecurityApi(
   def restoreUser(req: RequestHeader): Fu[Option[AppealOrUser]] =
     firewall.accepts(req) ?? reqSessionId(req) ?? { sessionId =>
       appeal.authenticate(sessionId) match {
-        // case Some(userId) => userRepo byId userId map2 { u => Left(AppealUser(u)) }
-        // case None =>
-        case _ =>
+        case Some(userId) => userRepo byId userId map2 { u => Left(AppealUser(u)) }
+        case None =>
           store.authInfo(sessionId) flatMapz { d =>
             userRepo byId d.user dmap {
               _ map { u => Right(FingerPrintedUser(stripRolesOfCookieUser(u), d.hasFp)) }
             }
           }
       }: Fu[Option[AppealOrUser]]
-    }
-
-  def ipToUser(req: RequestHeader): Fu[Option[Either[User, FingerPrintedUser]]] =
-    store.ipToUser(HTTPRequest.ipAddress(req).toString) map {
-      case Some(u) =>
-        // saveAuthentication(u.id, None) map { sessionId =>
-        // result.withCookies(env.lilaCookie.session(env.security.api.sessionIdKey, sessionId))
-        // }
-        Left(u).some
-      case None => None
     }
 
   def oauthScoped(
@@ -168,9 +157,9 @@ final class SecurityApi(
 
   val sessionIdKey = "sessionId"
 
-  def reqSessionId(req: RequestHeader): Option[String] = {
+  def reqSessionId(req: RequestHeader): Option[String] =
     req.session.get(sessionIdKey) orElse req.headers.get(sessionIdKey)
-  }
+
   def recentUserIdsByFingerHash(fh: FingerHash) = recentUserIdsByField("fp")(fh.value)
 
   def recentUserIdsByIp(ip: IpAddress) = recentUserIdsByField("ip")(ip.value)

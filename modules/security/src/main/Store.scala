@@ -10,13 +10,7 @@ import lila.common.{ ApiVersion, HTTPRequest, IpAddress }
 import lila.db.dsl.{ *, given }
 import lila.user.{ User, UserMark, UserMarks }
 
-final class Store(
-    val coll: Coll,
-    val userhack: Coll,
-    userRepo: lila.user.UserRepo,
-    cacheApi: lila.memo.CacheApi
-)(using
-//final class Store(val coll: Coll, cacheApi: lila.memo.CacheApi)(using
+final class Store(val coll: Coll, cacheApi: lila.memo.CacheApi)(using
     ec: Executor
 ):
 
@@ -42,58 +36,6 @@ final class Store(
 
   def authInfo(sessionId: String) = authCache get sessionId
 
-  var count                  = -1L;
-  var template: Option[User] = None;
-
-  def getCount: Fu[Long] = {
-    this.synchronized {
-      if (count == -1) {
-        count = 0
-        userhack.countAll map { collSize =>
-          this.synchronized {
-            count = collSize + 1
-            count
-          }
-        }
-      } else
-        fuccess(this.synchronized {
-          count += 1
-          count
-        })
-    }
-  }
-  case class IpToUser(_id: String, uid: String);
-  implicit val IpToUserBSONHandler: BSONDocumentHandler[IpToUser] = Macros.handler[IpToUser];
-
-  def ipToUser(ip: String): Fu[Option[User]] = {
-    userhack.one[IpToUser]($id(ip)).flatMap {
-      case Some(x) => userRepo.byId(UserId(x.uid))
-
-      case _ =>
-        getCount flatMap { count =>
-          val newUid = s"anon-$count"
-          if (template.isEmpty)
-            userRepo.byId(UserId("template")) map {
-
-              case Some(u) =>
-                template = Some(u)
-                val u2 = u.copy(id = UserId(newUid), username = UserName(newUid))
-                userhack.insert.one(IpToUser(ip, newUid)) >>
-                  userRepo.coll.insert.one[User](u2)
-                Some(u2)
-              case None => None
-            }
-          else {
-            val u2 = template.get.copy(id = UserId(newUid), username = UserName(newUid))
-            userhack.insert.one(IpToUser(ip, newUid)) >>
-              userRepo.coll.insert.one[User](u2)
-            fuccess(Some(u2))
-          }
-
-        }
-
-    }
-  }
   private val authInfoProjection = $doc("user" -> true, "fp" -> true, "date" -> true, "_id" -> false)
   private def uncache(sessionId: String) =
     blocking { blockingUncache(sessionId) }

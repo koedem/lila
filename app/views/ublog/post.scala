@@ -117,7 +117,6 @@ object post:
           ),
           strong(cls := "ublog-post__intro")(post.intro),
           div(cls := "ublog-post__markup expand-text", role := "document")(
-            // markdown is currently putting lpv <div>s inside of <p> elements, should be looked at
             views.html.ask.render(markup, asks)
           ),
           div(cls := "ublog-post__footer")(
