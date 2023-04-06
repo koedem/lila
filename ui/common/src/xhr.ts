@@ -20,6 +20,16 @@ export const ensureOk = (res: Response): Response => {
   throw new Error(`Error ${res.status}`);
 };
 
+/* fetch a JSON value without X-Requested-With */
+export const jsonSimple = (url: string, init: RequestInit = {}): Promise<any> =>
+  fetch(url, {
+    ...defaultInit,
+    headers: {
+      ...jsonHeader,
+    },
+    ...init,
+  });
+
 /* fetch a JSON value */
 export const json = (url: string, init: RequestInit = {}): Promise<any> =>
   jsonAnyResponse(url, init).then(res => ensureOk(res).json());
