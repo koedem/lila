@@ -23,12 +23,12 @@ export const ensureOk = (res: Response): Response => {
 /* fetch a JSON value without X-Requested-With */
 export const jsonSimple = (url: string, init: RequestInit = {}): Promise<any> =>
   fetch(url, {
-    ...defaultInit,
+    //...defaultInit,
     headers: {
       ...jsonHeader,
     },
     ...init,
-  });
+  }).then(res => ensureOk(res).json());
 
 /* fetch a JSON value */
 export const json = (url: string, init: RequestInit = {}): Promise<any> =>
