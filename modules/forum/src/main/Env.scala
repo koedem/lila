@@ -8,12 +8,10 @@ import play.api.libs.ws.StandaloneWSClient
 import lila.common.config.*
 import lila.hub.actorApi.team.CreateTeam
 import lila.mod.ModlogApi
-import lila.mon
 import lila.notify.NotifyApi
 import lila.pref.PrefApi
 import lila.relation.RelationApi
 import lila.user.User
-import lila.game.PgnDump
 import lila.ask.AskApi
 
 @Module
@@ -23,6 +21,7 @@ final private class ForumConfig(
 )
 
 @Module
+@annotation.nowarn("msg=unused")
 final class Env(
     appConfig: Configuration,
     db: lila.db.Db,

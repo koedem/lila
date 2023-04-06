@@ -33,8 +33,9 @@ object Permission:
   case object ViewPrintNoIP    extends Permission("VIEW_PRINT_NOIP", "View Print & NoIP")
   case object DisableTwoFactor extends Permission("DISABLE_2FA", "Disable 2FA")
   case object CloseAccount     extends Permission("CLOSE_ACCOUNT", List(UserModView), "Close/reopen account")
+  case object GdprErase        extends Permission("GDPR_ERASE", List(CloseAccount), "GDPR erase account")
   case object SetTitle         extends Permission("SET_TITLE", List(UserModView), "Set/unset title")
-  case object SetEmail         extends Permission("SET_EMAIL", List(UserModView), "Set email address")
+  case object SetEmail         extends Permission("SET_EMAIL", "Set email address")
   case object SeeReport        extends Permission("SEE_REPORT", "See reports")
   case object Appeals          extends Permission("APPEAL", "Handle appeals")
   case object Presets          extends Permission("PRESET", "Edit mod presets")
@@ -197,6 +198,7 @@ object Permission:
         "SUPER_ADMIN",
         List(
           Admin,
+          GdprErase,
           Impersonate,
           PayPal,
           Cli,
@@ -232,6 +234,7 @@ object Permission:
       PrintBan,
       DisableTwoFactor,
       CloseAccount,
+      GdprErase,
       SetTitle,
       SetEmail
     ),
