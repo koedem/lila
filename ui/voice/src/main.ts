@@ -11,7 +11,8 @@ export { makeVoiceMove } from './voiceMove';
 export { type RootCtrl, type VoiceMove } from './interfaces';
 
 export function renderVoiceMove(ctrl: VoiceMove, isPuzzle: boolean) {
-  const rec = storedBooleanProp('recording', false);
+  const rec = storedBooleanProp('voice.listening', false);
+  const rtfm = storedBooleanProp('voice.rtfm', false);
   return h(`div#voice-control${isPuzzle ? '.puz' : ''}`, [
     h('span#status-row', [
       h('a#voice-help-button', {
@@ -26,6 +27,14 @@ export function renderVoiceMove(ctrl: VoiceMove, isPuzzle: boolean) {
         attrs: { role: 'button', ...dataIcon(lichess.mic?.isBusy ? '' : '') },
         hook: onInsert(el => {
           el.addEventListener('click', _ => {
+            if (!rtfm()) {
+              setTimeout(() =>
+                alert(
+                  `Voice beta has changed. Please read the rewritten first section of the help page (the 'i' button) or you will fail every pie attack.`
+                )
+              );
+              rtfm(true);
+            }
             rec(!(lichess.mic?.isListening || lichess.mic?.isBusy)) ? lichess.mic?.start() : lichess.mic?.stop();
           });
           if (rec() && !lichess.mic?.isListening) setTimeout(() => el.dispatchEvent(new Event('click')));
