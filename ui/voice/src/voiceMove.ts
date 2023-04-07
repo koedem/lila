@@ -215,7 +215,10 @@ class VoiceMoveCtrl implements VoiceMove {
 
   chooseMoves(m: [string, number][], conf: number) {
     if (m.length === 0) return false;
-    if ((m.length === 1 && m[0][1] < 0.4) || m[1][1] - m[0][1] > [0.7, 0.5, 0.3][this.clarityPref()]) {
+    if (
+      (m.length === 1 && m[0][1] < 0.4) ||
+      (m.length > 1 && m[1][1] - m[0][1] > [0.7, 0.5, 0.3][this.clarityPref()])
+    ) {
       if (this.debug) console.log('chooseMoves', `chose '${m[0][0]}' cost=${m[0][1]} conf=${conf}`);
       this.submit(m[0][0]);
       return true;
