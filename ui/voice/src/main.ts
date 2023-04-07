@@ -29,9 +29,7 @@ export function renderVoiceMove(ctrl: VoiceMove, isPuzzle: boolean) {
           el.addEventListener('click', _ => {
             if (!rtfm()) {
               setTimeout(() =>
-                alert(
-                  `Voice beta has changed. Please read the rewritten first section of the help page (the 'i' button) or you will fail every pie attack.`
-                )
+                alert(`Read the help page (the 'i' button) before using your microphone to make moves.`)
               );
               rtfm(true);
             }
@@ -105,6 +103,27 @@ function voiceSettings(ctrl: VoiceMove): VNode {
               [h('label', pref)]
             )
           )
+        ),
+      ]),
+      h('div.setting', [
+        h('label', { attrs: { for: 'lang' } }, 'Language'),
+        h(
+          'select#lang',
+          {
+            attrs: { name: 'lang' },
+            hook: bind('change', e => ctrl.langPref((e.target as HTMLSelectElement).value)),
+          },
+          [
+            ...ctrl.supportedLangs.map(l =>
+              h(
+                'option',
+                {
+                  attrs: l[0] === ctrl.lang ? { value: l[0], selected: '' } : { value: l[0] },
+                },
+                l[1]
+              )
+            ),
+          ]
         ),
       ]),
     ]
